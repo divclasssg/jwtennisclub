@@ -7,7 +7,12 @@ const publicEnvSchema = z.object({
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
 
-export function readPublicEnv(source: NodeJS.ProcessEnv): PublicEnv {
+type PublicEnvSource = {
+  NEXT_PUBLIC_SUPABASE_URL?: string;
+  NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
+};
+
+export function readPublicEnv(source: PublicEnvSource): PublicEnv {
   const parsed = publicEnvSchema.safeParse(source);
 
   if (!parsed.success) {
@@ -18,5 +23,8 @@ export function readPublicEnv(source: NodeJS.ProcessEnv): PublicEnv {
 }
 
 export function getPublicEnv(): PublicEnv {
-  return readPublicEnv(process.env);
+  return readPublicEnv({
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  });
 }
