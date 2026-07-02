@@ -12,25 +12,39 @@ const protectedPrefixes = [
   "/settings",
 ];
 
+function redirectWithSessionCookies(url: URL, response: NextResponse) {
+  const redirectResponse = NextResponse.redirect(url);
+  response.cookies.getAll().forEach((cookie) => {
+    redirectResponse.cookies.set(cookie);
+  });
+  return redirectResponse;
+}
+
+function isProtectedPath(pathname: string) {
+  return protectedPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
-  const isProtected = protectedPrefixes.some((prefix) =>
-    pathname.startsWith(prefix),
-  );
+  const isProtected = isProtectedPath(pathname);
 
   if (isProtected && !user) {
+    const requestedPath = `${pathname}${request.nextUrl.search}`;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    url.search = "";
+    url.searchParams.set("next", requestedPath);
+    return redirectWithSessionCookies(url, response);
   }
 
   if (pathname === "/login" && user) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirectWithSessionCookies(url, response);
   }
 
   return response;
