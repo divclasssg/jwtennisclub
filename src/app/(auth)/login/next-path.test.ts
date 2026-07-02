@@ -12,6 +12,10 @@ describe("normalizeLoginNext", () => {
 
   it.each([
     ["//evil.example"],
+    ["/\\\\evil.example"],
+    ["/\\evil.example"],
+    ["/members\\profile"],
+    ["\\evil.example"],
     ["https://evil.example"],
     [""],
     ["members"],

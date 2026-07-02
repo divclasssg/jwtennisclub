@@ -1,4 +1,5 @@
 export const DEFAULT_LOGIN_NEXT = "/dashboard";
+const LOGIN_NEXT_PARSE_ORIGIN = "https://jwtennisclub.local";
 
 export type LoginSearchParam = string | string[] | undefined;
 
@@ -13,11 +14,24 @@ export function normalizeLoginNext(value: unknown) {
     return DEFAULT_LOGIN_NEXT;
   }
 
-  if (next === "" || !next.startsWith("/") || next.startsWith("//")) {
+  if (next === "" || !next.startsWith("/") || next.includes("\\")) {
     return DEFAULT_LOGIN_NEXT;
   }
 
-  return next;
+  try {
+    const url = new URL(next, LOGIN_NEXT_PARSE_ORIGIN);
+
+    if (
+      url.origin !== LOGIN_NEXT_PARSE_ORIGIN ||
+      !url.pathname.startsWith("/")
+    ) {
+      return DEFAULT_LOGIN_NEXT;
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return DEFAULT_LOGIN_NEXT;
+  }
 }
 
 export function buildLoginErrorRedirect(error: string, next: unknown) {
