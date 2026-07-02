@@ -26,7 +26,9 @@ create table public.profiles (
   updated_at timestamptz not null default now()
 );
 
-create or replace function public.is_active_operator(user_id uuid)
+drop function if exists public.is_active_operator(uuid);
+
+create or replace function public.is_active_operator()
 returns boolean
 language sql
 security definer
@@ -36,10 +38,13 @@ as $$
   select exists (
     select 1
     from public.profiles
-    where profiles.id = user_id
+    where profiles.id = auth.uid()
       and profiles.status = 'active'
   );
 $$;
+
+revoke execute on function public.is_active_operator() from public, anon;
+grant execute on function public.is_active_operator() to authenticated;
 
 create table public.audit_logs (
   id uuid primary key default gen_random_uuid(),
@@ -102,27 +107,27 @@ alter table public.audit_logs enable row level security;
 create policy "authenticated operators can read roles"
 on public.roles for select
 to authenticated
-using (public.is_active_operator(auth.uid()));
+using (public.is_active_operator());
 
 create policy "authenticated operators can read role permissions"
 on public.role_permissions for select
 to authenticated
-using (public.is_active_operator(auth.uid()));
+using (public.is_active_operator());
 
 create policy "operators can read active profiles"
 on public.profiles for select
 to authenticated
-using (public.is_active_operator(auth.uid()) and status = 'active');
+using (public.is_active_operator() and status = 'active');
 
 create policy "operators can read audit logs"
 on public.audit_logs for select
 to authenticated
-using (public.is_active_operator(auth.uid()));
+using (public.is_active_operator());
 
 create policy "operators can create audit logs"
 on public.audit_logs for insert
 to authenticated
-with check (public.is_active_operator(auth.uid()) and actor_profile_id = auth.uid());
+with check (public.is_active_operator() and actor_profile_id = auth.uid());
 
 insert into storage.buckets (id, name, public)
 values ('receipts', 'receipts', false)
@@ -131,20 +136,20 @@ on conflict (id) do update set public = false;
 create policy "active operators can read receipts objects"
 on storage.objects for select
 to authenticated
-using (bucket_id = 'receipts' and public.is_active_operator(auth.uid()));
+using (bucket_id = 'receipts' and public.is_active_operator());
 
 create policy "active operators can create receipts objects"
 on storage.objects for insert
 to authenticated
-with check (bucket_id = 'receipts' and public.is_active_operator(auth.uid()));
+with check (bucket_id = 'receipts' and public.is_active_operator());
 
 create policy "active operators can update receipts objects"
 on storage.objects for update
 to authenticated
-using (bucket_id = 'receipts' and public.is_active_operator(auth.uid()))
-with check (bucket_id = 'receipts' and public.is_active_operator(auth.uid()));
+using (bucket_id = 'receipts' and public.is_active_operator())
+with check (bucket_id = 'receipts' and public.is_active_operator());
 
 create policy "active operators can delete receipts objects"
 on storage.objects for delete
 to authenticated
-using (bucket_id = 'receipts' and public.is_active_operator(auth.uid()));
+using (bucket_id = 'receipts' and public.is_active_operator());
