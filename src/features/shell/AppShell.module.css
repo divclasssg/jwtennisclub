@@ -85,7 +85,7 @@
 }
 
 .logoutButton {
-  min-height: 36px;
+  min-height: 40px;
   padding: 8px 14px;
   border: 1px solid var(--hairline);
   border-radius: 9999px;
@@ -142,8 +142,8 @@
 
   .navLink {
     flex: 0 0 auto;
-    min-height: 36px;
-    padding: 8px 10px;
+    min-height: 44px;
+    padding: 10px 12px;
     background: var(--surface-pearl);
     font-size: 13px;
   }
@@ -153,6 +153,11 @@
     min-height: 58px;
     padding: 10px 16px;
     background: var(--surface-parchment);
+  }
+
+  .logoutButton {
+    min-height: 44px;
+    padding: 10px 14px;
   }
 
   .content {

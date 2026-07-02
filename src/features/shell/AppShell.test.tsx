@@ -22,6 +22,17 @@ vi.mock("@/app/(auth)/login/actions", () => ({
   logout: vi.fn(),
 }));
 
+const requiredNavigationItems = [
+  { href: "/dashboard", label: "대시보드" },
+  { href: "/members", label: "회원" },
+  { href: "/fees", label: "회비" },
+  { href: "/expenses", label: "지출" },
+  { href: "/schedule", label: "일정" },
+  { href: "/settlements", label: "정산" },
+  { href: "/reports", label: "PDF" },
+  { href: "/settings", label: "설정" },
+];
+
 describe("AppShell", () => {
   it("renders the Korean primary navigation and logout action", () => {
     render(
@@ -33,18 +44,13 @@ describe("AppShell", () => {
     expect(screen.getAllByText("JW Tennis Club").length).toBeGreaterThan(0);
     const nav = screen.getByLabelText("주요 메뉴");
 
-    expect(within(nav).getByRole("link", { name: "대시보드" })).toHaveAttribute(
-      "href",
-      "/dashboard",
-    );
-    expect(within(nav).getByRole("link", { name: "회원" })).toHaveAttribute(
-      "href",
-      "/members",
-    );
-    expect(within(nav).getByRole("link", { name: "PDF" })).toHaveAttribute(
-      "href",
-      "/reports",
-    );
+    for (const item of requiredNavigationItems) {
+      expect(within(nav).getByRole("link", { name: item.label })).toHaveAttribute(
+        "href",
+        item.href,
+      );
+    }
+
     expect(screen.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "업무 화면" })).toBeInTheDocument();
   });

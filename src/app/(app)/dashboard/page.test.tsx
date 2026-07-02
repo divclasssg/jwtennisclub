@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import DashboardPage from "./page";
 
@@ -10,10 +10,13 @@ describe("DashboardPage", () => {
       screen.getByRole("heading", { name: "운영 대시보드" }),
     ).toBeInTheDocument();
     expect(screen.getByText("2026년 7월")).toBeInTheDocument();
-    expect(screen.getByText("회비 수입")).toBeInTheDocument();
-    expect(screen.getByText("운영비 지출")).toBeInTheDocument();
-    expect(screen.getByText("미납 회원")).toBeInTheDocument();
-    expect(screen.getByText("정산 상태")).toBeInTheDocument();
-    expect(screen.getByText("진행 중")).toBeInTheDocument();
+
+    const metrics = screen.getByRole("region", { name: "월간 운영 지표" });
+
+    expect(within(metrics).getByText("회비 수입", { selector: "dt" })).toBeInTheDocument();
+    expect(within(metrics).getByText("운영비 지출", { selector: "dt" })).toBeInTheDocument();
+    expect(within(metrics).getByText("미납 회원", { selector: "dt" })).toBeInTheDocument();
+    expect(within(metrics).getByText("정산 상태", { selector: "dt" })).toBeInTheDocument();
+    expect(within(metrics).getByText("진행 중")).toBeInTheDocument();
   });
 });

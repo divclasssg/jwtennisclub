@@ -20,15 +20,17 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className={styles.metrics} aria-label="월간 운영 지표">
-        {metrics.map((metric) => (
-          <article className={styles.metricCard} key={metric.label}>
-            <p className={styles.metricLabel}>{metric.label}</p>
-            <p className={styles.metricValue}>{metric.value}</p>
-            <p className={styles.metricNote}>{metric.note}</p>
-          </article>
-        ))}
-      </div>
+      <section aria-label="월간 운영 지표">
+        <dl className={styles.metrics}>
+          {metrics.map((metric) => (
+            <div className={styles.metricCard} key={metric.label}>
+              <dt className={styles.metricLabel}>{metric.label}</dt>
+              <dd className={styles.metricValue}>{metric.value}</dd>
+              <dd className={styles.metricNote}>{metric.note}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
 
       <section className={styles.panel} aria-labelledby="work-queue-title">
         <div>
