@@ -17,24 +17,29 @@ export const PERMISSIONS = [
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
-export type RoleName = "admin" | "operator";
+export type DefaultRoleName = "admin" | "operator";
+export type RoleName = DefaultRoleName | (string & {});
 
-export type RolePermissionMap = Record<RoleName, Permission[]>;
+export type RolePermissionMap = Readonly<
+  Record<string, readonly Permission[] | undefined>
+>;
 
-export const DEFAULT_ROLE_PERMISSIONS: RolePermissionMap = {
-  admin: [...PERMISSIONS],
-  operator: [
+export const DEFAULT_ROLE_PERMISSIONS: Readonly<
+  Record<DefaultRoleName, readonly Permission[]>
+> = Object.freeze({
+  admin: Object.freeze([...PERMISSIONS]),
+  operator: Object.freeze([
     "members.view",
     "fees.payments.create",
     "expenses.create",
     "events.create",
-  ],
-};
+  ] as const),
+});
 
 export function hasPermission(
   role: RoleName,
   permission: Permission,
   permissionMap: RolePermissionMap = DEFAULT_ROLE_PERMISSIONS,
 ): boolean {
-  return permissionMap[role].includes(permission);
+  return permissionMap[role]?.includes(permission) ?? false;
 }
