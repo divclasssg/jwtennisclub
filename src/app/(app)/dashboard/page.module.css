@@ -1,0 +1,156 @@
+.page {
+  display: grid;
+  gap: 24px;
+}
+
+.heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.month,
+.summary,
+.metricLabel,
+.metricValue,
+.metricNote,
+.panelLabel {
+  margin: 0;
+}
+
+.month {
+  color: var(--action-blue);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.heading h1 {
+  margin: 6px 0 0;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.summary {
+  max-width: 380px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metricCard,
+.panel {
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--canvas);
+}
+
+.metricCard {
+  min-width: 0;
+  padding: 16px;
+}
+
+.metricLabel {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.metricValue {
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.metricNote {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.panel {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  padding: 20px;
+}
+
+.panelLabel {
+  color: var(--action-blue);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.panel h2 {
+  margin: 6px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.queue {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+  list-style: none;
+}
+
+.queue li {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--divider-soft);
+}
+
+.queue li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+@media (max-width: 920px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .heading {
+    display: grid;
+    gap: 12px;
+  }
+
+  .heading h1 {
+    font-size: 24px;
+  }
+
+  .summary {
+    max-width: none;
+    text-align: left;
+  }
+
+  .metrics,
+  .panel {
+    grid-template-columns: 1fr;
+  }
+
+  .metricValue {
+    font-size: 22px;
+  }
+}
