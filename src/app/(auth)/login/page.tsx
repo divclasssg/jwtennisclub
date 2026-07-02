@@ -1,20 +1,22 @@
 import { login } from "./actions";
 import styles from "./login.module.css";
+import { firstSearchParam, normalizeLoginNext } from "./next-path";
 
 type LoginPageProps = {
   searchParams: Promise<{
-    next?: string;
-    error?: string;
+    next?: string | string[];
+    error?: string | string[];
   }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
-  const next = params.next ?? "/dashboard";
+  const next = normalizeLoginNext(params.next);
+  const error = firstSearchParam(params.error);
   const errorMessage =
-    params.error === "missing-fields"
+    error === "missing-fields"
       ? "이메일과 비밀번호를 입력하세요."
-      : params.error === "invalid-credentials"
+      : error === "invalid-credentials"
         ? "로그인 정보가 올바르지 않습니다."
         : null;
 

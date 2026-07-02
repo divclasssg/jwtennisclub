@@ -2,14 +2,15 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { buildLoginErrorRedirect, normalizeLoginNext } from "./next-path";
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = String(formData.get("next") ?? "/dashboard");
+  const next = normalizeLoginNext(formData.get("next"));
 
   if (!email || !password) {
-    redirect("/login?error=missing-fields");
+    redirect(buildLoginErrorRedirect("missing-fields", next));
   }
 
   const supabase = await createClient();
@@ -19,10 +20,10 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    redirect("/login?error=invalid-credentials");
+    redirect(buildLoginErrorRedirect("invalid-credentials", next));
   }
 
-  redirect(next.startsWith("/") ? next : "/dashboard");
+  redirect(next);
 }
 
 export async function logout() {
