@@ -1,5 +1,5 @@
-import { login } from "./actions";
-import styles from "./login.module.css";
+﻿import { login } from "./actions";
+import styles from "./login.module.scss";
 import { firstSearchParam, normalizeLoginNext } from "./next-path";
 
 type LoginPageProps = {
@@ -21,14 +21,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         : null;
 
   return (
-    <main className={styles.page}>
-      <section className={styles.panel}>
-        <p className={styles.eyebrow}>JW Tennis Club</p>
+    <main className={styles["login-page"]}>
+      <section className={styles["login-panel"]}>
+        <p className={styles["login-eyebrow"]}>JW Tennis Club</p>
         <h1>운영 장부 로그인</h1>
-        <p className={styles.description}>
-          회원, 회비, 지출, 일정과 월간 정산을 관리합니다.
+        <p className={styles["login-description"]}>
+          회원, 회비, 지출 일정을 월간 정산과 관리합니다.
         </p>
-        <form action={login} className={styles.form}>
+        <form action={login} className={styles["login-form"]}>
           <input type="hidden" name="next" value={next} />
           <label>
             이메일
@@ -44,7 +44,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             />
           </label>
           <button type="submit">로그인</button>
-          {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
+          {errorMessage ? (
+            <p className={styles["login-error"]}>{errorMessage}</p>
+          ) : null}
         </form>
       </section>
     </main>

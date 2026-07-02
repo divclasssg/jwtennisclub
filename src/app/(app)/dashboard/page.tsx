@@ -1,4 +1,4 @@
-import styles from "./page.module.css";
+﻿import styles from "./page.module.scss";
 
 const metrics = [
   { label: "회비 수입", value: "0원", note: "이번 달 입금 합계" },
@@ -9,35 +9,44 @@ const metrics = [
 
 export default function DashboardPage() {
   return (
-    <section className={styles.page}>
-      <div className={styles.heading}>
+    <section className={styles["dashboard-page"]}>
+      <div className={styles["dashboard-heading"]}>
         <div>
-          <p className={styles.month}>2026년 7월</p>
+          <p className={styles["dashboard-month"]}>2026년 7월</p>
           <h1>운영 대시보드</h1>
         </div>
-        <p className={styles.summary}>
-          회원, 회비, 지출, 일정 데이터를 월간 정산 기준으로 확인합니다.
+        <p className={styles["dashboard-summary"]}>
+          회원, 회비, 지출 일정 데이터를 월간 정산 기준으로 확인합니다.
         </p>
       </div>
 
       <section aria-label="월간 운영 지표">
-        <dl className={styles.metrics}>
+        <dl className={styles["dashboard-metrics"]}>
           {metrics.map((metric) => (
-            <div className={styles.metricCard} key={metric.label}>
-              <dt className={styles.metricLabel}>{metric.label}</dt>
-              <dd className={styles.metricValue}>{metric.value}</dd>
-              <dd className={styles.metricNote}>{metric.note}</dd>
+            <div className={styles["dashboard-metric-card"]} key={metric.label}>
+              <dt className={styles["dashboard-metric-label"]}>
+                {metric.label}
+              </dt>
+              <dd className={styles["dashboard-metric-value"]}>
+                {metric.value}
+              </dd>
+              <dd className={styles["dashboard-metric-note"]}>
+                {metric.note}
+              </dd>
             </div>
           ))}
         </dl>
       </section>
 
-      <section className={styles.panel} aria-labelledby="work-queue-title">
+      <section
+        className={styles["dashboard-panel"]}
+        aria-labelledby="work-queue-title"
+      >
         <div>
-          <p className={styles.panelLabel}>작업 대기</p>
+          <p className={styles["dashboard-panel-label"]}>작업 대기</p>
           <h2 id="work-queue-title">오늘 확인할 항목</h2>
         </div>
-        <ul className={styles.queue}>
+        <ul className={styles["dashboard-queue"]}>
           <li>신규 회원 등록 및 연락처 확인</li>
           <li>7월 회비 입금 내역 대조</li>
           <li>운영비 영수증 입력 준비</li>

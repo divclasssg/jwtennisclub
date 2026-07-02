@@ -1,0 +1,68 @@
+# JW Tennis Club SaaS Work Log
+
+## 2026-07-02
+
+### Completed
+- Added Apple design guide as `DESIGN-apple.md`.
+- Defined the product as an internal SaaS ledger for tennis club operators.
+- Documented the main goals: member management, membership fee management, expenses, schedules, monthly settlement, and PDF reporting.
+- Implemented the foundation branch with Supabase auth, role-based access foundations, app shell, login flow, dashboard, tests, and migration SQL.
+- Added Supabase migration at `supabase/migrations/202607020001_foundation.sql`.
+- Added environment validation for `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- Merged the foundation work into `main`.
+- Removed the temporary `.worktrees/foundation` Git worktree and related metadata.
+- Ran `npm install` in the main workspace after merging.
+- Verified the merged foundation with test, lint, typecheck, and build commands.
+- Pushed `main` to GitHub.
+- Created local `.env.local` with Supabase project URL and anon key.
+- Confirmed Supabase `roles` and `profiles` tables exist.
+- Registered the initial admin profile in Supabase.
+- Named Supabase SQL Editor queries:
+  - `001_foundation_schema_and_roles`
+  - `002_seed_initial_admin_profile`
+- Converted app styles from CSS to SCSS.
+- Added `sass` as a dev dependency.
+- Renamed CSS Module classes to kebab-case hyphen names.
+- Corrected the style naming rule to avoid arbitrary prefixes and keep meaningful hyphen class names such as `shell-nav-link`.
+
+### Verification Evidence
+- `npm run test`: 7 files passed, 33 tests passed.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
+- `npm run build`: passed.
+- Production build output included `Proxy (Middleware)`.
+- SCSS conversion verification passed with test, lint, typecheck, and build.
+
+### Product Decisions
+- The service is for tennis club operators.
+- General members may receive monthly PDF reports, but they are not the primary app users yet.
+- Fee payment method selection is unnecessary because payments are managed as bank transfers.
+- Admin and operator roles can have multiple users.
+- Role permission editing must be supported later.
+- Member records should include join date and withdrawal date.
+- Any operator can generate monthly PDFs.
+- A monthly PDF for a completed month becomes available on the 1st day of the next month.
+
+### Technical Decisions
+- Supabase Auth is used for login and session management.
+- Supabase Postgres is used for app data.
+- `roles`, `role_permissions`, and `profiles` provide the permission foundation.
+- The first admin is registered manually through SQL because the app does not yet have an operator management screen.
+- `.env.local` is not committed because `.env*` is ignored.
+- `src/proxy.ts` is the correct Next.js proxy location for this project structure.
+- Style files use `.scss` and `.module.scss`.
+- CSS Module class names use kebab-case hyphen names and TSX bracket access.
+
+### Issues And Lessons
+- The temporary worktree was useful for isolating the foundation implementation, but it confused project location until merged back into `main`.
+- Deleting `.worktrees/foundation` failed at first because Windows permissions and Next build cache files blocked removal.
+- Next telemetry Node processes may keep files under `.next` active after verification.
+- Removing a worktree may require deleting both the worktree folder and `.git/worktrees/<name>` metadata when Git cannot prune it.
+- Verification must be run from the final `main` workspace, not only from a temporary worktree.
+
+## Next Planned Work
+- Revise the current foundation UI design before starting member management.
+- Implement member management first.
+- Define the member data model before building screens.
+- Build member list, create, edit, and withdrawal flows.
+- After member management, proceed to fee payment tracking.

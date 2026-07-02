@@ -1,41 +1,41 @@
-.page {
+.dashboard-page {
   display: grid;
   gap: 24px;
 }
 
-.heading {
+.dashboard-heading {
   display: flex;
   align-items: end;
   justify-content: space-between;
   gap: 24px;
   padding-bottom: 20px;
   border-bottom: 1px solid var(--hairline);
+
+  h1 {
+    margin: 6px 0 0;
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
 }
 
-.month,
-.summary,
-.metricLabel,
-.metricValue,
-.metricNote,
-.panelLabel {
+.dashboard-month,
+.dashboard-summary,
+.dashboard-metric-label,
+.dashboard-metric-value,
+.dashboard-metric-note,
+.dashboard-panel-label {
   margin: 0;
 }
 
-.month {
+.dashboard-month {
   color: var(--action-blue);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.25;
 }
 
-.heading h1 {
-  margin: 6px 0 0;
-  font-size: 28px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.summary {
+.dashboard-summary {
   max-width: 380px;
   color: var(--muted);
   font-size: 14px;
@@ -43,7 +43,7 @@
   text-align: right;
 }
 
-.metrics {
+.dashboard-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
@@ -51,25 +51,25 @@
   padding: 0;
 }
 
-.metricCard,
-.panel {
+.dashboard-metric-card,
+.dashboard-panel {
   border: 1px solid var(--hairline);
   border-radius: 8px;
   background: var(--canvas);
 }
 
-.metricCard {
+.dashboard-metric-card {
   min-width: 0;
   padding: 16px;
 }
 
-.metricLabel {
+.dashboard-metric-label {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.25;
 }
 
-.metricValue {
+.dashboard-metric-value {
   margin-top: 10px;
   overflow-wrap: anywhere;
   font-size: 24px;
@@ -77,35 +77,35 @@
   line-height: 1.15;
 }
 
-.metricNote {
+.dashboard-metric-note {
   margin-top: 10px;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
 }
 
-.panel {
+.dashboard-panel {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 24px;
   padding: 20px;
+
+  h2 {
+    margin: 6px 0 0;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
 }
 
-.panelLabel {
+.dashboard-panel-label {
   color: var(--action-blue);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.25;
 }
 
-.panel h2 {
-  margin: 6px 0 0;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.queue {
+.dashboard-queue {
   display: grid;
   gap: 10px;
   margin: 0;
@@ -114,45 +114,45 @@
   font-size: 14px;
   line-height: 1.45;
   list-style: none;
-}
 
-.queue li {
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--divider-soft);
-}
+  li {
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--divider-soft);
 
-.queue li:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
+    &:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+  }
 }
 
 @media (max-width: 920px) {
-  .metrics {
+  .dashboard-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
-  .heading {
+  .dashboard-heading {
     display: grid;
     gap: 12px;
+
+    h1 {
+      font-size: 24px;
+    }
   }
 
-  .heading h1 {
-    font-size: 24px;
-  }
-
-  .summary {
+  .dashboard-summary {
     max-width: none;
     text-align: left;
   }
 
-  .metrics,
-  .panel {
+  .dashboard-metrics,
+  .dashboard-panel {
     grid-template-columns: 1fr;
   }
 
-  .metricValue {
+  .dashboard-metric-value {
     font-size: 22px;
   }
 }

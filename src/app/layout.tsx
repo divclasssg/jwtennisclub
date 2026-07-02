@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import "./globals.css";
+import "./globals.scss";
 
 export const metadata: Metadata = {
   title: "JW Tennis Club 운영 관리",

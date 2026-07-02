@@ -6,7 +6,7 @@
   color: var(--ink);
 }
 
-.sidebar {
+.shell-sidebar {
   position: sticky;
   top: 0;
   display: flex;
@@ -18,7 +18,7 @@
   background: var(--canvas);
 }
 
-.brand {
+.shell-brand {
   padding: 0 8px;
   font-size: 17px;
   font-weight: 600;
@@ -26,12 +26,12 @@
   color: var(--ink);
 }
 
-.nav {
+.shell-nav {
   display: grid;
   gap: 4px;
 }
 
-.navLink {
+.shell-nav-link {
   display: flex;
   align-items: center;
   min-height: 40px;
@@ -41,18 +41,18 @@
   font-size: 14px;
   line-height: 1.25;
   white-space: nowrap;
+
+  &:hover {
+    background: var(--surface-pearl);
+    color: var(--action-blue);
+  }
 }
 
-.navLink:hover {
-  background: var(--surface-pearl);
-  color: var(--action-blue);
-}
-
-.workspace {
+.shell-workspace {
   min-width: 0;
 }
 
-.header {
+.shell-header {
   position: sticky;
   top: 0;
   z-index: 10;
@@ -66,25 +66,25 @@
   background: var(--surface-parchment);
 }
 
-.kicker,
-.headerTitle {
+.shell-kicker,
+.shell-header-title {
   margin: 0;
 }
 
-.kicker {
+.shell-kicker {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.2;
 }
 
-.headerTitle {
+.shell-header-title {
   margin-top: 3px;
   font-size: 17px;
   font-weight: 600;
   line-height: 1.25;
 }
 
-.logoutButton {
+.shell-logout-button {
   min-height: 40px;
   padding: 8px 14px;
   border: 1px solid var(--hairline);
@@ -95,13 +95,13 @@
   font-size: 14px;
   line-height: 1.2;
   white-space: nowrap;
+
+  &:active {
+    transform: scale(0.98);
+  }
 }
 
-.logoutButton:active {
-  transform: scale(0.98);
-}
-
-.content {
+.shell-content {
   width: min(100%, 1180px);
   margin: 0 auto;
   padding: 32px;
@@ -112,7 +112,7 @@
     display: block;
   }
 
-  .sidebar {
+  .shell-sidebar {
     position: sticky;
     top: 0;
     z-index: 20;
@@ -123,24 +123,24 @@
     border-bottom: 1px solid var(--hairline);
   }
 
-  .brand {
+  .shell-brand {
     padding: 0;
     font-size: 16px;
   }
 
-  .nav {
+  .shell-nav {
     display: flex;
     gap: 6px;
     overflow-x: auto;
     padding-bottom: 2px;
     scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 
-  .nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .navLink {
+  .shell-nav-link {
     flex: 0 0 auto;
     min-height: 44px;
     padding: 10px 12px;
@@ -148,19 +148,19 @@
     font-size: 13px;
   }
 
-  .header {
+  .shell-header {
     position: static;
     min-height: 58px;
     padding: 10px 16px;
     background: var(--surface-parchment);
   }
 
-  .logoutButton {
+  .shell-logout-button {
     min-height: 44px;
     padding: 10px 14px;
   }
 
-  .content {
+  .shell-content {
     padding: 20px 16px 28px;
   }
 }
