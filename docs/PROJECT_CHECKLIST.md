@@ -21,7 +21,7 @@
 - [x] Admin/operator profile auto-add migration added for member records
 - [x] Member management screen flow verified
 - [x] Member management feature implemented
-- [ ] Membership fee management feature implemented
+- [x] Membership fee management feature implemented
 - [ ] Expense management feature implemented
 - [ ] Schedule management feature implemented
 - [ ] Monthly settlement feature implemented
@@ -32,7 +32,7 @@
 - [ ] Implement member tabs for separate active and withdrawn member management
 - [x] Define membership fee payment records
 - [x] Implement fee payment list and monthly filters
-- [ ] Implement fee payment CSV upload
+- [x] Implement fee payment CSV upload
 - [x] Implement fee payment cancellation handling
 - [x] Execute Supabase fee payment schema query
 - [x] Verify fee payment screen flow in browser

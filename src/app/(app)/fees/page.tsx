@@ -1,3 +1,4 @@
+import Link from "next/link";
 import styles from "./page.module.scss";
 import { cancelFeePayment, createFeePayment } from "./actions";
 import { createClient } from "@/lib/supabase/server";
@@ -184,6 +185,7 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
             월을 선택한 뒤 회원별 납부 상태를 바로 확인하고 미납 행에서 즉시
             납부 처리합니다. 기본 회비는 30,000원입니다.
           </p>
+          <Link href="/fees/new">CSV 등록</Link>
         </div>
       </header>
 

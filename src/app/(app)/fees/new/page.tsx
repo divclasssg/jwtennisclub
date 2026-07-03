@@ -1,100 +1,86 @@
-import { createFeePayment } from "../actions";
+import { importFeePaymentsCsv } from "../actions";
 import styles from "./page.module.scss";
-import { FeePaymentForm } from "@/features/fees/FeePaymentForm";
-import {
-  getCurrentPeriodMonth,
-  normalizePeriodMonth,
-} from "@/features/fees/fee-model";
-import { firstSearchParam, mapMemberRow } from "@/features/members/member-list";
-import { createClient } from "@/lib/supabase/server";
+import { firstSearchParam } from "@/features/members/member-list";
 
 type NewFeePaymentPageProps = {
   searchParams: Promise<{
-    error?: string | string[];
-    month?: string | string[];
+    importError?: string | string[];
+    line?: string | string[];
   }>;
 };
 
-function getErrorMessage(error: string | undefined) {
-  if (error === "invalid-member") {
-    return "회원을 선택하세요.";
+function getImportErrorMessage(error: string | undefined, line: string | undefined) {
+  const prefix = line ? `${line}번째 줄을 확인하세요. ` : "";
+
+  if (error === "missing-file") {
+    return "CSV 파일을 선택하세요.";
   }
 
-  if (error === "invalid-period-month") {
-    return "납부 월을 확인하세요.";
+  if (error === "invalid-csv") {
+    return `${prefix}CSV 형식 또는 입력값을 확인하세요.`;
   }
 
-  if (error === "invalid-amount") {
-    return "납부 금액을 확인하세요.";
+  if (error === "too-many-rows") {
+    return "CSV는 한 번에 200명 이하로 등록하세요.";
   }
 
-  if (error === "invalid-paid-date") {
-    return "납부일을 확인하세요.";
+  if (error === "member-load-failed") {
+    return "회원 목록을 불러오지 못했습니다.";
+  }
+
+  if (error === "member-not-found") {
+    return `${prefix}활동 회원 목록에서 이름과 전화번호 끝 4자리가 일치하는 회원을 찾지 못했습니다.`;
   }
 
   if (error === "save-failed") {
-    return "납부 기록을 저장하지 못했습니다. 중복 기록, 권한, 입력값을 확인하세요.";
+    return "CSV 납부 기록을 저장하지 못했습니다. 중복 기록, 권한, 입력값을 확인하세요.";
   }
 
   return null;
-}
-
-async function getActiveMembers() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("members")
-    .select(
-      "id, name, phone_last_four, status, joined_date, withdrawn_date, withdrawal_reason, memo",
-    )
-    .eq("status", "active")
-    .order("name", { ascending: true });
-
-  if (error) {
-    throw new Error("납부 등록 대상 회원을 불러오지 못했습니다.");
-  }
-
-  return (data ?? []).map(mapMemberRow);
-}
-
-function getTodayInputValue() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 export default async function NewFeePaymentPage({
   searchParams,
 }: NewFeePaymentPageProps) {
   const params = await searchParams;
-  const defaultPeriodMonth =
-    normalizePeriodMonth(firstSearchParam(params.month)) || getCurrentPeriodMonth();
-  const members = await getActiveMembers();
-  const errorMessage = getErrorMessage(firstSearchParam(params.error));
+  const importErrorMessage = getImportErrorMessage(
+    firstSearchParam(params.importError),
+    firstSearchParam(params.line),
+  );
 
   return (
     <section className={styles["fee-create-page"]}>
       <header className={styles["fee-create-header"]}>
         <div>
           <p className={styles["fee-create-kicker"]}>회비 납부</p>
-          <h1>납부 등록</h1>
+          <h1>CSV 등록</h1>
         </div>
         <p>
-          입금 확인이 끝난 회원의 납부 월, 금액, 납부일을 기록합니다. 같은
-          회원과 같은 월은 한 번만 등록할 수 있습니다.
+          입금 내역 CSV를 업로드해 여러 회원의 회비 납부 기록을 한 번에
+          등록합니다. 같은 회원과 같은 월은 한 번만 등록할 수 있습니다.
         </p>
       </header>
 
       <section className={styles["fee-create-panel"]}>
         <div className={styles["fee-section-header"]}>
-          <h2>납부 정보</h2>
-          <p>활동 중인 회원만 납부 등록 대상에 표시됩니다.</p>
+          <h2>업로드 파일</h2>
+          <p>
+            name, phoneLastFour, periodMonth, amount, paidDate, memo 순서로
+            여러 납부 기록을 한 번에 등록합니다.
+          </p>
         </div>
-        <FeePaymentForm
-          action={createFeePayment}
-          defaultPaidDate={getTodayInputValue()}
-          defaultPeriodMonth={defaultPeriodMonth}
-          members={members}
-        />
-        {errorMessage ? (
-          <p className={styles["fee-form-error"]}>{errorMessage}</p>
+        <form
+          action={importFeePaymentsCsv}
+          className={styles["fee-csv-form"]}
+        >
+          <label>
+            CSV 파일
+            <input accept=".csv,text/csv" name="csvFile" required type="file" />
+          </label>
+          <button type="submit">CSV 등록</button>
+        </form>
+        {importErrorMessage ? (
+          <p className={styles["fee-form-error"]}>{importErrorMessage}</p>
         ) : null}
       </section>
     </section>

@@ -6,6 +6,20 @@ const mocks = vi.hoisted(() => {
   };
   const feePaymentsTable = {
     delete: vi.fn(() => deleteQuery),
+    insert: vi.fn(async () => ({ error: null })),
+  };
+  const membersQuery = {
+    select: vi.fn(() => membersQuery),
+    eq: vi.fn(async () => ({
+      data: [
+        {
+          id: "member-1",
+          name: "김민수",
+          phone_last_four: "1234",
+        },
+      ],
+      error: null,
+    })),
   };
   const supabase = {
     auth: {
@@ -15,17 +29,22 @@ const mocks = vi.hoisted(() => {
       })),
     },
     from: vi.fn((table: string) => {
-      if (table !== "fee_payments") {
-        throw new Error(`Unexpected table: ${table}`);
+      if (table === "fee_payments") {
+        return feePaymentsTable;
       }
 
-      return feePaymentsTable;
+      if (table === "members") {
+        return membersQuery;
+      }
+
+        throw new Error(`Unexpected table: ${table}`);
     }),
   };
 
   return {
     deleteQuery,
     feePaymentsTable,
+    membersQuery,
     revalidatePath: vi.fn(),
     redirect: vi.fn((path: string) => {
       throw new Error(`redirect:${path}`);
@@ -46,7 +65,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => mocks.supabase),
 }));
 
-import { cancelFeePayment } from "./actions";
+import { cancelFeePayment, importFeePaymentsCsv } from "./actions";
 
 describe("fee payment actions", () => {
   beforeEach(() => {
@@ -55,8 +74,12 @@ describe("fee payment actions", () => {
     mocks.supabase.auth.getUser.mockClear();
     mocks.supabase.from.mockClear();
     mocks.feePaymentsTable.delete.mockClear();
+    mocks.feePaymentsTable.insert.mockClear();
+    mocks.membersQuery.select.mockClear();
+    mocks.membersQuery.eq.mockClear();
     mocks.deleteQuery.eq.mockClear();
     mocks.deleteQuery.eq.mockResolvedValue({ error: null });
+    mocks.feePaymentsTable.insert.mockResolvedValue({ error: null });
   });
 
   it("cancels a fee payment and returns to the selected month", async () => {
@@ -71,6 +94,42 @@ describe("fee payment actions", () => {
     expect(mocks.supabase.from).toHaveBeenCalledWith("fee_payments");
     expect(mocks.feePaymentsTable.delete).toHaveBeenCalled();
     expect(mocks.deleteQuery.eq).toHaveBeenCalledWith("id", "payment-1");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
+  });
+
+  it("imports fee payments from CSV by matching active members", async () => {
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(
+        [
+          [
+            "name,phoneLastFour,periodMonth,amount,paidDate,memo",
+            "김민수,1234,2026-07,30000,2026-07-03,7월 회비",
+          ].join("\n"),
+        ],
+        "fees.csv",
+        { type: "text/csv" },
+      ),
+    );
+
+    await expect(importFeePaymentsCsv(formData)).rejects.toThrow(
+      "redirect:/fees?status=imported&count=1&month=2026-07",
+    );
+
+    expect(mocks.supabase.from).toHaveBeenCalledWith("members");
+    expect(mocks.membersQuery.eq).toHaveBeenCalledWith("status", "active");
+    expect(mocks.feePaymentsTable.insert).toHaveBeenCalledWith([
+      {
+        member_id: "member-1",
+        period_month: "2026-07-01",
+        amount: 30000,
+        paid_date: "2026-07-03",
+        memo: "7월 회비",
+        created_by: "operator-id",
+        updated_by: "operator-id",
+      },
+    ]);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
   });
 });

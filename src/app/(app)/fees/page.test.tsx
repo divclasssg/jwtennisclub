@@ -169,6 +169,9 @@ describe("FeesPage", () => {
     expect(screen.getByLabelText("검색")).toHaveValue("김");
     expect(screen.getByLabelText("상태")).toHaveValue("all");
     expect(screen.getByText("청구 대상")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "CSV 등록" }),
+    ).toHaveAttribute("href", "/fees/new");
     expect(screen.getAllByText("미납").length).toBeGreaterThan(0);
     expect(screen.getAllByText("납부완료").length).toBeGreaterThan(0);
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
+  parseFeePaymentsCsv,
   parseFeePaymentFormData,
   toFeePaymentDatabaseInput,
   validateFeePaymentForm,
@@ -15,6 +16,13 @@ import {
 
 const feesPath = "/fees";
 const feeCreatePath = "/fees/new";
+const maximumCsvRows = 200;
+
+type FeeImportMemberRow = {
+  id: string;
+  name: string;
+  phone_last_four: string | null;
+};
 
 function buildRedirect(path: string, params: Record<string, string | number>) {
   const searchParams = new URLSearchParams();
@@ -111,4 +119,92 @@ export async function cancelFeePayment(formData: FormData) {
 
   revalidatePath(feesPath);
   redirect(buildRedirect(feesPath, { status: "cancelled", month }));
+}
+
+export async function importFeePaymentsCsv(formData: FormData) {
+  const file = formData.get("csvFile");
+
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(buildRedirect(feeCreatePath, { importError: "missing-file" }));
+  }
+
+  const parsed = parseFeePaymentsCsv(await file.text());
+
+  if (!parsed.ok) {
+    redirect(
+      buildRedirect(feeCreatePath, {
+        importError: "invalid-csv",
+        line: parsed.line,
+      }),
+    );
+  }
+
+  if (parsed.payments.length > maximumCsvRows) {
+    redirect(buildRedirect(feeCreatePath, { importError: "too-many-rows" }));
+  }
+
+  const { supabase, userId } = await getAuthenticatedUserId();
+  const { data: members, error: membersError } = await supabase
+    .from("members")
+    .select("id, name, phone_last_four")
+    .eq("status", "active");
+
+  if (membersError) {
+    redirect(buildRedirect(feeCreatePath, { importError: "member-load-failed" }));
+  }
+
+  const memberMap = buildMemberImportMap(members ?? []);
+  const payments = parsed.payments.map((payment, index) => {
+    const memberId = memberMap.get(buildMemberImportKey(payment));
+
+    if (!memberId) {
+      redirect(
+        buildRedirect(feeCreatePath, {
+          importError: "member-not-found",
+          line: index + 2,
+        }),
+      );
+    }
+
+    return {
+      member_id: memberId,
+      period_month: payment.periodMonth,
+      amount: payment.amount,
+      paid_date: payment.paidDate,
+      memo: payment.memo,
+      created_by: userId,
+      updated_by: userId,
+    };
+  });
+
+  const { error } = await supabase.from("fee_payments").insert(payments);
+
+  if (error) {
+    redirect(buildRedirect(feeCreatePath, { importError: "save-failed" }));
+  }
+
+  revalidatePath(feesPath);
+  redirect(
+    buildRedirect(feesPath, {
+      status: "imported",
+      count: payments.length,
+      month: parsed.payments[0].periodMonth.slice(0, 7),
+    }),
+  );
+}
+
+function buildMemberImportMap(members: FeeImportMemberRow[]) {
+  return new Map(
+    members.map((member) => [
+      buildMemberImportKey({
+        name: member.name,
+        phoneLastFour: member.phone_last_four ?? "",
+      }),
+      member.id,
+    ]),
+  );
+}
+
+function buildMemberImportKey(input: { name: string; phoneLastFour: string }) {
+  return `${input.name.trim()}|${input.phoneLastFour.trim()}`;
 }

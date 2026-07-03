@@ -97,6 +97,9 @@
   - Unpaid rows can be processed inline with a single `납부 처리` action.
 - Executed the Supabase fee payment schema query in SQL Editor.
 - Implemented fee payment cancellation handling from paid rows on the monthly fee board.
+- Implemented fee payment CSV upload from `/fees/new` using `name`, `phoneLastFour`, `periodMonth`, `amount`, `paidDate`, and `memo` columns.
+- Changed `/fees/new` into a CSV-only import page and updated `/fees` to link to it as `CSV 등록`.
+- Marked membership fee management complete after schema execution, browser fee-flow verification, inline payment processing, cancellation handling, and CSV upload implementation.
 
 ### Verification Evidence
 - `npm run test -- src/features/members/member-model.test.ts`: 1 file passed, 8 tests passed.
@@ -115,10 +118,13 @@
 - Supabase SQL Editor fee payment schema query: completed.
 - Browser verification: `/fees`, `/fees/new`, and inline `납부 처리` passed with an operator account.
 - Fee payment cancellation tests: action deletion and paid-row cancel button passed.
+- Fee payment CSV upload tests: CSV parser, CSV upload form rendering, and bulk import action passed.
+- `npm run test`: 19 files passed, 83 tests passed.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
 
 ## Next Planned Work
 - Implement member tabs for separate active and withdrawn member management.
-- Implement fee payment CSV upload.
-- Complete membership fee management after database and browser verification.
 - Verify CSV member import later when a real CSV file is available.
 - Deferred by user: verify member/fee kind columns and operator-first sorting later after real data is accumulated.
+- Implement expense records.

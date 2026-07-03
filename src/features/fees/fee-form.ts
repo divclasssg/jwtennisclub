@@ -20,6 +20,31 @@ export type FeePaymentDatabaseInput = {
   memo: string | null;
 };
 
+export type FeePaymentCsvInput = Omit<FeePaymentFormInput, "memberId"> & {
+  name: string;
+  phoneLastFour: string;
+};
+
+export type FeePaymentCsvParseResult =
+  | {
+      ok: true;
+      payments: FeePaymentCsvInput[];
+    }
+  | {
+      ok: false;
+      line: number;
+      message: string;
+    };
+
+const csvHeaderAliases: Readonly<Record<keyof FeePaymentCsvInput, string[]>> = {
+  name: ["name", "이름"],
+  phoneLastFour: ["phone_last_four", "phoneLastFour", "전화번호끝4자리"],
+  periodMonth: ["period_month", "periodMonth", "납부월"],
+  amount: ["amount", "금액"],
+  paidDate: ["paid_date", "paidDate", "납부일"],
+  memo: ["memo", "메모"],
+};
+
 export function parseFeePaymentFormData(
   formData: FormData,
 ): FeePaymentFormInput {
@@ -53,6 +78,51 @@ export function normalizeFeePaymentInput(input: {
     paidDate: normalizeRequiredText(input.paidDate),
     memo: normalizeOptionalText(input.memo),
   };
+}
+
+export function parseFeePaymentsCsv(source: string): FeePaymentCsvParseResult {
+  const rows = parseCsvRows(source);
+
+  if (rows.length < 2) {
+    return { ok: false, line: 1, message: "CSV에 회비 납부 데이터가 없습니다." };
+  }
+
+  const headers = rows[0].map((header) => header.trim());
+  const payments: FeePaymentCsvInput[] = [];
+
+  for (let index = 1; index < rows.length; index += 1) {
+    const row = rows[index];
+
+    if (row.every((cell) => !cell.trim())) {
+      continue;
+    }
+
+    const payment = normalizeFeePaymentCsvInput({
+      name: readCsvValue(headers, row, "name"),
+      phoneLastFour: readCsvValue(headers, row, "phoneLastFour"),
+      periodMonth: readCsvValue(headers, row, "periodMonth"),
+      amount: readCsvValue(headers, row, "amount"),
+      paidDate: readCsvValue(headers, row, "paidDate"),
+      memo: readCsvValue(headers, row, "memo"),
+    });
+    const errors = validateFeePaymentCsvInput(payment);
+
+    if (errors.length > 0) {
+      return {
+        ok: false,
+        line: index + 1,
+        message: errors[0],
+      };
+    }
+
+    payments.push(payment);
+  }
+
+  if (payments.length === 0) {
+    return { ok: false, line: 1, message: "CSV에 회비 납부 데이터가 없습니다." };
+  }
+
+  return { ok: true, payments };
 }
 
 export function validateFeePaymentForm(input: FeePaymentFormInput): string[] {
@@ -91,6 +161,119 @@ export function toFeePaymentDatabaseInput(
     paid_date: input.paidDate,
     memo: input.memo,
   };
+}
+
+function normalizeFeePaymentCsvInput(input: {
+  name?: string | null;
+  phoneLastFour?: string | null;
+  periodMonth?: string | null;
+  amount?: string | number | null;
+  paidDate?: string | null;
+  memo?: string | null;
+}): FeePaymentCsvInput {
+  const payment = normalizeFeePaymentInput({
+    memberId: "csv-member-placeholder",
+    periodMonth: input.periodMonth,
+    amount: input.amount,
+    paidDate: input.paidDate,
+    memo: input.memo,
+  });
+
+  return {
+    name: normalizeRequiredText(input.name),
+    phoneLastFour: normalizeRequiredText(input.phoneLastFour),
+    periodMonth: payment.periodMonth,
+    amount: payment.amount,
+    paidDate: payment.paidDate,
+    memo: payment.memo,
+  };
+}
+
+function validateFeePaymentCsvInput(input: FeePaymentCsvInput) {
+  const errors: string[] = [];
+
+  if (!input.name) {
+    errors.push("이름을 입력하세요.");
+  }
+
+  if (!/^[0-9]{4}$/.test(input.phoneLastFour)) {
+    errors.push("전화번호 끝 4자리는 숫자 4자리로 입력하세요.");
+  }
+
+  errors.push(
+    ...validateFeePaymentForm({
+      memberId: "csv-member-placeholder",
+      periodMonth: input.periodMonth,
+      amount: input.amount,
+      paidDate: input.paidDate,
+      memo: input.memo,
+    }).filter((error) => !error.includes("회원")),
+  );
+
+  return errors;
+}
+
+function parseCsvRows(source: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    const nextCharacter = source[index + 1];
+
+    if (character === "\"" && inQuotes && nextCharacter === "\"") {
+      cell += "\"";
+      index += 1;
+      continue;
+    }
+
+    if (character === "\"") {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (character === "," && !inQuotes) {
+      row.push(cell);
+      cell = "";
+      continue;
+    }
+
+    if ((character === "\n" || character === "\r") && !inQuotes) {
+      if (character === "\r" && nextCharacter === "\n") {
+        index += 1;
+      }
+
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      continue;
+    }
+
+    cell += character;
+  }
+
+  row.push(cell);
+  rows.push(row);
+
+  return rows;
+}
+
+function readCsvValue(
+  headers: string[],
+  row: string[],
+  field: keyof FeePaymentCsvInput,
+) {
+  const aliases = csvHeaderAliases[field];
+  const index = headers.findIndex((header) => aliases.includes(header));
+
+  if (index < 0) {
+    return null;
+  }
+
+  return row[index] ?? null;
 }
 
 function readFormString(formData: FormData, name: string) {
