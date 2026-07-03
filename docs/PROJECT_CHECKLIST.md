@@ -14,6 +14,7 @@
 - [x] SCSS token usage rule documented in `AGENTS.md`
 - [x] Foundation UI design revised before member management
 - [x] Member table fields and statuses defined
+- [x] Supabase member schema query executed
 - [x] Member list screen implemented
 - [x] Member create/edit flow implemented
 - [ ] Member management feature implemented
@@ -48,6 +49,7 @@
 - [x] Database provider: Supabase Postgres
 - [x] Authorization model: `roles`, `role_permissions`, `profiles`
 - [x] First admin profile is seeded manually through Supabase SQL Editor
+- [x] Member schema is applied through Supabase SQL Editor
 - [x] `.env.local` is local-only and ignored by Git
 - [x] Next.js proxy lives at `src/proxy.ts`
 - [x] Component styles use SCSS Modules with kebab-case hyphen class names
