@@ -104,6 +104,11 @@ const from = vi.fn((table: string) =>
       : membersQuery,
 );
 
+vi.mock("./actions", () => ({
+  cancelFeePayment: vi.fn(),
+  createFeePayment: vi.fn(),
+}));
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ from })),
 }));
@@ -172,7 +177,7 @@ describe("FeesPage", () => {
     expect(within(list).getByRole("cell", { name: "1234" })).toBeInTheDocument();
     expect(within(list).getByText("운영진")).toBeInTheDocument();
     expect(within(list).getByRole("cell", { name: "30,000원" })).toBeInTheDocument();
-    expect(within(list).getByText("처리 완료")).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
   });
 
   it("renders unpaid rows with an inline payment action", async () => {

@@ -95,6 +95,8 @@
   - `/fees` now shows target members for the selected month.
   - Paid/unpaid status is visible per member row.
   - Unpaid rows can be processed inline with a single `납부 처리` action.
+- Executed the Supabase fee payment schema query in SQL Editor.
+- Implemented fee payment cancellation handling from paid rows on the monthly fee board.
 
 ### Verification Evidence
 - `npm run test -- src/features/members/member-model.test.ts`: 1 file passed, 8 tests passed.
@@ -110,13 +112,13 @@
 - `npm run lint`: passed.
 - `npx tsc --noEmit`: passed.
 - `npm run build`: passed.
+- Supabase SQL Editor fee payment schema query: completed.
+- Browser verification: `/fees`, `/fees/new`, and inline `납부 처리` passed with an operator account.
+- Fee payment cancellation tests: action deletion and paid-row cancel button passed.
 
 ## Next Planned Work
 - Implement member tabs for separate active and withdrawn member management.
-- Execute the Supabase fee payment schema query.
-- Verify `/fees` and `/fees/new` with an operator account after the schema exists.
 - Implement fee payment CSV upload.
-- Implement fee payment cancellation handling.
 - Complete membership fee management after database and browser verification.
 - Verify CSV member import later when a real CSV file is available.
-- Deferred by user: verify member/fee kind columns, operator-first sorting, and inline fee payment processing later after real data is accumulated.
+- Deferred by user: verify member/fee kind columns and operator-first sorting later after real data is accumulated.

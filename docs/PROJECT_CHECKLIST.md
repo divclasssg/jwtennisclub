@@ -33,9 +33,9 @@
 - [x] Define membership fee payment records
 - [x] Implement fee payment list and monthly filters
 - [ ] Implement fee payment CSV upload
-- [ ] Implement fee payment cancellation handling
-- [ ] Execute Supabase fee payment schema query
-- [ ] Verify fee payment screen flow in browser
+- [x] Implement fee payment cancellation handling
+- [x] Execute Supabase fee payment schema query
+- [x] Verify fee payment screen flow in browser
 - [ ] Implement expense records
 - [ ] Implement monthly settlement summary
 - [ ] Implement PDF template for monthly report
@@ -44,7 +44,7 @@
 - [ ] Verify CSV member import with a real CSV file
 - [ ] Verify member and fee operator/general kind columns after real operator/member data exists
 - [ ] Verify operator-first sorting after real club positions are assigned
-- [ ] Verify fee inline payment processing after real monthly payment data exists
+- [x] Verify fee inline payment processing after real monthly payment data exists
 
 ## Confirmed Product Decisions
 - [x] Target users are tennis club operators, not general members

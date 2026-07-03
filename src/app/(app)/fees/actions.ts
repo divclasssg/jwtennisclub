@@ -8,6 +8,10 @@ import {
   toFeePaymentDatabaseInput,
   validateFeePaymentForm,
 } from "@/features/fees/fee-form";
+import {
+  getCurrentPeriodMonth,
+  normalizePeriodMonth,
+} from "@/features/fees/fee-model";
 
 const feesPath = "/fees";
 const feeCreatePath = "/fees/new";
@@ -82,4 +86,29 @@ export async function createFeePayment(formData: FormData) {
       month: payment.periodMonth.slice(0, 7),
     }),
   );
+}
+
+export async function cancelFeePayment(formData: FormData) {
+  const paymentId = String(formData.get("paymentId") ?? "");
+  const periodMonth =
+    normalizePeriodMonth(String(formData.get("periodMonth") ?? "")) ||
+    getCurrentPeriodMonth();
+  const month = periodMonth.slice(0, 7);
+
+  if (!paymentId) {
+    redirect(buildRedirect(feesPath, { error: "missing-payment", month }));
+  }
+
+  const { supabase } = await getAuthenticatedUserId();
+  const { error } = await supabase
+    .from("fee_payments")
+    .delete()
+    .eq("id", paymentId);
+
+  if (error) {
+    redirect(buildRedirect(feesPath, { error: "cancel-failed", month }));
+  }
+
+  revalidatePath(feesPath);
+  redirect(buildRedirect(feesPath, { status: "cancelled", month }));
 }

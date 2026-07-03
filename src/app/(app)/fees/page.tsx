@@ -1,5 +1,5 @@
 import styles from "./page.module.scss";
-import { createFeePayment } from "./actions";
+import { cancelFeePayment, createFeePayment } from "./actions";
 import { createClient } from "@/lib/supabase/server";
 import {
   buildFeeBoardRows,
@@ -292,9 +292,27 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                     <td>{row.payment?.memo ?? "-"}</td>
                     <td>
                       {row.payment ? (
-                        <span className={styles["fees-complete-text"]}>
-                          처리 완료
-                        </span>
+                        <form
+                          action={cancelFeePayment}
+                          className={styles["fees-inline-form"]}
+                        >
+                          <input
+                            name="paymentId"
+                            type="hidden"
+                            value={row.payment.id}
+                          />
+                          <input
+                            name="periodMonth"
+                            type="hidden"
+                            value={filters.periodMonth.slice(0, 7)}
+                          />
+                          <button
+                            className={styles["fees-cancel-button"]}
+                            type="submit"
+                          >
+                            납부 취소
+                          </button>
+                        </form>
                       ) : (
                         <form
                           action={createFeePayment}

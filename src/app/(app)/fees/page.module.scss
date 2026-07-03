@@ -281,6 +281,12 @@
   }
 }
 
+.fees-inline-form .fees-cancel-button {
+  border: var(--hairline-width) solid var(--hairline);
+  background: var(--surface-pearl);
+  color: var(--error-text);
+}
+
 .fees-empty-state {
   display: grid;
   gap: var(--spacing-xs);
