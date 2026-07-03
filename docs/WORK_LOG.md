@@ -74,6 +74,7 @@
 - Implemented the member list screen at `/members` with Supabase-backed loading, name or phone-last-four search, status filters, table display, and empty state.
 - Implemented member create and edit flows, including single-member registration and CSV member import.
 - Executed the Supabase member schema query in SQL Editor.
+- Verified the member screen flow with the operator account: login, member list, single-member registration, search, edit, withdrawal status, withdrawal date, and withdrawal reason.
 
 ### Verification Evidence
 - `npm run test -- src/features/members/member-model.test.ts`: 1 file passed, 8 tests passed.
@@ -82,8 +83,10 @@
 - `npx tsc --noEmit`: passed.
 - `npm run build`: passed.
 - Supabase SQL Editor member schema query: completed.
+- Browser verification: `/members`, `/members/new`, single-member create, search, edit, and withdrawn filter passed using verification member `Verify463463`.
+- CSV import screen rendered, but CSV upload execution is deferred until a real CSV file is available.
 
 ## Next Planned Work
 - Implement member management first.
-- Build member withdrawal handling polish and complete member management verification.
+- Verify CSV member import with a real CSV file.
 - After member management, proceed to fee payment tracking.

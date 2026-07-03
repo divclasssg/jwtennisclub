@@ -17,6 +17,8 @@
 - [x] Supabase member schema query executed
 - [x] Member list screen implemented
 - [x] Member create/edit flow implemented
+- [x] Member withdrawal handling with withdrawal date implemented
+- [x] Member management screen flow verified
 - [ ] Member management feature implemented
 - [ ] Membership fee management feature implemented
 - [ ] Expense management feature implemented
@@ -26,7 +28,7 @@
 
 ## Next Work
 - [ ] Revisit and finalize the dashboard after member, fee, expense, schedule, settlement, and PDF features are implemented
-- [ ] Implement member withdrawal handling with withdrawal date
+- [ ] Verify CSV member import with a real CSV file
 - [ ] Define membership fee payment records
 - [ ] Implement fee payment list and monthly filters
 - [ ] Implement expense records
