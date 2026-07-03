@@ -9,8 +9,10 @@ export const PERMISSIONS = [
   "expenses.create",
   "expenses.update",
   "expenses.delete",
+  "events.view",
   "events.create",
   "events.update",
+  "events.delete",
   "settlements.close",
   "settlements.reopen",
   "operators.manage",
@@ -34,7 +36,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Readonly<
     "fees.payments.create",
     "expenses.view",
     "expenses.create",
+    "events.view",
     "events.create",
+    "events.update",
+    "events.delete",
   ] as const),
 });
 

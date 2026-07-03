@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   DEFAULT_ROLE_PERMISSIONS,
@@ -9,21 +9,27 @@ import {
   type RoleName,
 } from "./permissions";
 
-const migrationSql = readFileSync(
-  join(process.cwd(), "supabase/migrations/202607020001_foundation.sql"),
-  "utf8",
-);
+const migrationsDirectory = join(process.cwd(), "supabase/migrations");
+const migrationSql = readdirSync(migrationsDirectory)
+  .filter((fileName) => fileName.endsWith(".sql"))
+  .sort()
+  .map((fileName) => readFileSync(join(migrationsDirectory, fileName), "utf8"))
+  .join("\n");
 
-function roleSeedSection(role: string): string {
-  const match = migrationSql.match(
-    new RegExp(
-      String.raw`insert into public\.role_permissions[\s\S]*?where roles\.name = '${role}'[\s\S]*?on conflict \(role_id, permission\) do nothing;`,
-      "m",
-    ),
+function roleSeedSections(role: string): string[] {
+  const matches = migrationSql.matchAll(
+    /insert into public\.role_permissions[\s\S]*?on conflict \(role_id, permission\) do nothing;/gm,
   );
+  const sections = [...matches]
+    .map((match) => match[0])
+    .filter(
+      (section) =>
+        section.includes(`where roles.name = '${role}'`) ||
+        new RegExp(String.raw`where roles\.name in \([^)]*'${role}'`).test(section),
+    );
 
-  expect(match, `Missing ${role} role permission seed section`).not.toBeNull();
-  return match?.[0] ?? "";
+  expect(sections, `Missing ${role} role permission seed section`).not.toHaveLength(0);
+  return sections;
 }
 
 describe("hasPermission", () => {
@@ -34,6 +40,13 @@ describe("hasPermission", () => {
   it("allows default operators to create payments and expenses", () => {
     expect(hasPermission("operator", "fees.payments.create")).toBe(true);
     expect(hasPermission("operator", "expenses.create")).toBe(true);
+  });
+
+  it("allows operators to manage schedule events", () => {
+    expect(hasPermission("operator", "events.view")).toBe(true);
+    expect(hasPermission("operator", "events.create")).toBe(true);
+    expect(hasPermission("operator", "events.update")).toBe(true);
+    expect(hasPermission("operator", "events.delete")).toBe(true);
   });
 
   it("blocks default operators from destructive admin actions", () => {
@@ -82,10 +95,12 @@ describe("DEFAULT_ROLE_PERMISSIONS", () => {
     }
 
     for (const [role, permissions] of Object.entries(DEFAULT_ROLE_PERMISSIONS)) {
-      const section = roleSeedSection(role);
+      const sections = roleSeedSections(role);
 
       for (const permission of permissions) {
-        expect(section).toContain(`('${permission}')`);
+        expect(
+          sections.some((section) => section.includes(`('${permission}')`)),
+        ).toBe(true);
       }
     }
   });
