@@ -26,7 +26,10 @@
 - [x] Execute Supabase expense receipt metadata query
 - [x] Configure Cloudflare R2 receipt bucket credentials in `.env.local`
 - [x] Verify expense receipt attachment locally
-- [ ] Schedule management feature implemented
+- [x] Schedule management feature implemented
+- [x] Schedule month/week calendar UI implemented
+- [x] Schedule month view overflow displays as `+N개`
+- [x] Schedule week navigation stays in week view
 - [x] Execute Supabase event schedule schema query
 - [ ] Verify schedule management screen flow in browser
 - [ ] Monthly settlement feature implemented
