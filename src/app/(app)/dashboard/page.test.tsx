@@ -6,11 +6,6 @@ describe("DashboardPage", () => {
   it("renders dense Korean operational placeholder metrics", () => {
     render(<DashboardPage />);
 
-    expect(
-      screen.getByRole("heading", { name: "운영 대시보드" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("2026년 7월")).toBeInTheDocument();
-
     const metrics = screen.getByRole("region", { name: "월간 운영 지표" });
 
     expect(within(metrics).getByText("회비 수입", { selector: "dt" })).toBeInTheDocument();

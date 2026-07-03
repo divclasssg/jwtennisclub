@@ -23,7 +23,7 @@ vi.mock("@/app/(auth)/login/actions", () => ({
 }));
 
 const requiredNavigationItems = [
-  { href: "/dashboard", label: "대시보드" },
+  { href: "/dashboard", label: "홈" },
   { href: "/members", label: "회원" },
   { href: "/fees", label: "회비" },
   { href: "/expenses", label: "지출" },

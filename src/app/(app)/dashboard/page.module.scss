@@ -1,158 +1,92 @@
+@use "../../breakpoints" as bp;
+
 .dashboard-page {
   display: grid;
-  gap: 24px;
-}
-
-.dashboard-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--hairline);
-
-  h1 {
-    margin: 6px 0 0;
-    font-size: 28px;
-    font-weight: 600;
-    line-height: 1.2;
-  }
-}
-
-.dashboard-month,
-.dashboard-summary,
-.dashboard-metric-label,
-.dashboard-metric-value,
-.dashboard-metric-note,
-.dashboard-panel-label {
-  margin: 0;
-}
-
-.dashboard-month {
-  color: var(--action-blue);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.dashboard-summary {
-  max-width: 380px;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.45;
-  text-align: right;
+  gap: var(--spacing-xl);
 }
 
 .dashboard-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-  padding: 0;
+  gap: var(--spacing-sm);
 }
 
 .dashboard-metric-card,
-.dashboard-panel {
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
+.dashboard-panel,
+.dashboard-utility-card {
+  border: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-md);
   background: var(--canvas);
 }
 
 .dashboard-metric-card {
-  min-width: 0;
-  padding: 16px;
-}
-
-.dashboard-metric-label {
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.25;
+  padding: var(--spacing-lg);
 }
 
 .dashboard-metric-value {
-  margin-top: 10px;
-  overflow-wrap: anywhere;
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.15;
+  margin-top: var(--spacing-sm);
+  font-size: var(--font-size-lead);
 }
 
 .dashboard-metric-note {
-  margin-top: 10px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.35;
+  margin-top: var(--spacing-sm);
+}
+
+.dashboard-utility-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.dashboard-utility-card {
+  display: grid;
+  gap: var(--spacing-md);
+  min-height: var(--dashboard-card-min-height);
+  padding: var(--spacing-lg);
+  color: var(--ink);
+
+  span {
+    color: var(--action-blue);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-caption-strong);
+  }
+
+  strong {
+    align-self: end;
+    max-width: var(--dashboard-utility-title-max-width);
+    font-size: var(--font-size-lead-airy);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--dashboard-utility-title-line-height);
+    letter-spacing: var(--dashboard-utility-title-letter-spacing);
+  }
 }
 
 .dashboard-panel {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 24px;
-  padding: 20px;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
 
   h2 {
-    margin: 6px 0 0;
-    font-size: 20px;
-    font-weight: 600;
-    line-height: 1.25;
+    margin: var(--spacing-xs) 0 0;
+    font-size: var(--font-size-lead-airy);
   }
-}
-
-.dashboard-panel-label {
-  color: var(--action-blue);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.25;
 }
 
 .dashboard-queue {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.45;
-  list-style: none;
+  gap: var(--spacing-sm);
+  font-size: var(--dashboard-queue-size);
 
   li {
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--divider-soft);
-
-    &:last-child {
-      padding-bottom: 0;
-      border-bottom: 0;
-    }
+    padding-bottom: var(--spacing-sm);
   }
 }
 
-@media (max-width: 920px) {
-  .dashboard-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  .dashboard-heading {
-    display: grid;
-    gap: 12px;
-
-    h1 {
-      font-size: 24px;
-    }
-  }
-
-  .dashboard-summary {
-    max-width: none;
-    text-align: left;
-  }
-
-  .dashboard-metrics,
-  .dashboard-panel {
+@media (max-width: bp.$breakpoint-tablet-landscape) {
+  .dashboard-utility-grid {
     grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: bp.$breakpoint-phone) {
   .dashboard-metric-value {
-    font-size: 22px;
+    font-size: var(--font-size-lead-airy);
   }
 }

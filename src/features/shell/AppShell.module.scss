@@ -1,166 +1,232 @@
+﻿@use "../../app/breakpoints" as bp;
+
 .shell {
-  display: grid;
-  grid-template-columns: 224px minmax(0, 1fr);
-  min-height: 100dvh;
-  background: var(--surface-parchment);
-  color: var(--ink);
+    display: block;
+    min-height: 100dvh;
+    background: var(--canvas-parchment);
+    color: var(--ink);
 }
 
-.shell-sidebar {
-  position: sticky;
-  top: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  height: 100dvh;
-  padding: 24px 16px;
-  border-right: 1px solid var(--hairline);
-  background: var(--canvas);
+.shell-global-nav {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--spacing-xxl);
+    min-height: var(--global-nav-height);
+    padding: 0 clamp(16px, 4vw, 56px);
+    background: var(--surface-black);
+    color: var(--body-on-dark);
+    backdrop-filter: var(--frosted-backdrop-filter);
 }
 
 .shell-brand {
-  padding: 0 8px;
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--ink);
+    flex: 0 0 auto;
+    width: max-content;
+    padding: 0;
+    color: inherit;
+    font-size: var(--font-size-nav-link);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-button);
+    letter-spacing: var(--letter-spacing-nav-link);
 }
 
 .shell-nav {
-  display: grid;
-  gap: 4px;
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    justify-content: flex-start;
+    gap: clamp(14px, 3vw, 34px);
+    min-width: 0;
 }
 
 .shell-nav-link {
-  display: flex;
-  align-items: center;
-  min-height: 40px;
-  padding: 9px 10px;
-  border-radius: 8px;
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.25;
-  white-space: nowrap;
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-height: auto;
+    padding: 0;
+    border-radius: var(--rounded-none);
+    background: transparent;
+    color: var(--body-muted);
+    font-size: var(--font-size-nav-link);
+    line-height: var(--line-height-button);
+    letter-spacing: var(--letter-spacing-nav-link);
+    white-space: nowrap;
 
-  &:hover {
-    background: var(--surface-pearl);
-    color: var(--action-blue);
-  }
+    &:hover {
+        background: transparent;
+        color: inherit;
+    }
 }
 
-.shell-workspace {
-  min-width: 0;
+.shell-sub-nav {
+    position: sticky;
+    top: var(--global-nav-height);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-sm) clamp(16px, 4vw, 56px);
+    border-bottom: var(--hairline-width) solid var(--hairline);
+    background: var(--frosted-surface);
+    backdrop-filter: var(--frosted-backdrop-filter);
 }
 
-.shell-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 64px;
-  padding: 12px 32px;
-  border-bottom: 1px solid var(--hairline);
-  background: var(--surface-parchment);
+.shell-sub-nav-content {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--spacing-md);
+    min-width: 0;
 }
 
-.shell-kicker,
 .shell-header-title {
-  margin: 0;
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.12;
+    letter-spacing: var(--letter-spacing-body);
+    white-space: nowrap;
 }
 
 .shell-kicker {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.2;
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-caption-strong);
+    letter-spacing: var(--letter-spacing-caption);
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 
-.shell-header-title {
-  margin-top: 3px;
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.25;
+.shell-account-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.shell-password-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--button-utility-height);
+    min-height: auto;
+    padding: var(--button-pearl-capsule-padding);
+    border: 1px solid var(--ink);
+    border-radius: var(--rounded-md);
+    background: var(--surface-pearl);
+    color: var(--ink-muted-80);
+    font-size: var(--font-size-button-utility);
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-button-utility);
+    letter-spacing: var(--letter-spacing-button-utility);
+    white-space: nowrap;
+
+    &:hover {
+        color: var(--action-blue);
+    }
+
+    &:active {
+        transform: scale(var(--active-scale));
+    }
 }
 
 .shell-logout-button {
-  min-height: 40px;
-  padding: 8px 14px;
-  border: 1px solid var(--hairline);
-  border-radius: 9999px;
-  background: var(--canvas);
-  color: var(--action-blue);
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1.2;
-  white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--button-utility-height);
+    min-height: auto;
+    padding: var(--button-pearl-capsule-padding);
+    appearance: none;
+    border: 0;
+    border-radius: var(--rounded-sm);
+    background: var(--ink);
+    color: var(--on-dark);
+    cursor: pointer;
+    font-size: var(--font-size-button-utility);
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-button-utility);
+    letter-spacing: var(--letter-spacing-button-utility);
+    white-space: nowrap;
 
-  &:active {
-    transform: scale(0.98);
-  }
+    &:hover {
+        background: var(--ink);
+        color: var(--on-dark);
+    }
+
+    &:active {
+        transform: scale(var(--active-scale));
+    }
 }
 
 .shell-content {
-  width: min(100%, 1180px);
-  margin: 0 auto;
-  padding: 32px;
+    width: min(100%, 1280px);
+    margin: 0 auto;
+    padding: var(--spacing-xl) clamp(16px, 4vw, 56px) var(--spacing-section);
 }
 
-@media (max-width: 760px) {
-  .shell {
-    display: block;
-  }
-
-  .shell-sidebar {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    height: auto;
-    gap: 12px;
-    padding: 12px 16px 10px;
-    border-right: 0;
-    border-bottom: 1px solid var(--hairline);
-  }
-
-  .shell-brand {
-    padding: 0;
-    font-size: 16px;
-  }
-
-  .shell-nav {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-
-    &::-webkit-scrollbar {
-      display: none;
+@media (max-width: bp.$breakpoint-tablet-landscape) {
+    .shell-global-nav {
+        flex-wrap: wrap;
+        gap: var(--spacing-lg);
+        min-height: 52px;
+        padding-block: var(--spacing-xs);
     }
-  }
 
-  .shell-nav-link {
-    flex: 0 0 auto;
-    min-height: 44px;
-    padding: 10px 12px;
-    background: var(--surface-pearl);
-    font-size: 13px;
-  }
+    .shell-nav {
+        order: 2;
+        flex: 0 0 100%;
+        gap: var(--spacing-lg);
+        overflow-x: auto;
+        padding-bottom: var(--spacing-xs);
+        scrollbar-width: none;
 
-  .shell-header {
-    position: static;
-    min-height: 58px;
-    padding: 10px 16px;
-    background: var(--surface-parchment);
-  }
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
 
-  .shell-logout-button {
-    min-height: 44px;
-    padding: 10px 14px;
-  }
+    .shell-nav-link {
+        font-size: var(--font-size-caption);
+    }
 
-  .shell-content {
-    padding: 20px 16px 28px;
-  }
+    .shell-sub-nav {
+        top: 88px;
+        min-height: 64px;
+    }
+
+    .shell-content {
+        padding-top: var(--spacing-lg);
+    }
+}
+
+@media (max-width: bp.$breakpoint-phone) {
+    .shell-sub-nav {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .shell-sub-nav-content {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: var(--spacing-xxs);
+    }
+
+    .shell-account-actions {
+        width: 100%;
+    }
+
+    .shell-password-link,
+    .shell-logout-button {
+        justify-content: center;
+    }
+
+    .shell-content {
+        padding-inline: var(--spacing-lg);
+    }
 }

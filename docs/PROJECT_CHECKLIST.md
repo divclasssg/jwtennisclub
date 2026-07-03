@@ -11,6 +11,7 @@
 - [x] Changes pushed to GitHub `main`
 - [x] Styles converted from CSS to SCSS
 - [x] CSS Module class names converted to kebab-case hyphen naming
+- [x] SCSS token usage rule documented in `AGENTS.md`
 - [ ] Member management feature implemented
 - [ ] Membership fee management feature implemented
 - [ ] Expense management feature implemented
@@ -20,6 +21,7 @@
 
 ## Next Work
 - [ ] Revise the current foundation UI design before member management
+- [ ] Revisit and finalize the dashboard after member, fee, expense, schedule, settlement, and PDF features are implemented
 - [ ] Define member table fields and statuses
 - [ ] Implement member list screen
 - [ ] Implement member create/edit flow
@@ -49,6 +51,7 @@
 - [x] `.env.local` is local-only and ignored by Git
 - [x] Next.js proxy lives at `src/proxy.ts`
 - [x] Component styles use SCSS Modules with kebab-case hyphen class names
+- [x] SCSS should use `src/app/globals.scss` design tokens and `src/app/_breakpoints.scss` breakpoint variables before hardcoded values
 
 ## Verification Commands
 - [x] `npm run test`

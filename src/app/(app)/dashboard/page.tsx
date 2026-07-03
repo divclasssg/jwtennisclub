@@ -7,19 +7,27 @@ const metrics = [
   { label: "정산 상태", value: "진행 중", note: "월말 확정 전" },
 ];
 
+const utilityItems = [
+  {
+    label: "회원",
+    title: "연락처와 출석 흐름을 한 화면에서 확인",
+    href: "/members",
+  },
+  {
+    label: "정산",
+    title: "월말 회비, 운영비, 잔액을 빠르게 대조",
+    href: "/settlements",
+  },
+  {
+    label: "PDF",
+    title: "공유용 월간 리포트를 준비",
+    href: "/reports",
+  },
+];
+
 export default function DashboardPage() {
   return (
     <section className={styles["dashboard-page"]}>
-      <div className={styles["dashboard-heading"]}>
-        <div>
-          <p className={styles["dashboard-month"]}>2026년 7월</p>
-          <h1>운영 대시보드</h1>
-        </div>
-        <p className={styles["dashboard-summary"]}>
-          회원, 회비, 지출 일정 데이터를 월간 정산 기준으로 확인합니다.
-        </p>
-      </div>
-
       <section aria-label="월간 운영 지표">
         <dl className={styles["dashboard-metrics"]}>
           {metrics.map((metric) => (
@@ -36,6 +44,19 @@ export default function DashboardPage() {
             </div>
           ))}
         </dl>
+      </section>
+
+      <section className={styles["dashboard-utility-grid"]}>
+        {utilityItems.map((item) => (
+          <a
+            className={styles["dashboard-utility-card"]}
+            href={item.href}
+            key={item.href}
+          >
+            <span>{item.label}</span>
+            <strong>{item.title}</strong>
+          </a>
+        ))}
       </section>
 
       <section

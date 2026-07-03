@@ -24,6 +24,9 @@
 - Added `sass` as a dev dependency.
 - Renamed CSS Module classes to kebab-case hyphen names.
 - Corrected the style naming rule to avoid arbitrary prefixes and keep meaningful hyphen class names such as `shell-nav-link`.
+- Added the SCSS token usage rule: use `src/app/globals.scss` tokens and `src/app/_breakpoints.scss` variables before introducing hardcoded style values.
+- Added a protected password change flow at `/settings/password` with current-password verification, a shell action link before logout, and forced re-login after a successful password update.
+- Removed the dashboard hero section for now; dashboard cleanup is deferred until the main operational features are implemented.
 
 ### Verification Evidence
 - `npm run test`: 7 files passed, 33 tests passed.
@@ -32,6 +35,8 @@
 - `npm run build`: passed.
 - Production build output included `Proxy (Middleware)`.
 - SCSS conversion verification passed with test, lint, typecheck, and build.
+- Password change flow verification passed with `npm run test` and `npm run build`.
+- Dashboard hero removal verification passed with `npm run test` and `npm run build`.
 
 ### Product Decisions
 - The service is for tennis club operators.
@@ -52,6 +57,7 @@
 - `src/proxy.ts` is the correct Next.js proxy location for this project structure.
 - Style files use `.scss` and `.module.scss`.
 - CSS Module class names use kebab-case hyphen names and TSX bracket access.
+- SCSS should use existing design tokens and breakpoint variables first; new hardcoded values should become meaningful tokens before use.
 
 ### Issues And Lessons
 - The temporary worktree was useful for isolating the foundation implementation, but it confused project location until merged back into `main`.

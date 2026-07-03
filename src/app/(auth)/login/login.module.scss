@@ -1,76 +1,133 @@
+@use "../../breakpoints" as bp;
+
 .login-page {
   min-height: 100vh;
   display: grid;
+  grid-template-columns: 1fr;
   place-items: center;
-  padding: 48px 20px;
-  background: var(--surface-parchment);
+  padding: clamp(var(--spacing-lg), 5vw, var(--footer-padding));
+  background: var(--canvas-parchment);
   color: var(--ink);
 }
 
 .login-panel {
-  width: min(100%, 420px);
-  padding: 40px;
-  border: 1px solid var(--hairline);
-  border-radius: 18px;
+  align-self: center;
+  width: min(100%, var(--login-panel-width));
+  margin: 0 auto;
+  padding: clamp(var(--spacing-xl), 5vw, var(--spacing-xxl));
+  border: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-lg);
   background: var(--canvas);
+  box-shadow: var(--product-shadow);
 
   h1 {
     margin: 0;
-    font-size: 34px;
-    line-height: 1.12;
-    letter-spacing: -0.28px;
+    font-family: var(--font-display);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-hero-display);
+    letter-spacing: var(--letter-spacing-hero-display);
   }
-}
-
-.login-eyebrow {
-  margin: 0 0 12px;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.login-description {
-  margin: 16px 0 32px;
-  color: var(--muted);
-  font-size: 17px;
-  line-height: 1.47;
 }
 
 .login-form {
   display: grid;
-  gap: 18px;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xl);
 
   label {
     display: grid;
-    gap: 8px;
-    color: var(--ink);
-    font-size: 14px;
+    gap: var(--spacing-xs);
+    color: var(--ink-muted-80);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+    letter-spacing: var(--letter-spacing-caption);
   }
 
   input {
-    height: 44px;
-    border: 1px solid var(--hairline);
-    border-radius: 9999px;
-    padding: 0 18px;
+    height: var(--search-input-height);
+    border: var(--hairline-width) solid var(--soft-border-color);
+    border-radius: var(--rounded-pill);
+    padding: var(--search-input-padding);
+    background: var(--surface-pearl);
+    color: var(--ink);
     font: inherit;
   }
 
   button {
-    height: 44px;
+    min-height: var(--search-input-height);
+    padding: var(--button-primary-padding);
     border: 0;
-    border-radius: 9999px;
+    border-radius: var(--rounded-pill);
     background: var(--action-blue);
-    color: white;
-    font: inherit;
+    color: var(--on-primary);
     cursor: pointer;
+    font: inherit;
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-button);
+    letter-spacing: var(--letter-spacing-body);
+
+    &:hover {
+      background: var(--action-blue-focus);
+    }
 
     &:active {
-      transform: scale(0.98);
+      transform: scale(var(--active-scale-subtle));
     }
   }
 }
 
+.login-success,
 .login-error {
   margin: 0;
-  color: #b00020;
-  font-size: 14px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-caption);
+}
+
+.login-success {
+  color: var(--success-text);
+}
+
+.login-error {
+  color: var(--error-text);
+}
+
+@media (max-width: bp.$breakpoint-tablet-landscape) {
+  .login-page {
+    align-items: start;
+    min-height: 100dvh;
+    padding: var(--spacing-xl) var(--spacing-lg);
+    background: var(--canvas);
+  }
+
+  .login-panel {
+    width: 100%;
+    margin-top: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--rounded-none);
+    background: transparent;
+    box-shadow: none;
+
+    h1 {
+      padding-bottom: var(--spacing-lg);
+    }
+  }
+
+  .login-form {
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-xl);
+
+    input,
+    button {
+      width: 100%;
+    }
+  }
+}
+
+@media (max-width: bp.$breakpoint-small-phone) {
+  .login-page {
+    padding: var(--spacing-lg);
+  }
 }
