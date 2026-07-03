@@ -27,6 +27,7 @@
 - Added the SCSS token usage rule: use `src/app/globals.scss` tokens and `src/app/_breakpoints.scss` variables before introducing hardcoded style values.
 - Added a protected password change flow at `/settings/password` with current-password verification, a shell action link before logout, and forced re-login after a successful password update.
 - Removed the dashboard hero section for now; dashboard cleanup is deferred until the main operational features are implemented.
+- Revised the foundation UI design before starting member management.
 
 ### Verification Evidence
 - `npm run test`: 7 files passed, 33 tests passed.
@@ -67,7 +68,6 @@
 - Verification must be run from the final `main` workspace, not only from a temporary worktree.
 
 ## Next Planned Work
-- Revise the current foundation UI design before starting member management.
 - Implement member management first.
 - Define the member data model before building screens.
 - Build member list, create, edit, and withdrawal flows.

@@ -12,6 +12,7 @@
 - [x] Styles converted from CSS to SCSS
 - [x] CSS Module class names converted to kebab-case hyphen naming
 - [x] SCSS token usage rule documented in `AGENTS.md`
+- [x] Foundation UI design revised before member management
 - [ ] Member management feature implemented
 - [ ] Membership fee management feature implemented
 - [ ] Expense management feature implemented
@@ -20,7 +21,6 @@
 - [ ] Monthly PDF generation implemented
 
 ## Next Work
-- [ ] Revise the current foundation UI design before member management
 - [ ] Revisit and finalize the dashboard after member, fee, expense, schedule, settlement, and PDF features are implemented
 - [ ] Define member table fields and statuses
 - [ ] Implement member list screen

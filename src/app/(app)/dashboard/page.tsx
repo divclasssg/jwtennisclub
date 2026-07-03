@@ -1,5 +1,7 @@
 ﻿import styles from "./page.module.scss";
 
+import Link from "next/link";
+
 const metrics = [
   { label: "회비 수입", value: "0원", note: "이번 달 입금 합계" },
   { label: "운영비 지출", value: "0원", note: "코트비, 공, 기타 비용" },
@@ -28,6 +30,17 @@ const utilityItems = [
 export default function DashboardPage() {
   return (
     <section className={styles["dashboard-page"]}>
+      <header className={styles["dashboard-header"]}>
+        <div>
+          <p className={styles["dashboard-kicker"]}>운영 대시보드</p>
+          <h1>이번 달 클럽 운영 상태</h1>
+        </div>
+        <p>
+          회원, 회비, 지출, 정산 흐름을 한 화면에서 확인할 수 있도록
+          foundation 화면을 준비했습니다.
+        </p>
+      </header>
+
       <section aria-label="월간 운영 지표">
         <dl className={styles["dashboard-metrics"]}>
           {metrics.map((metric) => (
@@ -48,14 +61,14 @@ export default function DashboardPage() {
 
       <section className={styles["dashboard-utility-grid"]}>
         {utilityItems.map((item) => (
-          <a
+          <Link
             className={styles["dashboard-utility-card"]}
             href={item.href}
             key={item.href}
           >
             <span>{item.label}</span>
             <strong>{item.title}</strong>
-          </a>
+          </Link>
         ))}
       </section>
 

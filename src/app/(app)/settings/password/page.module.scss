@@ -63,7 +63,7 @@
         min-height: var(--search-input-height);
         padding: var(--search-input-padding);
         border: var(--hairline-width) solid var(--hairline);
-        border-radius: var(--rounded-md);
+        border-radius: var(--rounded-pill);
         background: var(--surface-pearl);
         color: var(--ink);
     }
@@ -77,15 +77,16 @@
         color: var(--on-primary);
         cursor: pointer;
         font-size: var(--font-size-body);
-        font-weight: var(--font-weight-semibold);
+        font-weight: var(--font-weight-regular);
         line-height: var(--line-height-button);
+        letter-spacing: var(--letter-spacing-body);
 
         &:hover {
             background: var(--action-blue-focus);
         }
 
         &:active {
-            transform: scale(var(--active-scale-subtle));
+            transform: scale(var(--active-scale));
         }
     }
 }

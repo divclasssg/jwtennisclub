@@ -23,10 +23,10 @@
   h1 {
     margin: 0;
     font-family: var(--font-display);
-    font-size: var(--font-size-body);
+    font-size: var(--font-size-tagline);
     font-weight: var(--font-weight-semibold);
-    line-height: var(--line-height-hero-display);
-    letter-spacing: var(--letter-spacing-hero-display);
+    line-height: var(--line-height-tagline);
+    letter-spacing: var(--letter-spacing-tagline);
   }
 }
 
@@ -46,7 +46,7 @@
 
   input {
     height: var(--search-input-height);
-    border: var(--hairline-width) solid var(--soft-border-color);
+    border: var(--hairline-width) solid var(--hairline);
     border-radius: var(--rounded-pill);
     padding: var(--search-input-padding);
     background: var(--surface-pearl);
@@ -62,8 +62,8 @@
     background: var(--action-blue);
     color: var(--on-primary);
     cursor: pointer;
-    font: inherit;
     font-size: var(--font-size-body);
+    font-weight: var(--font-weight-regular);
     line-height: var(--line-height-button);
     letter-spacing: var(--letter-spacing-body);
 
@@ -72,7 +72,7 @@
     }
 
     &:active {
-      transform: scale(var(--active-scale-subtle));
+      transform: scale(var(--active-scale));
     }
   }
 }
