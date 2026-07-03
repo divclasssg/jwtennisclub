@@ -67,8 +67,19 @@
 - Removing a worktree may require deleting both the worktree folder and `.git/worktrees/<name>` metadata when Git cannot prune it.
 - Verification must be run from the final `main` workspace, not only from a temporary worktree.
 
+## 2026-07-03
+
+### Completed
+- Defined the member data model with `active`, `paused`, and `withdrawn` statuses, joined and withdrawn dates, optional phone last-four digits, optional withdrawal reason, a stable UUID key for future fee record references, permission-based RLS, and lifecycle validation helpers.
+
+### Verification Evidence
+- `npm run test -- src/features/members/member-model.test.ts`: 1 file passed, 8 tests passed.
+- `npm run test`: 8 files passed, 41 tests passed.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
+- `npm run build`: passed.
+
 ## Next Planned Work
 - Implement member management first.
-- Define the member data model before building screens.
 - Build member list, create, edit, and withdrawal flows.
 - After member management, proceed to fee payment tracking.
