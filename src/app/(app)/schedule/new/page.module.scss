@@ -1,0 +1,28 @@
+.event-form-page {
+  display: grid;
+  gap: var(--spacing-xl);
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.event-form-header {
+  display: grid;
+  gap: var(--spacing-xs);
+
+  h1 {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--font-size-display-md);
+    line-height: var(--line-height-display-md);
+    letter-spacing: var(--letter-spacing-display-md);
+  }
+}
+
+.event-form-kicker {
+  margin: 0;
+  color: var(--ink-muted-48);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-caption-strong);
+  letter-spacing: var(--letter-spacing-caption);
+}
