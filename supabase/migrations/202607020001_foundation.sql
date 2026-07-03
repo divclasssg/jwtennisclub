@@ -73,6 +73,7 @@ cross join (
     ('members.delete'),
     ('fees.payments.create'),
     ('fees.payments.update'),
+    ('expenses.view'),
     ('expenses.create'),
     ('expenses.update'),
     ('expenses.delete'),
@@ -93,6 +94,7 @@ cross join (
   values
     ('members.view'),
     ('fees.payments.create'),
+    ('expenses.view'),
     ('expenses.create'),
     ('events.create')
 ) as permissions(permission)

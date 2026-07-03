@@ -5,6 +5,7 @@ export const PERMISSIONS = [
   "members.delete",
   "fees.payments.create",
   "fees.payments.update",
+  "expenses.view",
   "expenses.create",
   "expenses.update",
   "expenses.delete",
@@ -31,6 +32,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Readonly<
   operator: Object.freeze([
     "members.view",
     "fees.payments.create",
+    "expenses.view",
     "expenses.create",
     "events.create",
   ] as const),

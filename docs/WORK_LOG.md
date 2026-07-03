@@ -100,6 +100,28 @@
 - Implemented fee payment CSV upload from `/fees/new` using `name`, `phoneLastFour`, `periodMonth`, `amount`, `paidDate`, and `memo` columns.
 - Changed `/fees/new` into a CSV-only import page and updated `/fees` to link to it as `CSV 등록`.
 - Marked membership fee management complete after schema execution, browser fee-flow verification, inline payment processing, cancellation handling, and CSV upload implementation.
+- Implemented expense record management with:
+  - Supabase migration `202607030005_add_expenses.sql`
+  - `expenses` table model with category, date, amount, receipt, memo, and audit fields
+  - permission-based RLS for expense view/create/update/delete
+  - `/expenses` monthly expense list, category filter, summary cards, and empty state
+  - `/expenses/new` expense registration flow
+  - expense model, form, list, action, and page tests
+- Marked expense management complete after local verification.
+- Implemented Cloudflare R2-backed expense receipt attachments:
+  - Added R2 S3-compatible upload/download helpers.
+  - Added optional JPG, PNG, WebP, and PDF upload to `/expenses/new`.
+  - Added private receipt object metadata columns through `202607030006_add_expense_receipts_r2.sql`.
+  - Added `/expenses/receipts` authenticated signed-download route.
+  - Raised Next server action body size limit to 10MB for receipt uploads.
+  - Added `.env.example` entries for Cloudflare R2 credentials.
+- Added expense deletion from the `/expenses` table. Deleting an expense removes the database row first, then best-effort deletes the attached R2 receipt object.
+- Added expense editing:
+  - `/expenses/[id]/edit` loads existing expense values.
+  - `/expenses` rows now include a `수정` link next to `삭제`.
+  - Updating an expense can replace the receipt file; the database is updated to the new R2 object and the old object is deleted best-effort after a successful save.
+- Removed the manual `증빙 있음` checkbox from expense forms. Receipt state is now derived from an attached receipt file.
+- Added a receipt deletion button on the expense edit form. Removing a receipt clears receipt metadata and best-effort deletes the R2 object after a successful save.
 
 ### Verification Evidence
 - `npm run test -- src/features/members/member-model.test.ts`: 1 file passed, 8 tests passed.
@@ -122,9 +144,33 @@
 - `npm run test`: 19 files passed, 83 tests passed.
 - `npm run lint`: passed.
 - `npx tsc --noEmit`: passed.
+- Expense management focused tests: 6 files passed, 9 tests passed.
+- `npm run test`: 25 files passed, 92 tests passed.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
+- `npm run build`: passed.
+- Expense receipt attachment focused tests: 8 files passed, 14 tests passed.
+- `npm run test`: 28 files passed, 101 tests passed.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
+- `npm run build`: passed.
+- Expense deletion tests: action deletion and table delete button passed.
+- `npm run test`: 28 files passed, 102 tests passed.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
+- Expense editing tests: update action, receipt replacement, edit page, and list edit link passed.
+- `npm run test`: 29 files passed, 105 tests passed.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
+- Receipt deletion button and proof-checkbox removal tests passed.
+- `npm run test`: 29 files passed, 106 tests passed.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
 
 ## Next Planned Work
 - Implement member tabs for separate active and withdrawn member management.
 - Verify CSV member import later when a real CSV file is available.
 - Deferred by user: verify member/fee kind columns and operator-first sorting later after real data is accumulated.
-- Implement expense records.
+- Execute `supabase/migrations/202607030006_add_expense_receipts_r2.sql` in Supabase SQL Editor.
+- Create a private Cloudflare R2 bucket and add R2 credentials to `.env.local`.
+- Implement monthly settlement summary.
