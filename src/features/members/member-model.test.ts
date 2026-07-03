@@ -11,6 +11,13 @@ const migrationSql = readFileSync(
   join(process.cwd(), "supabase/migrations/202607030002_add_members.sql"),
   "utf8",
 );
+const operatorMemberMigrationSql = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/migrations/202607030004_auto_add_operator_members.sql",
+  ),
+  "utf8",
+);
 
 describe("member model", () => {
   it("defines the supported member statuses", () => {
@@ -114,5 +121,23 @@ describe("members migration", () => {
     expect(migrationSql).toContain("public.has_permission('members.create')");
     expect(migrationSql).toContain("public.has_permission('members.update')");
     expect(migrationSql).toContain("public.has_permission('members.delete')");
+  });
+
+  it("links operator profiles to automatically created member records", () => {
+    expect(operatorMemberMigrationSql).toContain(
+      "add column operator_profile_id uuid unique references public.profiles(id)",
+    );
+    expect(operatorMemberMigrationSql).toContain(
+      "create or replace function public.ensure_operator_member()",
+    );
+    expect(operatorMemberMigrationSql).toContain(
+      "create trigger profiles_auto_add_member",
+    );
+    expect(operatorMemberMigrationSql).toContain(
+      "after insert on public.profiles",
+    );
+    expect(operatorMemberMigrationSql).toContain(
+      "운영자 계정 생성으로 자동 등록",
+    );
   });
 });

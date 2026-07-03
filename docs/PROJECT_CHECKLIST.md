@@ -18,6 +18,7 @@
 - [x] Member list screen implemented
 - [x] Member create/edit flow implemented
 - [x] Member withdrawal handling with withdrawal date implemented
+- [x] Admin/operator profile auto-add migration added for member records
 - [x] Member management screen flow verified
 - [x] Member management feature implemented
 - [ ] Membership fee management feature implemented
@@ -28,20 +29,29 @@
 
 ## Next Work
 - [ ] Revisit and finalize the dashboard after member, fee, expense, schedule, settlement, and PDF features are implemented
-- [ ] Define membership fee payment records
-- [ ] Implement fee payment list and monthly filters
+- [ ] Implement member tabs for separate active and withdrawn member management
+- [x] Define membership fee payment records
+- [x] Implement fee payment list and monthly filters
+- [ ] Implement fee payment CSV upload
+- [ ] Implement fee payment cancellation handling
+- [ ] Execute Supabase fee payment schema query
+- [ ] Verify fee payment screen flow in browser
 - [ ] Implement expense records
 - [ ] Implement monthly settlement summary
 - [ ] Implement PDF template for monthly report
 
 ## Deferred Work
 - [ ] Verify CSV member import with a real CSV file
+- [ ] Verify member and fee operator/general kind columns after real operator/member data exists
+- [ ] Verify operator-first sorting after real club positions are assigned
+- [ ] Verify fee inline payment processing after real monthly payment data exists
 
 ## Confirmed Product Decisions
 - [x] Target users are tennis club operators, not general members
 - [x] Main goal is reducing repeated checks and settlement mistakes
 - [x] Payment method tracking is not needed; transfers are handled externally
 - [x] Admins and operators can both exist as multiple users
+- [x] Admins and operators are also tennis club members and must be registered in members
 - [x] Role permissions must be editable later
 - [x] Member records need join date and withdrawal date
 - [x] Monthly PDF reports are shared with general members
@@ -52,6 +62,7 @@
 - [x] Authentication provider: Supabase Auth
 - [x] Database provider: Supabase Postgres
 - [x] Authorization model: `roles`, `role_permissions`, `profiles`
+- [x] Operator accounts and member records are linked by `members.operator_profile_id`; profiles auto-create member records
 - [x] First admin profile is seeded manually through Supabase SQL Editor
 - [x] Member schema is applied through Supabase SQL Editor
 - [x] `.env.local` is local-only and ignored by Git

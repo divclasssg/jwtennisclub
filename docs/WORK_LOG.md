@@ -44,6 +44,8 @@
 - General members may receive monthly PDF reports, but they are not the primary app users yet.
 - Fee payment method selection is unnecessary because payments are managed as bank transfers.
 - Admin and operator roles can have multiple users.
+- Admins and operators are still tennis club members. They should also exist in the member list and be treated the same as other members for membership fees.
+- Admin/operator profiles should automatically create linked member records so operators are not missed in monthly fee tracking.
 - Role permission editing must be supported later.
 - Member records should include join date and withdrawal date.
 - Any operator can generate monthly PDFs.
@@ -54,6 +56,11 @@
 - Supabase Postgres is used for app data.
 - `roles`, `role_permissions`, and `profiles` provide the permission foundation.
 - The first admin is registered manually through SQL because the app does not yet have an operator management screen.
+- Operator login profiles and member records are linked through `members.operator_profile_id`.
+- Added migration `202607030004_auto_add_operator_members.sql` to backfill existing profiles into members, auto-create members after new profile inserts, and sync member names when profile display names change.
+- Added a member-list kind column that distinguishes linked operator members from general members using `members.operator_profile_id`.
+- Member and fee-board lists now keep operator members above general members and order operators by club position: president, match director, treasurer, assistant treasurer.
+- Added the same operator/general member kind column to the fee board.
 - `.env.local` is not committed because `.env*` is ignored.
 - `src/proxy.ts` is the correct Next.js proxy location for this project structure.
 - Style files use `.scss` and `.module.scss`.
@@ -76,6 +83,18 @@
 - Executed the Supabase member schema query in SQL Editor.
 - Verified the member screen flow with the operator account: login, member list, single-member registration, search, edit, withdrawal status, withdrawal date, and withdrawal reason.
 - Marked member management complete; CSV import execution remains deferred until a real CSV file is available.
+- Implemented the fee payment tracking code path with:
+  - Supabase migration `202607030003_add_fee_payments.sql`
+  - `fee_payments` table model with one payment per member per month
+  - permission-based RLS for fee payment view/create/update/delete
+  - `/fees` monthly fee board, filters, summary cards, and unpaid count
+  - `/fees/new` active-member payment registration flow
+  - fee model, form, list, and page tests
+- Revised the fee UX from a separate payment-record list into a monthly member checklist:
+  - Default monthly fee amount changed to 30,000 KRW.
+  - `/fees` now shows target members for the selected month.
+  - Paid/unpaid status is visible per member row.
+  - Unpaid rows can be processed inline with a single `납부 처리` action.
 
 ### Verification Evidence
 - `npm run test -- src/features/members/member-model.test.ts`: 1 file passed, 8 tests passed.
@@ -86,7 +105,18 @@
 - Supabase SQL Editor member schema query: completed.
 - Browser verification: `/members`, `/members/new`, single-member create, search, edit, and withdrawn filter passed using verification member `Verify463463`.
 - CSV import screen rendered, but CSV upload execution is deferred until a real CSV file is available.
+- Fee payment focused tests: 4 files passed, 15 tests passed.
+- `npm run test`: 17 files passed, 72 tests passed.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
+- `npm run build`: passed.
 
 ## Next Planned Work
-- Proceed to fee payment tracking.
+- Implement member tabs for separate active and withdrawn member management.
+- Execute the Supabase fee payment schema query.
+- Verify `/fees` and `/fees/new` with an operator account after the schema exists.
+- Implement fee payment CSV upload.
+- Implement fee payment cancellation handling.
+- Complete membership fee management after database and browser verification.
 - Verify CSV member import later when a real CSV file is available.
+- Deferred by user: verify member/fee kind columns, operator-first sorting, and inline fee payment processing later after real data is accumulated.

@@ -8,6 +8,9 @@ export type MemberListRow = {
   id: string;
   name: string;
   phoneLastFour: string | null;
+  operatorProfileId: string | null;
+  operatorPositionName: string | null;
+  operatorPositionSortOrder: number | null;
   status: MemberStatus;
   joinedDate: string;
   withdrawnDate: string | null;
@@ -29,6 +32,7 @@ type MemberDatabaseRow = {
   id: string;
   name: string;
   phone_last_four: string | null;
+  operator_profile_id?: string | null;
   status: MemberStatus;
   joined_date: string;
   withdrawn_date: string | null;
@@ -64,12 +68,53 @@ export function mapMemberRow(row: MemberDatabaseRow): MemberListRow {
     id: row.id,
     name: row.name,
     phoneLastFour: row.phone_last_four,
+    operatorProfileId: row.operator_profile_id ?? null,
+    operatorPositionName: null,
+    operatorPositionSortOrder: null,
     status: row.status,
     joinedDate: row.joined_date,
     withdrawnDate: row.withdrawn_date,
     withdrawalReason: row.withdrawal_reason,
     memo: row.memo ?? null,
   };
+}
+
+export function applyOperatorPositionInfo(
+  member: MemberListRow,
+  positionInfo: {
+    name: string | null;
+    sortOrder: number | null;
+  } | null,
+): MemberListRow {
+  return {
+    ...member,
+    operatorPositionName: positionInfo?.name ?? null,
+    operatorPositionSortOrder: positionInfo?.sortOrder ?? null,
+  };
+}
+
+export function sortMemberListRows(rows: MemberListRow[]): MemberListRow[] {
+  return [...rows].sort((left, right) => {
+    const leftGroup = left.operatorProfileId ? 0 : 1;
+    const rightGroup = right.operatorProfileId ? 0 : 1;
+
+    if (leftGroup !== rightGroup) {
+      return leftGroup - rightGroup;
+    }
+
+    const leftPositionOrder = left.operatorPositionSortOrder ?? 999;
+    const rightPositionOrder = right.operatorPositionSortOrder ?? 999;
+
+    if (leftPositionOrder !== rightPositionOrder) {
+      return leftPositionOrder - rightPositionOrder;
+    }
+
+    return left.name.localeCompare(right.name, "ko-KR");
+  });
+}
+
+export function formatMemberKind(member: Pick<MemberListRow, "operatorProfileId">) {
+  return member.operatorProfileId ? "운영진" : "일반회원";
 }
 
 export function formatMemberStatus(status: MemberStatus) {

@@ -2,10 +2,13 @@ import Link from "next/link";
 import styles from "./page.module.scss";
 import { createClient } from "@/lib/supabase/server";
 import {
+  applyOperatorPositionInfo,
   formatDate,
+  formatMemberKind,
   formatMemberStatus,
   mapMemberRow,
   normalizeMemberListFilters,
+  sortMemberListRows,
   type MemberListRow,
   type MemberListSearchParams,
 } from "@/features/members/member-list";
@@ -19,6 +22,38 @@ function buildSearchPattern(query: string) {
   return `%${query.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
 }
 
+type OperatorPositionDatabaseRow = {
+  id: string;
+  club_positions:
+    | {
+        name: string | null;
+        sort_order: number | null;
+      }
+    | {
+        name: string | null;
+        sort_order: number | null;
+      }[]
+    | null;
+};
+
+function mapOperatorPositionRows(rows: OperatorPositionDatabaseRow[]) {
+  return new Map(
+    rows.map((row) => {
+      const position = Array.isArray(row.club_positions)
+        ? row.club_positions[0]
+        : row.club_positions;
+
+      return [
+        row.id,
+        {
+          name: position?.name ?? null,
+          sortOrder: position?.sort_order ?? null,
+        },
+      ];
+    }),
+  );
+}
+
 async function getMembers(filters: {
   query: string;
   status: "all" | (typeof MEMBER_STATUSES)[number];
@@ -27,7 +62,7 @@ async function getMembers(filters: {
   let request = supabase
     .from("members")
     .select(
-      "id, name, phone_last_four, status, joined_date, withdrawn_date, withdrawal_reason, memo",
+      "id, name, phone_last_four, operator_profile_id, status, joined_date, withdrawn_date, withdrawal_reason, memo",
     )
     .order("name", { ascending: true });
 
@@ -46,7 +81,36 @@ async function getMembers(filters: {
     throw new Error("회원 목록을 불러오지 못했습니다.");
   }
 
-  return (data ?? []).map(mapMemberRow);
+  const members = (data ?? []).map(mapMemberRow);
+  const operatorProfileIds = members
+    .map((member) => member.operatorProfileId)
+    .filter((id) => id !== null);
+
+  if (operatorProfileIds.length === 0) {
+    return sortMemberListRows(members);
+  }
+
+  const { data: positionRows, error: positionError } = await supabase
+    .from("profiles")
+    .select("id, club_positions(name, sort_order)")
+    .in("id", operatorProfileIds);
+
+  if (positionError) {
+    throw new Error("운영진 직책을 불러오지 못했습니다.");
+  }
+
+  const positionMap = mapOperatorPositionRows(positionRows ?? []);
+
+  return sortMemberListRows(
+    members.map((member) =>
+      applyOperatorPositionInfo(
+        member,
+        member.operatorProfileId
+          ? (positionMap.get(member.operatorProfileId) ?? null)
+          : null,
+      ),
+    ),
+  );
 }
 
 export default async function MembersPage({ searchParams }: MembersPageProps) {
@@ -110,6 +174,7 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
                 <tr>
                   <th scope="col">이름</th>
                   <th scope="col">연락처</th>
+                  <th scope="col">구분</th>
                   <th scope="col">상태</th>
                   <th scope="col">가입일</th>
                   <th scope="col">탈퇴일</th>
@@ -122,6 +187,17 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
                   <tr key={member.id}>
                     <th scope="row">{member.name}</th>
                     <td>{member.phoneLastFour ?? "-"}</td>
+                    <td>
+                      <span
+                        className={
+                          member.operatorProfileId
+                            ? styles["members-kind-operator"]
+                            : styles["members-kind-general"]
+                        }
+                      >
+                        {formatMemberKind(member)}
+                      </span>
+                    </td>
                     <td>
                       <span
                         className={

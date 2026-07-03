@@ -1,11 +1,11 @@
 @use "../../breakpoints" as bp;
 
-.members-page {
+.fees-page {
   display: grid;
   gap: var(--section-gap);
 }
 
-.members-header {
+.fees-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(var(--dashboard-side-column-min), 0.56fr);
   gap: var(--spacing-xl);
@@ -32,7 +32,7 @@
   }
 }
 
-.members-header-side {
+.fees-header-side {
   display: grid;
   justify-items: start;
   gap: var(--spacing-md);
@@ -54,7 +54,7 @@
   }
 }
 
-.members-kicker {
+.fees-kicker {
   color: var(--action-blue);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
@@ -62,16 +62,48 @@
   letter-spacing: var(--letter-spacing-caption);
 }
 
-.members-filters,
-.members-list-panel {
+.fees-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+
+  article {
+    display: grid;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-lg);
+    border: var(--hairline-width) solid var(--hairline);
+    border-radius: var(--rounded-lg);
+    background: var(--canvas);
+  }
+
+  p {
+    margin: 0;
+    color: var(--ink-muted-48);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-caption-strong);
+    letter-spacing: var(--letter-spacing-caption);
+  }
+
+  strong {
+    color: var(--ink);
+    font-size: var(--font-size-lead-airy);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-lead);
+    letter-spacing: var(--letter-spacing-lead-airy);
+  }
+}
+
+.fees-filters,
+.fees-list-panel {
   border: var(--hairline-width) solid var(--hairline);
   border-radius: var(--rounded-lg);
   background: var(--canvas);
 }
 
-.members-filters {
+.fees-filters {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(var(--members-status-filter-width), 0.3fr) auto;
+  grid-template-columns: minmax(var(--members-status-filter-width), 0.24fr) minmax(0, 1fr) minmax(var(--members-status-filter-width), 0.24fr) auto;
   gap: var(--spacing-sm);
   align-items: end;
   padding: var(--spacing-lg);
@@ -116,18 +148,14 @@
     line-height: var(--line-height-button);
     letter-spacing: var(--letter-spacing-button-utility);
     white-space: nowrap;
-
-    &:active {
-      transform: scale(var(--active-scale-subtle));
-    }
   }
 }
 
-.members-list-panel {
+.fees-list-panel {
   overflow: hidden;
 }
 
-.members-list-summary {
+.fees-list-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -153,11 +181,11 @@
   }
 }
 
-.members-table-wrap {
+.fees-table-wrap {
   overflow-x: auto;
 }
 
-.members-table {
+.fees-table {
   width: 100%;
   min-width: var(--members-table-min-width);
   border-collapse: collapse;
@@ -185,22 +213,16 @@
     font-weight: var(--font-weight-semibold);
   }
 
-  tbody a {
-    color: var(--action-blue);
-    font-weight: var(--font-weight-semibold);
-  }
-
   tbody tr:last-child th,
   tbody tr:last-child td {
     border-bottom: 0;
   }
 }
 
-.members-status-active,
-.members-status-paused,
-.members-status-withdrawn,
-.members-kind-operator,
-.members-kind-general {
+.fees-status-paid,
+.fees-status-unpaid,
+.fees-kind-operator,
+.fees-kind-general {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -215,27 +237,51 @@
   letter-spacing: var(--letter-spacing-fine-print);
 }
 
-.members-status-active {
+.fees-status-paid {
   color: var(--success-text);
 }
 
-.members-status-paused {
-  color: var(--ink-muted-48);
-}
-
-.members-status-withdrawn {
+.fees-status-unpaid {
   color: var(--error-text);
 }
 
-.members-kind-operator {
+.fees-kind-operator {
   color: var(--action-blue);
 }
 
-.members-kind-general {
+.fees-kind-general {
   color: var(--ink-muted-48);
 }
 
-.members-empty-state {
+.fees-complete-text {
+  color: var(--ink-muted-48);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-caption-strong);
+  letter-spacing: var(--letter-spacing-caption);
+}
+
+.fees-inline-form {
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--button-utility-height);
+    padding: var(--button-dark-utility-padding);
+    border: 0;
+    border-radius: var(--rounded-pill);
+    background: var(--action-blue);
+    color: var(--on-primary);
+    cursor: pointer;
+    font-size: var(--font-size-button-utility);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-button);
+    letter-spacing: var(--letter-spacing-button-utility);
+    white-space: nowrap;
+  }
+}
+
+.fees-empty-state {
   display: grid;
   gap: var(--spacing-xs);
   padding: var(--spacing-xxl) var(--spacing-lg);
@@ -261,14 +307,18 @@
 }
 
 @media (max-width: bp.$breakpoint-tablet-landscape) {
-  .members-header,
-  .members-filters {
+  .fees-header,
+  .fees-filters {
     grid-template-columns: 1fr;
+  }
+
+  .fees-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: bp.$breakpoint-phone) {
-  .members-header {
+  .fees-header {
     padding-top: var(--spacing-lg);
 
     h1 {
@@ -276,5 +326,9 @@
       line-height: var(--line-height-display-lg);
       letter-spacing: var(--letter-spacing-display-md);
     }
+  }
+
+  .fees-summary-grid {
+    grid-template-columns: 1fr;
   }
 }
