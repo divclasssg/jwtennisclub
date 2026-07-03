@@ -75,6 +75,7 @@
 - Implemented member create and edit flows, including single-member registration and CSV member import.
 - Executed the Supabase member schema query in SQL Editor.
 - Verified the member screen flow with the operator account: login, member list, single-member registration, search, edit, withdrawal status, withdrawal date, and withdrawal reason.
+- Marked member management complete; CSV import execution remains deferred until a real CSV file is available.
 
 ### Verification Evidence
 - `npm run test -- src/features/members/member-model.test.ts`: 1 file passed, 8 tests passed.
@@ -87,6 +88,5 @@
 - CSV import screen rendered, but CSV upload execution is deferred until a real CSV file is available.
 
 ## Next Planned Work
-- Implement member management first.
-- Verify CSV member import with a real CSV file.
-- After member management, proceed to fee payment tracking.
+- Proceed to fee payment tracking.
+- Verify CSV member import later when a real CSV file is available.
