@@ -122,6 +122,9 @@
   - Updating an expense can replace the receipt file; the database is updated to the new R2 object and the old object is deleted best-effort after a successful save.
 - Removed the manual `증빙 있음` checkbox from expense forms. Receipt state is now derived from an attached receipt file.
 - Added a receipt deletion button on the expense edit form. Removing a receipt clears receipt metadata and best-effort deletes the R2 object after a successful save.
+- Executed the Supabase expense receipt metadata query in SQL Editor.
+- Configured Cloudflare R2 receipt bucket credentials in local `.env.local`.
+- Verified receipt attachment locally through `/expenses/new` and confirmed the receipt link appears in `/expenses`.
 
 ### Verification Evidence
 - `npm run test -- src/features/members/member-model.test.ts`: 1 file passed, 8 tests passed.
@@ -166,11 +169,11 @@
 - `npm run test`: 29 files passed, 106 tests passed.
 - `npm run lint`: passed.
 - `npx tsc --noEmit`: passed.
+- Supabase SQL Editor expense receipt metadata query: completed.
+- Local browser verification: expense receipt attachment and list receipt link passed.
 
 ## Next Planned Work
 - Implement member tabs for separate active and withdrawn member management.
 - Verify CSV member import later when a real CSV file is available.
 - Deferred by user: verify member/fee kind columns and operator-first sorting later after real data is accumulated.
-- Execute `supabase/migrations/202607030006_add_expense_receipts_r2.sql` in Supabase SQL Editor.
-- Create a private Cloudflare R2 bucket and add R2 credentials to `.env.local`.
 - Implement monthly settlement summary.

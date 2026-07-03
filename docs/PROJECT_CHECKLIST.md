@@ -23,8 +23,9 @@
 - [x] Member management feature implemented
 - [x] Membership fee management feature implemented
 - [x] Expense management feature implemented
-- [ ] Execute Supabase expense receipt metadata query
-- [ ] Configure Cloudflare R2 receipt bucket credentials in `.env.local`
+- [x] Execute Supabase expense receipt metadata query
+- [x] Configure Cloudflare R2 receipt bucket credentials in `.env.local`
+- [x] Verify expense receipt attachment locally
 - [ ] Schedule management feature implemented
 - [ ] Monthly settlement feature implemented
 - [ ] Monthly PDF generation implemented
