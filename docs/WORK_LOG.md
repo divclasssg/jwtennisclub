@@ -172,7 +172,37 @@
 - Supabase SQL Editor expense receipt metadata query: completed.
 - Local browser verification: expense receipt attachment and list receipt link passed.
 
+## 2026-07-04
+
+### Completed
+- Designed the schedule management feature with month and week calendar views.
+- Implemented Supabase event permissions and migration SQL for `events`.
+- Implemented event form parsing, validation, and database input mapping.
+- Implemented month and week calendar builders with date grouping, time sorting, three-event month previews, and `+N개` overflow counts.
+- Implemented schedule create, update, and delete server actions.
+- Implemented `/schedule/new` and `/schedule/[id]/edit` event form pages.
+- Implemented `/schedule` month/week calendar UI:
+  - Month view shows time and event title only.
+  - Month date cells show up to three events.
+  - Overflow events are represented as `+N개`.
+  - Selected-date details show all events with location and management actions.
+  - Week view shows all events for each day with location.
+
+### Verification Evidence
+- Baseline before schedule implementation: `npm run test` passed with 29 files and 106 tests.
+- Schedule focused tests: `npm run test -- src/features/events src/app/\(app\)/schedule` passed with 6 files and 14 tests.
+- Full test suite: `npm run test` passed with 35 files and 121 tests.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
+- `npm run build`: passed.
+
+### Pending Verification
+- Supabase REST check returned `PGRST205` for `public.events`, confirming the event schedule migration has not yet been applied to the project database.
+- Browser verification for schedule create/edit/delete is pending until `supabase/migrations/202607040001_add_events.sql` is executed in Supabase SQL Editor.
+
 ## Next Planned Work
+- Execute the Supabase event schedule schema query from `supabase/migrations/202607040001_add_events.sql`.
+- Verify the schedule management screen flow in browser after the `events` table exists.
 - Implement member tabs for separate active and withdrawn member management.
 - Verify CSV member import later when a real CSV file is available.
 - Deferred by user: verify member/fee kind columns and operator-first sorting later after real data is accumulated.
