@@ -1,0 +1,91 @@
+.member-form {
+  display: grid;
+  gap: var(--spacing-lg);
+
+  label {
+    display: grid;
+    gap: var(--spacing-xs);
+    color: var(--ink-muted-48);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-caption-strong);
+    letter-spacing: var(--letter-spacing-caption);
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    border: var(--hairline-width) solid var(--hairline);
+    border-radius: var(--rounded-md);
+    background: var(--surface-pearl);
+    color: var(--ink);
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    letter-spacing: var(--letter-spacing-body);
+  }
+
+  input,
+  select {
+    height: var(--search-input-height);
+    padding: var(--search-input-padding);
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: var(--member-form-textarea-min-height);
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+}
+
+.member-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md);
+}
+
+.member-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+
+  a,
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--search-input-height);
+    padding: var(--button-primary-padding);
+    border-radius: var(--rounded-pill);
+    font-size: var(--font-size-button-utility);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-button);
+    letter-spacing: var(--letter-spacing-button-utility);
+    white-space: nowrap;
+  }
+
+  a {
+    border: var(--hairline-width) solid var(--hairline);
+    background: var(--surface-pearl);
+    color: var(--ink-muted-80);
+  }
+
+  button {
+    border: 0;
+    background: var(--action-blue);
+    color: var(--on-primary);
+    cursor: pointer;
+  }
+}
+
+@media (max-width: 640px) {
+  .member-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .member-form-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+}

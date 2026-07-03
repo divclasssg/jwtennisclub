@@ -32,6 +32,28 @@
   }
 }
 
+.members-header-side {
+  display: grid;
+  justify-items: start;
+  gap: var(--spacing-md);
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--search-input-height);
+    padding: var(--button-primary-padding);
+    border-radius: var(--rounded-pill);
+    background: var(--action-blue);
+    color: var(--on-primary);
+    font-size: var(--font-size-button-utility);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-button);
+    letter-spacing: var(--letter-spacing-button-utility);
+    white-space: nowrap;
+  }
+}
+
 .members-kicker {
   color: var(--action-blue);
   font-size: var(--font-size-caption);
@@ -160,6 +182,11 @@
 
   tbody th {
     color: var(--ink);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  tbody a {
+    color: var(--action-blue);
     font-weight: var(--font-weight-semibold);
   }
 

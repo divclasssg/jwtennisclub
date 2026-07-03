@@ -1,3 +1,4 @@
+import Link from "next/link";
 import styles from "./page.module.scss";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -26,7 +27,7 @@ async function getMembers(filters: {
   let request = supabase
     .from("members")
     .select(
-      "id, name, phone_last_four, status, joined_date, withdrawn_date, withdrawal_reason",
+      "id, name, phone_last_four, status, joined_date, withdrawn_date, withdrawal_reason, memo",
     )
     .order("name", { ascending: true });
 
@@ -60,10 +61,13 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
           <p className={styles["members-kicker"]}>회원 관리</p>
           <h1>회원 목록</h1>
         </div>
-        <p>
-          활동중, 휴회, 탈퇴 상태를 기준으로 회원을 찾고 이후 회비 기록과
-          연결할 기준 정보를 확인합니다.
-        </p>
+        <div className={styles["members-header-side"]}>
+          <p>
+            활동중, 휴회, 탈퇴 상태를 기준으로 회원을 찾고 이후 회비 기록과
+            연결할 기준 정보를 확인합니다.
+          </p>
+          <Link href="/members/new">회원 등록</Link>
+        </div>
       </header>
 
       <form className={styles["members-filters"]}>
@@ -110,6 +114,7 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
                   <th scope="col">가입일</th>
                   <th scope="col">탈퇴일</th>
                   <th scope="col">탈퇴 사유</th>
+                  <th scope="col">관리</th>
                 </tr>
               </thead>
               <tbody>
@@ -129,6 +134,9 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
                     <td>{formatDate(member.joinedDate)}</td>
                     <td>{formatDate(member.withdrawnDate)}</td>
                     <td>{member.withdrawalReason ?? "-"}</td>
+                    <td>
+                      <Link href={`/members/${member.id}/edit`}>수정</Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -12,6 +12,7 @@ export type MemberListRow = {
   joinedDate: string;
   withdrawnDate: string | null;
   withdrawalReason: string | null;
+  memo: string | null;
 };
 
 export type MemberListFilters = {
@@ -32,6 +33,7 @@ type MemberDatabaseRow = {
   joined_date: string;
   withdrawn_date: string | null;
   withdrawal_reason: string | null;
+  memo?: string | null;
 };
 
 export function firstSearchParam(value: string | string[] | undefined) {
@@ -66,6 +68,7 @@ export function mapMemberRow(row: MemberDatabaseRow): MemberListRow {
     joinedDate: row.joined_date,
     withdrawnDate: row.withdrawn_date,
     withdrawalReason: row.withdrawal_reason,
+    memo: row.memo ?? null,
   };
 }
 

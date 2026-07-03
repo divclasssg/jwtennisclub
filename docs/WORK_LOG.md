@@ -72,6 +72,7 @@
 ### Completed
 - Defined the member data model with `active`, `paused`, and `withdrawn` statuses, joined and withdrawn dates, optional phone last-four digits, optional withdrawal reason, a stable UUID key for future fee record references, permission-based RLS, and lifecycle validation helpers.
 - Implemented the member list screen at `/members` with Supabase-backed loading, name or phone-last-four search, status filters, table display, and empty state.
+- Implemented member create and edit flows, including single-member registration and CSV member import.
 
 ### Verification Evidence
 - `npm run test -- src/features/members/member-model.test.ts`: 1 file passed, 8 tests passed.
@@ -82,5 +83,5 @@
 
 ## Next Planned Work
 - Implement member management first.
-- Build member create, edit, and withdrawal flows.
+- Build member withdrawal handling polish and complete member management verification.
 - After member management, proceed to fee payment tracking.

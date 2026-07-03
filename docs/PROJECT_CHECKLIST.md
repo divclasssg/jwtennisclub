@@ -15,6 +15,7 @@
 - [x] Foundation UI design revised before member management
 - [x] Member table fields and statuses defined
 - [x] Member list screen implemented
+- [x] Member create/edit flow implemented
 - [ ] Member management feature implemented
 - [ ] Membership fee management feature implemented
 - [ ] Expense management feature implemented
@@ -24,7 +25,6 @@
 
 ## Next Work
 - [ ] Revisit and finalize the dashboard after member, fee, expense, schedule, settlement, and PDF features are implemented
-- [ ] Implement member create/edit flow
 - [ ] Implement member withdrawal handling with withdrawal date
 - [ ] Define membership fee payment records
 - [ ] Implement fee payment list and monthly filters

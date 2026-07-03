@@ -47,6 +47,7 @@ describe("member list formatting", () => {
         joined_date: "2026-07-01",
         withdrawn_date: null,
         withdrawal_reason: null,
+        memo: "첫 등록",
       }),
     ).toEqual({
       id: "member-id",
@@ -56,6 +57,7 @@ describe("member list formatting", () => {
       joinedDate: "2026-07-01",
       withdrawnDate: null,
       withdrawalReason: null,
+      memo: "첫 등록",
     });
   });
 

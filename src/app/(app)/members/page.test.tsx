@@ -11,6 +11,7 @@ const members = [
     joined_date: "2026-07-01",
     withdrawn_date: null,
     withdrawal_reason: null,
+    memo: null,
   },
   {
     id: "member-2",
@@ -20,6 +21,7 @@ const members = [
     joined_date: "2026-06-01",
     withdrawn_date: "2026-07-10",
     withdrawal_reason: "이사",
+    memo: null,
   },
 ];
 

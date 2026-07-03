@@ -1,0 +1,62 @@
+@use "../../../../breakpoints" as bp;
+
+.member-edit-page {
+  display: grid;
+  gap: var(--section-gap);
+}
+
+.member-edit-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(var(--dashboard-side-column-min), 0.56fr);
+  gap: var(--spacing-xl);
+  align-items: end;
+  padding: var(--spacing-xl) 0 var(--spacing-md);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+
+  h1 {
+    margin: var(--spacing-xs) 0 0;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: var(--font-size-display-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-display-lg);
+    letter-spacing: var(--letter-spacing-display-lg);
+  }
+
+  p {
+    margin: 0;
+    color: var(--ink-muted-48);
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    letter-spacing: var(--letter-spacing-body);
+  }
+}
+
+.member-edit-kicker {
+  color: var(--action-blue);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-caption-strong);
+  letter-spacing: var(--letter-spacing-caption);
+}
+
+.member-edit-panel {
+  padding: var(--spacing-lg);
+  border: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  background: var(--canvas);
+}
+
+.member-form-error {
+  margin: var(--spacing-lg) 0 0;
+  color: var(--error-text);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-caption);
+}
+
+@media (max-width: bp.$breakpoint-tablet-landscape) {
+  .member-edit-header {
+    grid-template-columns: 1fr;
+  }
+}
