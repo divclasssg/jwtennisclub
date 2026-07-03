@@ -68,6 +68,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   const events = await getEvents(filters.periodMonth);
   const monthCalendar = buildMonthCalendar(filters.periodMonth, events);
   const weekCalendar = buildWeekCalendar(filters.selectedDate, events);
+  const periodNavigation = buildPeriodNavigation(filters);
   const selectedEvents = events.filter(
     (event) => event.eventDate === filters.selectedDate,
   );
@@ -87,13 +88,9 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
 
       <div className={styles["schedule-toolbar"]}>
         <nav aria-label="일정 기간 이동" className={styles["schedule-nav"]}>
-          <Link href={buildScheduleHref({ month: getPreviousMonth(filters.periodMonth) })}>
-            이전
-          </Link>
-          <Link href="/schedule">오늘</Link>
-          <Link href={buildScheduleHref({ month: getNextMonth(filters.periodMonth) })}>
-            다음
-          </Link>
+          <Link href={periodNavigation.previousHref}>이전</Link>
+          <Link href={periodNavigation.todayHref}>오늘</Link>
+          <Link href={periodNavigation.nextHref}>다음</Link>
         </nav>
 
         <p className={styles["schedule-current-label"]}>{monthCalendar.label}</p>
@@ -309,6 +306,35 @@ function buildScheduleHref(params: {
   return `/schedule?${searchParams.toString()}`;
 }
 
+function buildPeriodNavigation(filters: ScheduleFilters) {
+  if (filters.view === "week") {
+    return {
+      previousHref: buildScheduleHref({
+        view: "week",
+        date: addDaysToDateKey(filters.selectedDate, -7),
+      }),
+      todayHref: buildScheduleHref({
+        view: "week",
+        date: getTodayDateKey(),
+      }),
+      nextHref: buildScheduleHref({
+        view: "week",
+        date: addDaysToDateKey(filters.selectedDate, 7),
+      }),
+    };
+  }
+
+  return {
+    previousHref: buildScheduleHref({
+      month: getPreviousMonth(filters.periodMonth),
+    }),
+    todayHref: "/schedule",
+    nextHref: buildScheduleHref({
+      month: getNextMonth(filters.periodMonth),
+    }),
+  };
+}
+
 function firstSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -323,6 +349,13 @@ function normalizeDateKey(value: string | undefined) {
 
 function getTodayDateKey() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function addDaysToDateKey(value: string, days: number) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function formatEventTime(value: string) {

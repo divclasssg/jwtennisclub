@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SchedulePage from "./page";
 
@@ -36,6 +36,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 describe("SchedulePage", () => {
   beforeEach(() => {
+    cleanup();
     eventsQuery.gte.mockClear();
     eventsQuery.lt.mockClear();
     eventsQuery.order.mockClear();
@@ -90,6 +91,26 @@ describe("SchedulePage", () => {
     expect(within(week).getByText("09:00 첫 번째")).toBeInTheDocument();
     expect(within(week).getByText("12:00 네 번째")).toBeInTheDocument();
     expect(within(week).getAllByText("올림픽공원").length).toBeGreaterThan(0);
+  });
+
+  it("keeps week view when moving to the previous or next period", async () => {
+    render(
+      await SchedulePage({
+        searchParams: Promise.resolve({
+          view: "week",
+          date: "2026-07-11",
+        }),
+      }),
+    );
+
+    expect(screen.getByRole("link", { name: "이전" })).toHaveAttribute(
+      "href",
+      "/schedule?view=week&date=2026-07-04",
+    );
+    expect(screen.getByRole("link", { name: "다음" })).toHaveAttribute(
+      "href",
+      "/schedule?view=week&date=2026-07-18",
+    );
   });
 });
 
