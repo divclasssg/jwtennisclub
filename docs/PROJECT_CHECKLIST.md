@@ -27,7 +27,7 @@
 - [x] Configure Cloudflare R2 receipt bucket credentials in `.env.local`
 - [x] Verify expense receipt attachment locally
 - [ ] Schedule management feature implemented
-- [ ] Execute Supabase event schedule schema query
+- [x] Execute Supabase event schedule schema query
 - [ ] Verify schedule management screen flow in browser
 - [ ] Monthly settlement feature implemented
 - [ ] Monthly PDF generation implemented

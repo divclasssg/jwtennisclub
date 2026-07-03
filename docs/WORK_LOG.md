@@ -197,12 +197,12 @@
 - `npm run build`: passed.
 
 ### Pending Verification
-- Supabase REST check returned `PGRST205` for `public.events`, confirming the event schedule migration has not yet been applied to the project database.
-- Browser verification for schedule create/edit/delete is pending until `supabase/migrations/202607040001_add_events.sql` is executed in Supabase SQL Editor.
+- Supabase SQL Editor event schedule schema query: completed.
+- Supabase REST check for `public.events` returned 200 with an empty result set after the schema query was executed.
+- Browser verification for schedule create/edit/delete is pending because unauthenticated `/schedule` requests correctly redirect to `/login`.
 
 ## Next Planned Work
-- Execute the Supabase event schedule schema query from `supabase/migrations/202607040001_add_events.sql`.
-- Verify the schedule management screen flow in browser after the `events` table exists.
+- Verify the schedule management screen flow in browser with an authenticated operator session.
 - Implement member tabs for separate active and withdrawn member management.
 - Verify CSV member import later when a real CSV file is available.
 - Deferred by user: verify member/fee kind columns and operator-first sorting later after real data is accumulated.
