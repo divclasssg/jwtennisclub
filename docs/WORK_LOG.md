@@ -234,6 +234,18 @@
 - Refactored repeated member, fee, expense, schedule, settlement, and password-change page structures to use the shared atomic UI components.
 - Moved the schedule calendar UI into `src/features/events/ScheduleCalendar.tsx` with focused tests.
 - Stabilized the monthly report PDF render test by giving the renderer-specific test a longer timeout because font/PDF initialization can exceed the default timeout under full-suite load.
+- Reused shared schedule UI patterns:
+  - selected-date empty schedule state now uses the shared `EmptyState`
+  - schedule event actions now use the shared `RowActions`
+- Revised the shared segmented `Tabs` UI to match the requested pill-style control:
+  - gray segmented track
+  - blue active segment
+  - same segmented interaction model on mobile
+  - constrained width on wider screens while preserving full-width mobile behavior
+- Implemented the originally planned mobile member list view:
+  - desktop keeps the table-oriented member layout
+  - mobile hides the table and shows a searchable member list/card layout
+  - mobile rows include member name, kind, status, phone last four, joined date, withdrawn date, withdrawal reason, and an accessible edit link
 
 ### Verification Evidence
 - Member tab focused tests: `npm run test -- src/features/members/member-list.test.ts src/app/\(app\)/members/page.test.tsx` passed with 2 files and 9 tests.
@@ -248,6 +260,10 @@
 - Atomic UI refactor focused tests: `npm run test -- src/components/molecules/molecules.test.tsx src/features/members/member-form.test.ts src/features/events src/features/expenses src/features/fees src/app/\(app\)/members src/app/\(app\)/expenses src/app/\(app\)/fees src/app/\(app\)/schedule` passed with 27 files and 80 tests.
 - Full test suite after atomic UI refactor: `npm run test` passed with 46 files and 158 tests.
 - Atomic UI refactor verification: `npm run lint`, `npx tsc --noEmit`, `git diff --check`, and `npm run build` passed.
+- Shared schedule UI reuse verification: `npm run test`, `npm run lint`, `npx tsc --noEmit`, `git diff --check`, and `npm run build` passed with 46 files and 160 tests.
+- Segmented tab UI verification: focused member/molecule tests, `npm run test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed with 46 files and 160 tests.
+- Mobile member list verification: `npm run test -- src/features/members src/app/\(app\)/members` passed with 6 files and 30 tests.
+- Full verification after mobile member list: `npm run test` passed with 46 files and 161 tests; `npm run lint`, `npx tsc --noEmit`, `git diff --check`, and `npm run build` passed.
 
 ### Atomic UI Guidelines
 - Prefer existing shared components before adding page-local markup or styles.

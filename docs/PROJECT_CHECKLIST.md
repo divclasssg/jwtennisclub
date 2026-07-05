@@ -38,6 +38,8 @@
 - [x] PDF download consolidated into settlement screen
 - [x] Unused settings item removed from primary navigation
 - [x] Atomic design UI component structure introduced for shared atoms, molecules, organisms, and templates
+- [x] Segmented tab UI revised for desktop and mobile
+- [x] Member list mobile layout implemented as a searchable list/card view
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management
@@ -52,6 +54,7 @@
 - [x] Implement monthly settlement summary
 - [x] Implement PDF template for monthly report
 - [x] Refactor repeated management pages, data tables, form panels, CSV fields, and form actions into shared atomic UI components
+- [x] Implement mobile member list view from the original responsive design plan
 
 ## Deferred Work
 - [ ] Revisit and finalize the dashboard after enough real operational data has accumulated
