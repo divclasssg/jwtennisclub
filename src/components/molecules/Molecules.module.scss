@@ -169,40 +169,40 @@
 }
 
 .tabs {
-  display: inline-grid;
-  gap: var(--spacing-xs);
-  width: fit-content;
-  padding: var(--spacing-xs);
-  border: var(--hairline-width) solid var(--hairline);
-  border-radius: var(--rounded-pill);
-  background: var(--canvas);
+  display: grid;
+  gap: var(--segmented-tab-padding);
+  width: 100%;
+  padding: var(--segmented-tab-padding);
+  border-radius: var(--rounded-md);
+  background: var(--surface-chip-translucent);
 }
 
 .tabs-3 {
-  grid-template-columns: repeat(3, minmax(var(--members-status-filter-width), 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .tabs-2 {
-  grid-template-columns: repeat(2, minmax(var(--members-status-filter-width), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .tab-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: var(--search-input-height);
-  padding: var(--button-secondary-pill-padding);
-  border-radius: var(--rounded-pill);
-  color: var(--ink-muted-48);
-  font-size: var(--font-size-button-utility);
+  min-width: 0;
+  min-height: var(--segmented-tab-height);
+  padding: var(--segmented-tab-padding) var(--spacing-md);
+  border-radius: var(--rounded-sm);
+  color: var(--ink);
+  font-size: var(--font-size-tagline);
   font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-button);
-  letter-spacing: var(--letter-spacing-button-utility);
+  line-height: var(--line-height-tagline);
+  letter-spacing: var(--letter-spacing-tagline);
   white-space: nowrap;
 
   &[aria-current="page"] {
-    background: var(--ink);
-    color: var(--on-dark);
+    background: var(--action-blue-focus);
+    color: var(--on-primary);
   }
 }
 
@@ -261,20 +261,12 @@
     grid-template-columns: 1fr;
   }
 
-  .tabs {
-    width: 100%;
-  }
 }
 
 @media (max-width: bp.$breakpoint-phone) {
   .summary-grid-2,
   .summary-grid-4 {
     grid-template-columns: 1fr;
-  }
-
-  .tabs {
-    grid-template-columns: 1fr;
-    border-radius: var(--rounded-lg);
   }
 
   .panel-header {

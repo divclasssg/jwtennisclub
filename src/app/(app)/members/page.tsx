@@ -233,7 +233,7 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
         </DataPanel>
       }
       tabs={
-        <Tabs aria-label="회원 상태">
+        <Tabs aria-label="회원 상태" columns={3}>
           {MEMBER_STATUSES.map((status) => (
             <TabLink
               href={buildStatusHref(status, filters.query)}

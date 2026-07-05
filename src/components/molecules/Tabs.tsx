@@ -14,7 +14,7 @@ type TabLinkProps = ComponentProps<typeof Link> & {
 export function Tabs({
   children,
   className,
-  columns = 3,
+  columns = 2,
   ...props
 }: TabsProps) {
   return (
