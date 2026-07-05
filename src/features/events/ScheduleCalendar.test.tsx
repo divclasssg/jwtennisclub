@@ -72,6 +72,25 @@ describe("ScheduleCalendar components", () => {
     expect(within(selected).getByText("관리 event-4")).toBeInTheDocument();
   });
 
+  it("renders selected-date empty state through the shared empty pattern", () => {
+    render(
+      <SelectedEventList
+        events={[]}
+        formatDateLong={() => "2026.07.12"}
+        month="2026-07"
+        renderActions={(event) => <span>관리 {event.id}</span>}
+        selectedDate="2026-07-12"
+      />,
+    );
+
+    const selected = screen.getByRole("region", { name: "선택한 날짜 일정" });
+    expect(
+      within(selected).getByRole("heading", {
+        name: "선택한 날짜에 등록된 일정이 없습니다.",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("renders week calendar days with locations", () => {
     const weekCalendar = buildWeekCalendar("2026-07-11", events);
 

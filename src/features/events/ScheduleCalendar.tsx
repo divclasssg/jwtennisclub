@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { EmptyState, RowActions } from "@/components/molecules";
 import type {
   CalendarEventPreview,
   MonthCalendarDay,
@@ -203,9 +204,7 @@ export function SelectedEventList({
           ))}
         </ol>
       ) : (
-        <p className={styles["schedule-empty-copy"]}>
-          선택한 날짜에 등록된 일정이 없습니다.
-        </p>
+        <EmptyState title="선택한 날짜에 등록된 일정이 없습니다." />
       )}
     </section>
   );
@@ -216,7 +215,11 @@ export function ScheduleEventActions({
 }: {
   children: ReactNode;
 }) {
-  return <div className={styles["schedule-event-actions"]}>{children}</div>;
+  return (
+    <RowActions className={styles["schedule-event-actions"]}>
+      {children}
+    </RowActions>
+  );
 }
 
 function formatEventTime(value: string) {
