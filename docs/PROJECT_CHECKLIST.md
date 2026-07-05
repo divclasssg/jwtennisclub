@@ -31,13 +31,14 @@
 - [x] Schedule month view overflow displays as `+N개`
 - [x] Schedule week navigation stays in week view
 - [x] Execute Supabase event schedule schema query
-- [ ] Verify schedule management screen flow in browser
-- [ ] Monthly settlement feature implemented
-- [ ] Monthly PDF generation implemented
+- [x] Verify schedule management screen flow in browser
+- [x] Member tabs for separate active, paused, and withdrawn member management implemented
+- [x] Monthly settlement summary implemented
+- [x] Monthly PDF generation implemented
+- [x] Unused settings item removed from primary navigation
 
 ## Next Work
-- [ ] Revisit and finalize the dashboard after member, fee, expense, schedule, settlement, and PDF features are implemented
-- [ ] Implement member tabs for separate active and withdrawn member management
+- [x] Implement member tabs for separate active, paused, and withdrawn member management
 - [x] Define membership fee payment records
 - [x] Implement fee payment list and monthly filters
 - [x] Implement fee payment CSV upload
@@ -46,10 +47,11 @@
 - [x] Verify fee payment screen flow in browser
 - [x] Implement expense records
 - [x] Implement expense receipt attachment with Cloudflare R2
-- [ ] Implement monthly settlement summary
-- [ ] Implement PDF template for monthly report
+- [x] Implement monthly settlement summary
+- [x] Implement PDF template for monthly report
 
 ## Deferred Work
+- [ ] Revisit and finalize the dashboard after enough real operational data has accumulated
 - [ ] Verify CSV member import with a real CSV file
 - [ ] Verify member and fee operator/general kind columns after real operator/member data exists
 - [ ] Verify operator-first sorting after real club positions are assigned

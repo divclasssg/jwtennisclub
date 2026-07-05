@@ -10,7 +10,6 @@ const navigationItems = [
     { href: "/schedule", label: "일정" },
     { href: "/settlements", label: "정산" },
     { href: "/reports", label: "PDF" },
-    { href: "/settings", label: "설정" },
 ];
 
 type AppShellProps = {

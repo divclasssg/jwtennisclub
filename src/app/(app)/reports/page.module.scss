@@ -1,0 +1,166 @@
+@use "../../breakpoints" as bp;
+
+.reports-page {
+  display: grid;
+  gap: var(--section-gap);
+}
+
+.reports-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(var(--dashboard-side-column-min), 0.56fr);
+  gap: var(--spacing-xl);
+  align-items: end;
+  padding: var(--spacing-xl) 0 var(--spacing-md);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+
+  h1 {
+    margin: var(--spacing-xs) 0 0;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: var(--font-size-display-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-display-lg);
+    letter-spacing: var(--letter-spacing-display-lg);
+  }
+
+  p {
+    margin: 0;
+    color: var(--ink-muted-48);
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    letter-spacing: var(--letter-spacing-body);
+  }
+}
+
+.reports-kicker {
+  color: var(--action-blue);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-caption-strong);
+  letter-spacing: var(--letter-spacing-caption);
+}
+
+.reports-header-side {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+.reports-filters,
+.reports-download-panel {
+  border: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  background: var(--canvas);
+}
+
+.reports-filters {
+  display: grid;
+  grid-template-columns: minmax(var(--members-status-filter-width), 0.24fr) auto;
+  gap: var(--spacing-sm);
+  align-items: end;
+  padding: var(--spacing-lg);
+
+  label {
+    display: grid;
+    gap: var(--spacing-xs);
+    color: var(--ink-muted-48);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-caption-strong);
+    letter-spacing: var(--letter-spacing-caption);
+  }
+
+  input {
+    width: 100%;
+    height: var(--search-input-height);
+    padding: var(--search-input-padding);
+    border: var(--hairline-width) solid var(--hairline);
+    border-radius: var(--rounded-pill);
+    background: var(--surface-pearl);
+    color: var(--ink);
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    letter-spacing: var(--letter-spacing-body);
+  }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--search-input-height);
+    padding: var(--button-primary-padding);
+    border: 0;
+    border-radius: var(--rounded-pill);
+    background: var(--action-blue);
+    color: var(--on-primary);
+    cursor: pointer;
+    font-size: var(--font-size-button-utility);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-button);
+    letter-spacing: var(--letter-spacing-button-utility);
+    white-space: nowrap;
+  }
+}
+
+.reports-download-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+
+  p {
+    margin: 0 0 var(--spacing-xs);
+    color: var(--ink);
+    font-size: var(--font-size-lead-airy);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-lead);
+    letter-spacing: var(--letter-spacing-lead-airy);
+  }
+
+  span {
+    color: var(--ink-muted-48);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+    letter-spacing: var(--letter-spacing-caption);
+  }
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--search-input-height);
+    padding: var(--button-primary-padding);
+    border-radius: var(--rounded-pill);
+    background: var(--action-blue);
+    color: var(--on-primary);
+    font-size: var(--font-size-button-utility);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-button);
+    letter-spacing: var(--letter-spacing-button-utility);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: bp.$breakpoint-tablet-landscape) {
+  .reports-header,
+  .reports-filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: bp.$breakpoint-phone) {
+  .reports-header {
+    padding-top: var(--spacing-lg);
+
+    h1 {
+      font-size: var(--font-size-display-md);
+      line-height: var(--line-height-display-lg);
+      letter-spacing: var(--letter-spacing-display-md);
+    }
+  }
+
+  .reports-download-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

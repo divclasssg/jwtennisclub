@@ -6,13 +6,14 @@ import {
   formatDate,
   formatMemberKind,
   formatMemberStatus,
+  formatMemberStatusTab,
   mapMemberRow,
   normalizeMemberListFilters,
   sortMemberListRows,
   type MemberListRow,
   type MemberListSearchParams,
 } from "@/features/members/member-list";
-import { MEMBER_STATUSES } from "@/features/members/member-model";
+import { MEMBER_STATUSES, type MemberStatus } from "@/features/members/member-model";
 
 type MembersPageProps = {
   searchParams: Promise<MemberListSearchParams>;
@@ -56,7 +57,7 @@ function mapOperatorPositionRows(rows: OperatorPositionDatabaseRow[]) {
 
 async function getMembers(filters: {
   query: string;
-  status: "all" | (typeof MEMBER_STATUSES)[number];
+  status: MemberStatus;
 }): Promise<MemberListRow[]> {
   const supabase = await createClient();
   let request = supabase
@@ -66,9 +67,7 @@ async function getMembers(filters: {
     )
     .order("name", { ascending: true });
 
-  if (filters.status !== "all") {
-    request = request.eq("status", filters.status);
-  }
+  request = request.eq("status", filters.status);
 
   if (filters.query) {
     const pattern = buildSearchPattern(filters.query);
@@ -113,10 +112,20 @@ async function getMembers(filters: {
   );
 }
 
+function buildStatusHref(status: MemberStatus, query: string) {
+  const params = new URLSearchParams({ status });
+
+  if (query) {
+    params.set("q", query);
+  }
+
+  return `/members?${params.toString()}`;
+}
+
 export default async function MembersPage({ searchParams }: MembersPageProps) {
   const filters = normalizeMemberListFilters(await searchParams);
   const members = await getMembers(filters);
-  const hasFilters = filters.query || filters.status !== "all";
+  const hasFilters = filters.query || filters.status !== "active";
 
   return (
     <section className={styles["members-page"]}>
@@ -134,6 +143,19 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
         </div>
       </header>
 
+      <nav className={styles["members-tabs"]} aria-label="회원 상태">
+        {MEMBER_STATUSES.map((status) => (
+          <Link
+            aria-current={filters.status === status ? "page" : undefined}
+            className={styles["members-tab-link"]}
+            href={buildStatusHref(status, filters.query)}
+            key={status}
+          >
+            {formatMemberStatusTab(status)}
+          </Link>
+        ))}
+      </nav>
+
       <form className={styles["members-filters"]}>
         <label className={styles["members-search-field"]}>
           검색
@@ -144,17 +166,7 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
             type="search"
           />
         </label>
-        <label className={styles["members-status-field"]}>
-          상태
-          <select defaultValue={filters.status} name="status">
-            <option value="all">전체</option>
-            {MEMBER_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {formatMemberStatus(status)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <input name="status" type="hidden" value={filters.status} />
         <button type="submit">조회</button>
       </form>
 

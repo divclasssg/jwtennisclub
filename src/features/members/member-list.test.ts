@@ -3,6 +3,7 @@ import {
   formatDate,
   formatMemberKind,
   formatMemberStatus,
+  formatMemberStatusTab,
   mapMemberRow,
   normalizeMemberListFilters,
   sortMemberListRows,
@@ -18,10 +19,10 @@ describe("normalizeMemberListFilters", () => {
     });
   });
 
-  it("falls back to all for missing or unsupported statuses", () => {
+  it("falls back to active for missing or unsupported statuses", () => {
     expect(normalizeMemberListFilters({ status: "unknown" })).toEqual({
       query: "",
-      status: "all",
+      status: "active",
     });
   });
 
@@ -69,8 +70,11 @@ describe("member list formatting", () => {
 
   it("formats status labels and dates for Korean operators", () => {
     expect(formatMemberStatus("active")).toBe("활동중");
+    expect(formatMemberStatusTab("active")).toBe("활동");
     expect(formatMemberStatus("paused")).toBe("휴회");
+    expect(formatMemberStatusTab("paused")).toBe("휴회");
     expect(formatMemberStatus("withdrawn")).toBe("탈퇴");
+    expect(formatMemberStatusTab("withdrawn")).toBe("탈퇴");
     expect(formatDate("2026-07-01")).toBe("2026.07.01");
     expect(formatDate(null)).toBe("-");
   });

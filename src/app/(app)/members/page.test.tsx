@@ -100,10 +100,10 @@ describe("MembersPage", () => {
     }
   });
 
-  it("renders member rows with search and status filters", async () => {
+  it("renders member rows with search and status tabs", async () => {
     render(
       await MembersPage({
-        searchParams: Promise.resolve({ q: "김", status: "active" }),
+        searchParams: Promise.resolve({ q: "김", status: "paused" }),
       }),
     );
 
@@ -111,7 +111,16 @@ describe("MembersPage", () => {
       screen.getByRole("heading", { name: "회원 목록" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("검색")).toHaveValue("김");
-    expect(screen.getByLabelText("상태")).toHaveValue("active");
+    expect(screen.getByDisplayValue("paused")).toHaveAttribute("name", "status");
+    expect(
+      screen.getByRole("link", { name: "활동" }),
+    ).toHaveAttribute("href", "/members?status=active&q=%EA%B9%80");
+    expect(
+      screen.getByRole("link", { name: "휴회" }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      screen.getByRole("link", { name: "탈퇴" }),
+    ).toHaveAttribute("href", "/members?status=withdrawn&q=%EA%B9%80");
 
     const list = screen.getByRole("region", { name: "회원 목록" });
     expect(within(list).getByText("총 2명")).toBeInTheDocument();
@@ -127,7 +136,7 @@ describe("MembersPage", () => {
 
     render(
       await MembersPage({
-        searchParams: Promise.resolve({ q: "없음", status: "all" }),
+        searchParams: Promise.resolve({ q: "없음", status: "active" }),
       }),
     );
 

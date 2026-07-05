@@ -4,6 +4,13 @@ import {
   type MemberStatus,
 } from "./member-model";
 
+const MEMBER_STATUS_TAB_LABELS: Readonly<Record<MemberStatus, string>> =
+  Object.freeze({
+    active: "활동",
+    paused: "휴회",
+    withdrawn: "탈퇴",
+  });
+
 export type MemberListRow = {
   id: string;
   name: string;
@@ -20,7 +27,7 @@ export type MemberListRow = {
 
 export type MemberListFilters = {
   query: string;
-  status: MemberStatus | "all";
+  status: MemberStatus;
 };
 
 export type MemberListSearchParams = {
@@ -52,7 +59,7 @@ export function normalizeMemberListFilters(
 
   return {
     query,
-    status: isMemberStatus(status) ? status : "all",
+    status: isMemberStatus(status) ? status : "active",
   };
 }
 
@@ -119,6 +126,10 @@ export function formatMemberKind(member: Pick<MemberListRow, "operatorProfileId"
 
 export function formatMemberStatus(status: MemberStatus) {
   return MEMBER_STATUS_LABELS[status];
+}
+
+export function formatMemberStatusTab(status: MemberStatus) {
+  return MEMBER_STATUS_TAB_LABELS[status];
 }
 
 export function formatDate(value: string | null) {

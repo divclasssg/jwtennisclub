@@ -201,9 +201,41 @@
 - Supabase REST check for `public.events` returned 200 with an empty result set after the schema query was executed.
 - Browser verification for schedule create/edit/delete is pending because unauthenticated `/schedule` requests correctly redirect to `/login`.
 
+## 2026-07-05
+
+### Completed
+- Verified the schedule management screen flow in browser with an authenticated operator session.
+- Implemented member list tabs for `활동`, `휴회`, and `탈퇴`.
+- Changed member list status filtering from a dropdown with `전체` to URL-backed status tabs.
+- Kept member search within the selected status tab by submitting the current `status` as a hidden form value.
+- Defaulted missing or unsupported member `status` query parameters to `active`.
+- Implemented the monthly settlement summary page at `/settlements`.
+- Added read-only monthly settlement calculations from existing `fee_payments` and `expenses` data:
+  - income total from fee payments in the selected month
+  - expense total from expenses in the selected month
+  - settlement balance as income minus expenses
+  - fee payment and expense counts
+  - expense totals grouped by category
+- Implemented monthly PDF report generation:
+  - Added `/reports` with month selection and a `PDF 다운로드` link.
+  - Added `/reports/monthly?month=YYYY-MM` as an authenticated PDF download route.
+  - Added a member-facing PDF template with Korean font support through `@react-pdf/renderer` and `@fontsource/noto-sans-kr`.
+  - Included income total, expense total, monthly balance, payment and expense counts, expense category totals, major expense rows, generation date, and generator name.
+  - Excluded individual payment records, unpaid member names, receipt links/files, and internal expense memos from the PDF.
+  - Current PDF generation uses live monthly fee and expense data because monthly closing snapshots are not implemented yet.
+- Removed the unused `설정` item from the primary navigation while keeping the `비밀번호 변경` account action.
+
+### Verification Evidence
+- Member tab focused tests: `npm run test -- src/features/members/member-list.test.ts src/app/\(app\)/members/page.test.tsx` passed with 2 files and 9 tests.
+- Settlement focused tests: `npm run test -- src/features/settlements/settlement-summary.test.ts src/app/\(app\)/settlements/page.test.tsx` passed with 2 files and 6 tests.
+- PDF report focused tests: `npm run test -- src/features/reports/monthly-report.test.ts src/features/reports/MonthlyReportPdf.test.tsx src/app/\(app\)/reports/page.test.tsx src/app/\(app\)/reports/monthly/route.test.ts` passed with 4 files and 7 tests.
+- Shell navigation focused test: `npm run test -- src/features/shell/AppShell.test.tsx` passed with 1 file and 1 test.
+- Full test suite: `npm run test` passed with 41 files and 135 tests.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
+- `npm run build`: passed.
+
 ## Next Planned Work
-- Verify the schedule management screen flow in browser with an authenticated operator session.
-- Implement member tabs for separate active and withdrawn member management.
 - Verify CSV member import later when a real CSV file is available.
+- Revisit and finalize the dashboard later after enough real operational data has accumulated.
 - Deferred by user: verify member/fee kind columns and operator-first sorting later after real data is accumulated.
-- Implement monthly settlement summary.

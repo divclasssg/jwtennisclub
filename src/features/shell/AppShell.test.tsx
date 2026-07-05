@@ -30,7 +30,6 @@ const requiredNavigationItems = [
   { href: "/schedule", label: "일정" },
   { href: "/settlements", label: "정산" },
   { href: "/reports", label: "PDF" },
-  { href: "/settings", label: "설정" },
 ];
 
 describe("AppShell", () => {
@@ -51,6 +50,13 @@ describe("AppShell", () => {
       );
     }
 
+    expect(
+      within(nav).queryByRole("link", { name: "설정" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "비밀번호 변경" })).toHaveAttribute(
+      "href",
+      "/settings/password",
+    );
     expect(screen.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "업무 화면" })).toBeInTheDocument();
   });

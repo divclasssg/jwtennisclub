@@ -1,11 +1,11 @@
 @use "../../breakpoints" as bp;
 
-.members-page {
+.settlements-page {
   display: grid;
   gap: var(--section-gap);
 }
 
-.members-header {
+.settlements-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(var(--dashboard-side-column-min), 0.56fr);
   gap: var(--spacing-xl);
@@ -32,29 +32,7 @@
   }
 }
 
-.members-header-side {
-  display: grid;
-  justify-items: start;
-  gap: var(--spacing-md);
-
-  a {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: var(--search-input-height);
-    padding: var(--button-primary-padding);
-    border-radius: var(--rounded-pill);
-    background: var(--action-blue);
-    color: var(--on-primary);
-    font-size: var(--font-size-button-utility);
-    font-weight: var(--font-weight-semibold);
-    line-height: var(--line-height-button);
-    letter-spacing: var(--letter-spacing-button-utility);
-    white-space: nowrap;
-  }
-}
-
-.members-kicker {
+.settlements-kicker {
   color: var(--action-blue);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
@@ -62,47 +40,22 @@
   letter-spacing: var(--letter-spacing-caption);
 }
 
-.members-filters,
-.members-list-panel {
+.settlements-header-side {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+.settlements-filters,
+.settlements-summary-panel,
+.settlements-category-panel {
   border: var(--hairline-width) solid var(--hairline);
   border-radius: var(--rounded-lg);
   background: var(--canvas);
 }
 
-.members-tabs {
-  display: inline-grid;
-  grid-template-columns: repeat(3, minmax(var(--members-status-filter-width), 1fr));
-  gap: var(--spacing-xs);
-  width: fit-content;
-  padding: var(--spacing-xs);
-  border: var(--hairline-width) solid var(--hairline);
-  border-radius: var(--rounded-pill);
-  background: var(--canvas);
-}
-
-.members-tab-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--search-input-height);
-  padding: var(--button-secondary-pill-padding);
-  border-radius: var(--rounded-pill);
-  color: var(--ink-muted-48);
-  font-size: var(--font-size-button-utility);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-button);
-  letter-spacing: var(--letter-spacing-button-utility);
-  white-space: nowrap;
-
-  &[aria-current="page"] {
-    background: var(--ink);
-    color: var(--on-dark);
-  }
-}
-
-.members-filters {
+.settlements-filters {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(var(--members-status-filter-width), 0.24fr) auto;
   gap: var(--spacing-sm);
   align-items: end;
   padding: var(--spacing-lg);
@@ -117,8 +70,7 @@
     letter-spacing: var(--letter-spacing-caption);
   }
 
-  input,
-  select {
+  input {
     width: 100%;
     height: var(--search-input-height);
     padding: var(--search-input-padding);
@@ -154,11 +106,13 @@
   }
 }
 
-.members-list-panel {
+.settlements-summary-panel,
+.settlements-category-panel {
   overflow: hidden;
 }
 
-.members-list-summary {
+.settlements-summary-heading,
+.settlements-category-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -175,20 +129,50 @@
     letter-spacing: var(--letter-spacing-caption);
   }
 
-  a {
-    color: var(--action-blue);
+  span {
+    color: var(--ink-muted-48);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+    letter-spacing: var(--letter-spacing-caption);
+  }
+}
+
+.settlements-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--hairline-width);
+  background: var(--divider-soft);
+
+  article {
+    display: grid;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-lg);
+    background: var(--canvas);
+  }
+
+  p {
+    margin: 0;
+    color: var(--ink-muted-48);
     font-size: var(--font-size-caption);
     font-weight: var(--font-weight-semibold);
     line-height: var(--line-height-caption-strong);
     letter-spacing: var(--letter-spacing-caption);
   }
+
+  strong {
+    color: var(--ink);
+    font-size: var(--font-size-lead-airy);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-lead);
+    letter-spacing: var(--letter-spacing-lead-airy);
+  }
 }
 
-.members-table-wrap {
+.settlements-table-wrap {
   overflow-x: auto;
 }
 
-.members-table {
+.settlements-table {
   width: 100%;
   min-width: var(--members-table-min-width);
   border-collapse: collapse;
@@ -202,7 +186,6 @@
     line-height: var(--line-height-caption);
     letter-spacing: var(--letter-spacing-caption);
     text-align: left;
-    vertical-align: middle;
     white-space: nowrap;
   }
 
@@ -211,62 +194,12 @@
     font-weight: var(--font-weight-semibold);
   }
 
-  tbody th {
-    color: var(--ink);
-    font-weight: var(--font-weight-semibold);
-  }
-
-  tbody a {
-    color: var(--action-blue);
-    font-weight: var(--font-weight-semibold);
-  }
-
-  tbody tr:last-child th,
   tbody tr:last-child td {
     border-bottom: 0;
   }
 }
 
-.members-status-active,
-.members-status-paused,
-.members-status-withdrawn,
-.members-kind-operator,
-.members-kind-general {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--member-status-pill-height);
-  padding: var(--button-pearl-capsule-padding);
-  border: var(--hairline-width) solid var(--hairline);
-  border-radius: var(--rounded-pill);
-  background: var(--surface-pearl);
-  font-size: var(--font-size-fine-print);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-button);
-  letter-spacing: var(--letter-spacing-fine-print);
-}
-
-.members-status-active {
-  color: var(--success-text);
-}
-
-.members-status-paused {
-  color: var(--ink-muted-48);
-}
-
-.members-status-withdrawn {
-  color: var(--error-text);
-}
-
-.members-kind-operator {
-  color: var(--action-blue);
-}
-
-.members-kind-general {
-  color: var(--ink-muted-48);
-}
-
-.members-empty-state {
+.settlements-empty-state {
   display: grid;
   gap: var(--spacing-xs);
   padding: var(--spacing-xxl) var(--spacing-lg);
@@ -282,8 +215,7 @@
   }
 
   p {
-    max-width: var(--member-empty-copy-max-width);
-    margin: 0 auto;
+    margin: 0;
     color: var(--ink-muted-48);
     font-size: var(--font-size-caption);
     line-height: var(--line-height-caption);
@@ -292,18 +224,15 @@
 }
 
 @media (max-width: bp.$breakpoint-tablet-landscape) {
-  .members-header,
-  .members-filters {
+  .settlements-header,
+  .settlements-filters,
+  .settlements-summary-grid {
     grid-template-columns: 1fr;
-  }
-
-  .members-tabs {
-    width: 100%;
   }
 }
 
 @media (max-width: bp.$breakpoint-phone) {
-  .members-header {
+  .settlements-header {
     padding-top: var(--spacing-lg);
 
     h1 {
@@ -313,8 +242,8 @@
     }
   }
 
-  .members-tabs {
-    grid-template-columns: 1fr;
-    border-radius: var(--rounded-lg);
+  .settlements-summary-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
