@@ -171,18 +171,19 @@
 .tabs {
   display: grid;
   gap: var(--segmented-tab-padding);
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
   padding: var(--segmented-tab-padding);
-  border-radius: var(--rounded-md);
+  border-radius: var(--rounded-lg);
   background: var(--surface-chip-translucent);
 }
 
 .tabs-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(var(--members-status-filter-width), 1fr));
 }
 
 .tabs-2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(var(--members-status-filter-width), 1fr));
 }
 
 .tab-link {
@@ -192,9 +193,9 @@
   min-width: 0;
   min-height: var(--segmented-tab-height);
   padding: var(--segmented-tab-padding) var(--spacing-md);
-  border-radius: var(--rounded-sm);
+  border-radius: var(--rounded-lg);
   color: var(--ink);
-  font-size: var(--font-size-tagline);
+  font-size: var(--font-size-button-utility);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tagline);
   letter-spacing: var(--letter-spacing-tagline);
@@ -267,6 +268,10 @@
   .summary-grid-2,
   .summary-grid-4 {
     grid-template-columns: 1fr;
+  }
+
+  .tabs {
+    width: 100%;
   }
 
   .panel-header {
