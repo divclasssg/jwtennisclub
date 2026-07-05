@@ -29,7 +29,6 @@ const requiredNavigationItems = [
   { href: "/expenses", label: "지출" },
   { href: "/schedule", label: "일정" },
   { href: "/settlements", label: "정산" },
-  { href: "/reports", label: "PDF" },
 ];
 
 describe("AppShell", () => {
@@ -52,6 +51,9 @@ describe("AppShell", () => {
 
     expect(
       within(nav).queryByRole("link", { name: "설정" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(nav).queryByRole("link", { name: "PDF" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "비밀번호 변경" })).toHaveAttribute(
       "href",
