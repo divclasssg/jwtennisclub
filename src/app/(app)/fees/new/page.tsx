@@ -1,5 +1,9 @@
 import { importFeePaymentsCsv } from "../actions";
 import styles from "./page.module.scss";
+import { Button } from "@/components/atoms";
+import { CsvUploadField, FormMessage } from "@/components/molecules";
+import { FormPanel } from "@/components/organisms";
+import { FormPageTemplate } from "@/components/templates";
 import { firstSearchParam } from "@/features/members/member-list";
 
 type NewFeePaymentPageProps = {
@@ -49,40 +53,33 @@ export default async function NewFeePaymentPage({
   );
 
   return (
-    <section className={styles["fee-create-page"]}>
-      <header className={styles["fee-create-header"]}>
-        <div>
-          <p className={styles["fee-create-kicker"]}>회비 납부</p>
-          <h1>CSV 등록</h1>
-        </div>
-        <p>
+    <FormPageTemplate
+      description={
+        <>
           입금 내역 CSV를 업로드해 여러 회원의 회비 납부 기록을 한 번에
           등록합니다. 같은 회원과 같은 월은 한 번만 등록할 수 있습니다.
-        </p>
-      </header>
-
-      <section className={styles["fee-create-panel"]}>
-        <div className={styles["fee-section-header"]}>
-          <h2>업로드 파일</h2>
-          <p>
+        </>
+      }
+      kicker="회비 납부"
+      title="CSV 등록"
+    >
+      <FormPanel
+        description={
+          <>
             name, phoneLastFour, periodMonth, amount, paidDate, memo 순서로
             여러 납부 기록을 한 번에 등록합니다.
-          </p>
-        </div>
-        <form
-          action={importFeePaymentsCsv}
-          className={styles["fee-csv-form"]}
-        >
-          <label>
-            CSV 파일
-            <input accept=".csv,text/csv" name="csvFile" required type="file" />
-          </label>
-          <button type="submit">CSV 등록</button>
+          </>
+        }
+        title="업로드 파일"
+      >
+        <form action={importFeePaymentsCsv} className={styles["fee-csv-form"]}>
+          <CsvUploadField />
+          <Button type="submit">CSV 등록</Button>
         </form>
         {importErrorMessage ? (
-          <p className={styles["fee-form-error"]}>{importErrorMessage}</p>
+          <FormMessage>{importErrorMessage}</FormMessage>
         ) : null}
-      </section>
-    </section>
+      </FormPanel>
+    </FormPageTemplate>
   );
 }

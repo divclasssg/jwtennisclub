@@ -1,0 +1,41 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--search-input-height);
+  padding: var(--button-primary-padding);
+  border-radius: var(--rounded-pill);
+  cursor: pointer;
+  font-size: var(--font-size-button-utility);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-button);
+  letter-spacing: var(--letter-spacing-button-utility);
+  white-space: nowrap;
+
+  &:active {
+    transform: scale(var(--active-scale-subtle));
+  }
+}
+
+.primary {
+  border: 0;
+  background: var(--action-blue);
+  color: var(--on-primary);
+}
+
+.secondary {
+  border: var(--hairline-width) solid var(--hairline);
+  background: var(--surface-pearl);
+  color: var(--ink-muted-80);
+}
+
+.danger {
+  border: var(--hairline-width) solid var(--hairline);
+  background: var(--canvas);
+  color: var(--error-text);
+}
+
+.compact {
+  min-height: var(--button-utility-height);
+  padding: var(--button-dark-utility-padding);
+}

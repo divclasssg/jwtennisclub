@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { updateMember } from "../../actions";
-import styles from "./page.module.scss";
+import { FormMessage } from "@/components/molecules";
+import { FormPanel } from "@/components/organisms";
+import { FormPageTemplate } from "@/components/templates";
 import { MemberForm } from "@/features/members/MemberForm";
 import { firstSearchParam, mapMemberRow } from "@/features/members/member-list";
 import { createClient } from "@/lib/supabase/server";
@@ -68,21 +70,20 @@ export default async function EditMemberPage({
   }
 
   return (
-    <section className={styles["member-edit-page"]}>
-      <header className={styles["member-edit-header"]}>
-        <div>
-          <p className={styles["member-edit-kicker"]}>회원 수정</p>
-          <h1>{member.name}</h1>
-        </div>
-        <p>회원 기본 정보, 상태, 탈퇴 처리 정보를 수정합니다.</p>
-      </header>
-
-      <section className={styles["member-edit-panel"]}>
+    <FormPageTemplate
+      description="회원 기본 정보, 상태, 탈퇴 처리 정보를 수정합니다."
+      kicker="회원 수정"
+      title={member.name}
+    >
+      <FormPanel
+        description="상태 변경과 탈퇴 처리가 필요한 경우 관련 날짜와 사유를 함께 입력합니다."
+        title="회원 정보"
+      >
         <MemberForm action={updateMember} member={member} mode="edit" />
         {errorMessage ? (
-          <p className={styles["member-form-error"]}>{errorMessage}</p>
+          <FormMessage>{errorMessage}</FormMessage>
         ) : null}
-      </section>
-    </section>
+      </FormPanel>
+    </FormPageTemplate>
   );
 }

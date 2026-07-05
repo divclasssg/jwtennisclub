@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { ActionLink, Button } from "@/components/atoms";
+import { FormActions, FormField, FormGrid } from "@/components/molecules";
 import { DEFAULT_MONTHLY_FEE_AMOUNT } from "./fee-model";
 import styles from "./FeePaymentForm.module.scss";
 
@@ -23,9 +24,8 @@ export function FeePaymentForm({
 }: FeePaymentFormProps) {
   return (
     <form action={action} className={styles["fee-payment-form"]}>
-      <div className={styles["fee-payment-form-grid"]}>
-        <label>
-          회원
+      <FormGrid>
+        <FormField label="회원">
           <select name="memberId" required>
             <option value="">회원 선택</option>
             {members.map((member) => (
@@ -35,18 +35,16 @@ export function FeePaymentForm({
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          납부 월
+        </FormField>
+        <FormField label="납부 월">
           <input
             defaultValue={defaultPeriodMonth.slice(0, 7)}
             name="periodMonth"
             required
             type="month"
           />
-        </label>
-        <label>
-          납부 금액
+        </FormField>
+        <FormField label="납부 금액">
           <input
             defaultValue={DEFAULT_MONTHLY_FEE_AMOUNT}
             inputMode="numeric"
@@ -56,27 +54,27 @@ export function FeePaymentForm({
             step={1}
             type="number"
           />
-        </label>
-        <label>
-          납부일
+        </FormField>
+        <FormField label="납부일">
           <input
             defaultValue={defaultPaidDate}
             name="paidDate"
             required
             type="date"
           />
-        </label>
-      </div>
+        </FormField>
+      </FormGrid>
 
-      <label>
-        메모
+      <FormField label="메모">
         <textarea maxLength={500} name="memo" rows={4} />
-      </label>
+      </FormField>
 
-      <div className={styles["fee-payment-form-actions"]}>
-        <Link href="/fees">취소</Link>
-        <button type="submit">납부 등록</button>
-      </div>
+      <FormActions>
+        <ActionLink href="/fees" variant="secondary">
+          취소
+        </ActionLink>
+        <Button type="submit">납부 등록</Button>
+      </FormActions>
     </form>
   );
 }

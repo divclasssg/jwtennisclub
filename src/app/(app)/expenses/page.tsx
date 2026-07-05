@@ -1,6 +1,15 @@
-import Link from "next/link";
-import styles from "./page.module.scss";
 import { deleteExpense } from "./actions";
+import { ActionLink, Button, SelectInput, TextInput } from "@/components/atoms";
+import {
+  EmptyState,
+  FilterBar,
+  FormField,
+  RowActions,
+  SummaryCard,
+  SummaryGrid,
+} from "@/components/molecules";
+import { DataPanel, DataTable } from "@/components/organisms";
+import { ManagementPageTemplate } from "@/components/templates";
 import { createClient } from "@/lib/supabase/server";
 import {
   buildExpenseListSummary,
@@ -56,63 +65,47 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   const hasFilters = filters.category !== "all";
 
   return (
-    <section className={styles["expenses-page"]}>
-      <header className={styles["expenses-header"]}>
-        <div>
-          <p className={styles["expenses-kicker"]}>지출 관리</p>
-          <h1>월별 지출 현황</h1>
-        </div>
-        <div className={styles["expenses-header-side"]}>
-          <p>월별 운영 지출을 등록하고 카테고리별로 확인합니다.</p>
-          <Link href="/expenses/new">지출 등록</Link>
-        </div>
-      </header>
-
-      <section className={styles["expenses-summary-grid"]} aria-label="지출 요약">
-        <article>
-          <p>지출 건수</p>
-          <strong>{summary.count}건</strong>
-        </article>
-        <article>
-          <p>지출 합계</p>
-          <strong>{formatCurrency(summary.totalAmount)}원</strong>
-        </article>
-      </section>
-
-      <form className={styles["expenses-filters"]}>
-        <label>
-          사용 월
-          <input
-            defaultValue={filters.periodMonth.slice(0, 7)}
-            name="month"
-            type="month"
-          />
-        </label>
-        <label>
-          카테고리
-          <select defaultValue={filters.category} name="category">
-            <option value="all">전체</option>
-            {EXPENSE_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {formatCategoryFilterLabel(category)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit">조회</button>
-      </form>
-
-      <section aria-label="월별 지출 목록" className={styles["expenses-list-panel"]}>
-        <div className={styles["expenses-list-summary"]}>
-          <p>
-            {formatPeriodMonth(filters.periodMonth)} · 총 {expenses.length}건
-          </p>
-          {hasFilters ? <a href="/expenses">필터 초기화</a> : null}
-        </div>
-
-        {expenses.length > 0 ? (
-          <div className={styles["expenses-table-wrap"]}>
-            <table className={styles["expenses-table"]}>
+    <ManagementPageTemplate
+      action={<ActionLink href="/expenses/new">지출 등록</ActionLink>}
+      description="월별 운영 지출을 등록하고 카테고리별로 확인합니다."
+      filters={
+        <FilterBar aria-label="지출 검색 필터" layout="two-controls">
+          <FormField label="사용 월">
+            <TextInput
+              defaultValue={filters.periodMonth.slice(0, 7)}
+              name="month"
+              shape="pill"
+              type="month"
+            />
+          </FormField>
+          <FormField label="카테고리">
+            <SelectInput defaultValue={filters.category} name="category" shape="pill">
+              <option value="all">전체</option>
+              {EXPENSE_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {formatCategoryFilterLabel(category)}
+                </option>
+              ))}
+            </SelectInput>
+          </FormField>
+          <Button type="submit">조회</Button>
+        </FilterBar>
+      }
+      kicker="지출 관리"
+      list={
+        <DataPanel
+          aria-label="월별 지출 목록"
+          empty={
+            <EmptyState
+              description="사용 월이나 카테고리 필터를 조정해서 지출 기록을 확인하세요."
+              title="등록된 지출이 없습니다"
+            />
+          }
+          headerSide={hasFilters ? <a href="/expenses">필터 초기화</a> : null}
+          headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${expenses.length}건`}
+        >
+          {expenses.length > 0 ? (
+            <DataTable>
               <thead>
                 <tr>
                   <th scope="col">사용일</th>
@@ -148,31 +141,39 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                     </td>
                     <td>{expense.memo ?? "-"}</td>
                     <td>
-                      <div className={styles["expense-row-actions"]}>
-                        <Link href={`/expenses/${expense.id}/edit`}>수정</Link>
+                      <RowActions>
+                        <ActionLink
+                          href={`/expenses/${expense.id}/edit`}
+                          size="compact"
+                          variant="secondary"
+                        >
+                          수정
+                        </ActionLink>
                         <form action={deleteExpense}>
                           <input name="expenseId" type="hidden" value={expense.id} />
-                          <button
-                            className={styles["expense-delete-button"]}
-                            type="submit"
-                          >
+                          <Button size="compact" type="submit" variant="danger">
                             삭제
-                          </button>
+                          </Button>
                         </form>
-                      </div>
+                      </RowActions>
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className={styles["expenses-empty-state"]}>
-            <h2>등록된 지출이 없습니다</h2>
-            <p>사용 월이나 카테고리 필터를 조정해서 지출 기록을 확인하세요.</p>
-          </div>
-        )}
-      </section>
-    </section>
+            </DataTable>
+          ) : null}
+        </DataPanel>
+      }
+      summary={
+        <SummaryGrid aria-label="지출 요약" columns={2}>
+          <SummaryCard label="지출 건수" value={`${summary.count}건`} />
+          <SummaryCard
+            label="지출 합계"
+            value={`${formatCurrency(summary.totalAmount)}원`}
+          />
+        </SummaryGrid>
+      }
+      title="월별 지출 현황"
+    />
   );
 }

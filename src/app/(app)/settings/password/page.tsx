@@ -1,5 +1,9 @@
 import { changePassword } from "./actions";
 import styles from "./page.module.scss";
+import { Button, TextInput } from "@/components/atoms";
+import { FormField, FormMessage } from "@/components/molecules";
+import { FormPanel } from "@/components/organisms";
+import { FormPageTemplate } from "@/components/templates";
 
 type PasswordPageProps = {
     searchParams: Promise<{
@@ -48,59 +52,50 @@ export default async function PasswordPage({ searchParams }: PasswordPageProps) 
         status === "updated" ? "비밀번호가 변경되었습니다." : null;
 
     return (
-        <section className={styles["password-page"]}>
-            <div className={styles["password-panel"]}>
-                <div className={styles["password-header"]}>
-                    <p className={styles["password-kicker"]}>계정 보안</p>
-                    <h1>비밀번호 변경</h1>
-                    <p>
-                        현재 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다.
-                    </p>
-                </div>
-
+        <FormPageTemplate
+            description="현재 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다."
+            kicker="계정 보안"
+            title="비밀번호 변경"
+        >
+            <FormPanel title="새 비밀번호">
                 <form action={changePassword} className={styles["password-form"]}>
-                    <label>
-                        현재 비밀번호
-                        <input
+                    <FormField label="현재 비밀번호">
+                        <TextInput
                             autoComplete="current-password"
                             name="currentPassword"
                             required
                             type="password"
                         />
-                    </label>
-                    <label>
-                        새 비밀번호
-                        <input
+                    </FormField>
+                    <FormField label="새 비밀번호">
+                        <TextInput
                             autoComplete="new-password"
                             minLength={8}
                             name="newPassword"
                             required
                             type="password"
                         />
-                    </label>
-                    <label>
-                        새 비밀번호 확인
-                        <input
+                    </FormField>
+                    <FormField label="새 비밀번호 확인">
+                        <TextInput
                             autoComplete="new-password"
                             minLength={8}
                             name="confirmPassword"
                             required
                             type="password"
                         />
-                    </label>
+                    </FormField>
 
-                    <button type="submit">비밀번호 변경</button>
+                    <Button type="submit">비밀번호 변경</Button>
 
                     {successMessage ? (
-                        <p className={styles["password-success"]}>
-                            {successMessage}
-                        </p>
+                        <FormMessage tone="success">{successMessage}</FormMessage>
                     ) : null}
                     {errorMessage ? (
-                        <p className={styles["password-error"]}>{errorMessage}</p>
+                        <FormMessage>{errorMessage}</FormMessage>
                     ) : null}
                 </form>
-            </div>
-        </section>
+            </FormPanel>
+        </FormPageTemplate>
     );
 }

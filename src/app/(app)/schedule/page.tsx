@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { deleteEvent } from "./actions";
+import { ActionLink, Button } from "@/components/atoms";
+import { PageHeader } from "@/components/organisms";
 import {
   buildMonthCalendar,
   buildWeekCalendar,
@@ -8,11 +9,16 @@ import {
   getPreviousMonth,
   type CalendarEventPreview,
 } from "@/features/events/event-calendar";
+import {
+  MonthCalendarView,
+  ScheduleEventActions,
+  ScheduleToolbar,
+  SelectedEventList,
+  WeekCalendarView,
+} from "@/features/events/ScheduleCalendar";
 import type { EventRecord } from "@/features/events/event-model";
 import { createClient } from "@/lib/supabase/server";
 import styles from "./page.module.scss";
-
-const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 
 type SchedulePageProps = {
   searchParams: Promise<ScheduleSearchParams>;
@@ -75,154 +81,48 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
 
   return (
     <section className={styles["schedule-page"]}>
-      <header className={styles["schedule-header"]}>
-        <div>
-          <p className={styles["schedule-kicker"]}>일정 관리</p>
-          <h1>일정 관리</h1>
-        </div>
-        <div className={styles["schedule-header-side"]}>
-          <p>월별 흐름과 주별 일정을 전환해서 확인합니다.</p>
-          <Link href="/schedule/new">일정 등록</Link>
-        </div>
-      </header>
+      <PageHeader
+        action={<ActionLink href="/schedule/new">일정 등록</ActionLink>}
+        description="월별 흐름과 주별 일정을 전환해서 확인합니다."
+        kicker="일정 관리"
+        title="일정 관리"
+      />
 
-      <div className={styles["schedule-toolbar"]}>
-        <nav aria-label="일정 기간 이동" className={styles["schedule-nav"]}>
-          <Link href={periodNavigation.previousHref}>이전</Link>
-          <Link href={periodNavigation.todayHref}>오늘</Link>
-          <Link href={periodNavigation.nextHref}>다음</Link>
-        </nav>
-
-        <p className={styles["schedule-current-label"]}>{monthCalendar.label}</p>
-
-        <nav aria-label="일정 보기 전환" className={styles["schedule-view-tabs"]}>
-          <Link
-            aria-current={filters.view === "month" ? "page" : undefined}
-            href={buildScheduleHref({
-              view: "month",
-              month: filters.periodMonth,
-            })}
-          >
-            월
-          </Link>
-          <Link
-            aria-current={filters.view === "week" ? "page" : undefined}
-            href={buildScheduleHref({
-              view: "week",
-              date: filters.selectedDate,
-            })}
-          >
-            주
-          </Link>
-        </nav>
-      </div>
+      <ScheduleToolbar
+        currentLabel={monthCalendar.label}
+        monthHref={buildScheduleHref({
+          view: "month",
+          month: filters.periodMonth,
+        })}
+        nextHref={periodNavigation.nextHref}
+        previousHref={periodNavigation.previousHref}
+        todayHref={periodNavigation.todayHref}
+        view={filters.view}
+        weekHref={buildScheduleHref({
+          view: "week",
+          date: filters.selectedDate,
+        })}
+      />
 
       {filters.view === "week" ? (
-        <section aria-label="주별 일정" className={styles["schedule-week"]}>
-          {weekCalendar.days.map((day) => (
-            <article className={styles["schedule-week-day"]} key={day.date}>
-              <header>
-                <span>{weekdays[new Date(`${day.date}T00:00:00Z`).getUTCDay()]}</span>
-                <strong>{formatDateShort(day.date)}</strong>
-              </header>
-              {day.events.length > 0 ? (
-                <ol>
-                  {day.events.map((event) => (
-                    <li key={event.id}>
-                      <Link href={`/schedule/${event.id}/edit`}>
-                        {formatEventTime(event.eventTime)} {event.title}
-                      </Link>
-                      <span>{event.location}</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p>일정 없음</p>
-              )}
-            </article>
-          ))}
-        </section>
+        <WeekCalendarView calendar={weekCalendar} />
       ) : (
         <>
-          <section aria-label="월별 일정" className={styles["schedule-month"]}>
-            <div className={styles["schedule-weekdays"]}>
-              {weekdays.map((weekday) => (
-                <span key={weekday}>{weekday}</span>
-              ))}
-            </div>
-            <div className={styles["schedule-month-grid"]}>
-              {monthCalendar.weeks.flat().map((day) => (
-                <article
-                  className={[
-                    styles["schedule-day-cell"],
-                    day.isCurrentMonth ? "" : styles["schedule-day-cell-muted"],
-                    day.date === filters.selectedDate
-                      ? styles["schedule-day-cell-selected"]
-                      : "",
-                  ].join(" ")}
-                  key={day.date}
-                >
-                  <Link
-                    className={styles["schedule-day-number"]}
-                    href={buildScheduleHref({
-                      month: filters.periodMonth,
-                      selectedDate: day.date,
-                    })}
-                  >
-                    {day.dayNumber}
-                  </Link>
-                  <ol className={styles["schedule-day-events"]}>
-                    {day.visibleEvents.map((event) => (
-                      <li key={event.id}>
-                        <Link href={`/schedule/${event.id}/edit`}>
-                          {formatEventTime(event.eventTime)} {event.title}
-                        </Link>
-                      </li>
-                    ))}
-                  </ol>
-                  {day.hiddenCount > 0 ? (
-                    <Link
-                      className={styles["schedule-overflow-link"]}
-                      href={buildScheduleHref({
-                        month: filters.periodMonth,
-                        selectedDate: day.date,
-                      })}
-                    >
-                      +{day.hiddenCount}개
-                    </Link>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          </section>
+          <MonthCalendarView
+            buildHref={buildScheduleHref}
+            calendar={monthCalendar}
+            selectedDate={filters.selectedDate}
+          />
 
-          <section
-            aria-label="선택한 날짜 일정"
-            className={styles["schedule-selected-events"]}
-          >
-            <div className={styles["schedule-selected-header"]}>
-              <h2>{formatDateLong(filters.selectedDate)}</h2>
-              <p>{selectedEvents.length}건</p>
-            </div>
-            {selectedEvents.length > 0 ? (
-              <ol>
-                {selectedEvents.map((event) => (
-                  <li key={event.id}>
-                    <div>
-                      <time>{formatEventTime(event.eventTime)}</time>
-                      <strong>{event.title}</strong>
-                      <span>{event.location}</span>
-                    </div>
-                    <EventActions event={event} month={filters.periodMonth} />
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className={styles["schedule-empty-copy"]}>
-                선택한 날짜에 등록된 일정이 없습니다.
-              </p>
+          <SelectedEventList
+            events={selectedEvents}
+            formatDateLong={formatDateLong}
+            month={filters.periodMonth}
+            renderActions={(event, month) => (
+              <EventActions event={event} month={month} />
             )}
-          </section>
+            selectedDate={filters.selectedDate}
+          />
         </>
       )}
     </section>
@@ -237,14 +137,18 @@ function EventActions({
   month: string;
 }) {
   return (
-    <div className={styles["schedule-event-actions"]}>
-      <Link href={`/schedule/${event.id}/edit`}>수정</Link>
+    <ScheduleEventActions>
+      <ActionLink href={`/schedule/${event.id}/edit`} size="compact" variant="secondary">
+        수정
+      </ActionLink>
       <form action={deleteEvent}>
         <input name="eventId" type="hidden" value={event.id} />
         <input name="month" type="hidden" value={month} />
-        <button type="submit">삭제</button>
+        <Button size="compact" type="submit" variant="danger">
+          삭제
+        </Button>
       </form>
-    </div>
+    </ScheduleEventActions>
   );
 }
 
@@ -356,15 +260,6 @@ function addDaysToDateKey(value: string, days: number) {
   const date = new Date(Date.UTC(year, month - 1, day));
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
-}
-
-function formatEventTime(value: string) {
-  return value.slice(0, 5);
-}
-
-function formatDateShort(value: string) {
-  const [, month, day] = value.split("-");
-  return `${Number(month)}.${Number(day)}`;
 }
 
 function formatDateLong(value: string) {

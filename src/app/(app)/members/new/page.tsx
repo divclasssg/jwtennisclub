@@ -1,5 +1,9 @@
 import { createMember, importMembersCsv } from "../actions";
 import styles from "./page.module.scss";
+import { Button } from "@/components/atoms";
+import { CsvUploadField, FormMessage } from "@/components/molecules";
+import { FormPanel } from "@/components/organisms";
+import { FormPageTemplate } from "@/components/templates";
 import { MemberForm } from "@/features/members/MemberForm";
 import { firstSearchParam } from "@/features/members/member-list";
 
@@ -66,47 +70,38 @@ export default async function NewMemberPage({
   );
 
   return (
-    <section className={styles["member-create-page"]}>
-      <header className={styles["member-create-header"]}>
-        <div>
-          <p className={styles["member-create-kicker"]}>회원 등록</p>
-          <h1>새 회원 추가</h1>
-        </div>
-        <p>
-          한 명씩 직접 등록하거나 CSV 파일로 여러 회원을 한 번에 등록합니다.
-        </p>
-      </header>
-
-      <section className={styles["member-create-panel"]}>
-        <div className={styles["member-section-header"]}>
-          <h2>단건 등록</h2>
-          <p>이름, 전화번호 끝 4자리, 가입일을 기준으로 회원을 추가합니다.</p>
-        </div>
+    <FormPageTemplate
+      description="한 명씩 직접 등록하거나 CSV 파일로 여러 회원을 한 번에 등록합니다."
+      kicker="회원 등록"
+      title="새 회원 추가"
+    >
+      <FormPanel
+        description="이름, 전화번호 끝 4자리, 가입일을 기준으로 회원을 추가합니다."
+        title="단건 등록"
+      >
         <MemberForm action={createMember} mode="create" />
         {errorMessage ? (
-          <p className={styles["member-form-error"]}>{errorMessage}</p>
+          <FormMessage>{errorMessage}</FormMessage>
         ) : null}
-      </section>
+      </FormPanel>
 
-      <section className={styles["member-create-panel"]}>
-        <div className={styles["member-section-header"]}>
-          <h2>CSV 등록</h2>
-          <p>
+      <FormPanel
+        description={
+          <>
             헤더는 이름, 전화번호끝4자리, 가입일, 상태, 탈퇴일, 탈퇴사유,
             메모를 사용할 수 있습니다.
-          </p>
-        </div>
+          </>
+        }
+        title="CSV 등록"
+      >
         <form action={importMembersCsv} className={styles["member-csv-form"]}>
-          <label>
-            CSV 파일
-            <input accept=".csv,text/csv" name="csvFile" required type="file" />
-          </label>
-          <button type="submit">CSV 등록</button>
+          <CsvUploadField />
+          <Button type="submit">CSV 등록</Button>
         </form>
         {importErrorMessage ? (
-          <p className={styles["member-form-error"]}>{importErrorMessage}</p>
+          <FormMessage>{importErrorMessage}</FormMessage>
         ) : null}
-      </section>
-    </section>
+      </FormPanel>
+    </FormPageTemplate>
   );
 }

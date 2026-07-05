@@ -1,0 +1,30 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--member-status-pill-height);
+  padding: var(--button-pearl-capsule-padding);
+  border: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-pill);
+  background: var(--surface-pearl);
+  font-size: var(--font-size-fine-print);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-button);
+  letter-spacing: var(--letter-spacing-fine-print);
+}
+
+.success {
+  color: var(--success-text);
+}
+
+.danger {
+  color: var(--error-text);
+}
+
+.info {
+  color: var(--action-blue);
+}
+
+.muted {
+  color: var(--ink-muted-48);
+}

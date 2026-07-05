@@ -1,4 +1,13 @@
-import styles from "./page.module.scss";
+import { ActionLink, Button, TextInput } from "@/components/atoms";
+import {
+  EmptyState,
+  FilterBar,
+  FormField,
+  SummaryCard,
+  SummaryGrid,
+} from "@/components/molecules";
+import { DataPanel, DataTable } from "@/components/organisms";
+import { ManagementPageTemplate } from "@/components/templates";
 import { createClient } from "@/lib/supabase/server";
 import { getNextPeriodMonth, isExpenseCategory } from "@/features/expenses/expense-model";
 import {
@@ -70,6 +79,7 @@ export default async function SettlementsPage({
   searchParams,
 }: SettlementsPageProps) {
   const filters = normalizeSettlementFilters(await searchParams);
+  const monthValue = filters.periodMonth.slice(0, 7);
   const [feePayments, expenses] = await Promise.all([
     getSettlementFeePayments(filters.periodMonth),
     getSettlementExpenses(filters.periodMonth),
@@ -77,65 +87,45 @@ export default async function SettlementsPage({
   const summary = buildSettlementSummary({ feePayments, expenses });
 
   return (
-    <section className={styles["settlements-page"]}>
-      <header className={styles["settlements-header"]}>
-        <div>
-          <p className={styles["settlements-kicker"]}>월별 정산</p>
-          <h1>월별 정산 요약</h1>
-        </div>
-        <div className={styles["settlements-header-side"]}>
-          <p>
-            선택한 월의 회비 수입과 운영 지출을 합산해 공유용 월간 보고서의
-            기준 금액을 확인합니다.
-          </p>
-        </div>
-      </header>
-
-      <form className={styles["settlements-filters"]}>
-        <label>
-          정산 월
-          <input
-            defaultValue={filters.periodMonth.slice(0, 7)}
-            name="month"
-            type="month"
-          />
-        </label>
-        <button type="submit">조회</button>
-      </form>
-
-      <section className={styles["settlements-summary-panel"]}>
-        <div className={styles["settlements-summary-heading"]}>
-          <p>{formatPeriodMonth(filters.periodMonth)} 정산</p>
-          <span>
-            회비 납부 {summary.feePaymentCount}건 · 지출 {summary.expenseCount}건
-          </span>
-        </div>
-        <div className={styles["settlements-summary-grid"]}>
-          <article>
-            <p>수입 합계</p>
-            <strong>{formatCurrency(summary.incomeTotal)}원</strong>
-          </article>
-          <article>
-            <p>지출 합계</p>
-            <strong>{formatCurrency(summary.expenseTotal)}원</strong>
-          </article>
-          <article>
-            <p>정산 잔액</p>
-            <strong>{formatSettlementBalance(summary.balance)}</strong>
-          </article>
-        </div>
-      </section>
-
-      <section
-        aria-label="카테고리별 지출"
-        className={styles["settlements-category-panel"]}
-      >
-        <div className={styles["settlements-category-summary"]}>
-          <p>카테고리별 지출</p>
-        </div>
-        {summary.expenseCategoryRows.length > 0 ? (
-          <div className={styles["settlements-table-wrap"]}>
-            <table className={styles["settlements-table"]}>
+    <ManagementPageTemplate
+      action={
+        <ActionLink href={`/reports/monthly?month=${monthValue}`}>
+          PDF 다운로드
+        </ActionLink>
+      }
+      description={
+        <>
+          선택한 월의 회비 수입과 운영 지출을 합산해 공유용 월간 보고서의 기준
+          금액을 확인합니다.
+        </>
+      }
+      filters={
+        <FilterBar aria-label="정산 검색 필터" layout="single-control">
+          <FormField label="정산 월">
+            <TextInput
+              defaultValue={monthValue}
+              name="month"
+              shape="pill"
+              type="month"
+            />
+          </FormField>
+          <Button type="submit">조회</Button>
+        </FilterBar>
+      }
+      kicker="월별 정산"
+      list={
+        <DataPanel
+          aria-label="카테고리별 지출"
+          empty={
+            <EmptyState
+              description="선택한 월에 등록된 지출이 없습니다."
+              title="카테고리별 지출이 없습니다"
+            />
+          }
+          headerTitle="카테고리별 지출"
+        >
+          {summary.expenseCategoryRows.length > 0 ? (
+            <DataTable>
               <thead>
                 <tr>
                   <th scope="col">카테고리</th>
@@ -152,15 +142,38 @@ export default async function SettlementsPage({
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className={styles["settlements-empty-state"]}>
-            <h2>카테고리별 지출이 없습니다</h2>
-            <p>선택한 월에 등록된 지출이 없습니다.</p>
-          </div>
-        )}
-      </section>
-    </section>
+            </DataTable>
+          ) : null}
+        </DataPanel>
+      }
+      summary={
+        <DataPanel
+          aria-label={`${formatPeriodMonth(filters.periodMonth)} 정산`}
+          headerSide={
+            <span>
+              회비 납부 {summary.feePaymentCount}건 · 지출{" "}
+              {summary.expenseCount}건
+            </span>
+          }
+          headerTitle={`${formatPeriodMonth(filters.periodMonth)} 정산`}
+        >
+          <SummaryGrid columns={3} variant="divided">
+            <SummaryCard
+              label="수입 합계"
+              value={`${formatCurrency(summary.incomeTotal)}원`}
+            />
+            <SummaryCard
+              label="지출 합계"
+              value={`${formatCurrency(summary.expenseTotal)}원`}
+            />
+            <SummaryCard
+              label="정산 잔액"
+              value={formatSettlementBalance(summary.balance)}
+            />
+          </SummaryGrid>
+        </DataPanel>
+      }
+      title="월별 정산 요약"
+    />
   );
 }

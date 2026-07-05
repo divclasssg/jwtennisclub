@@ -1,6 +1,15 @@
-import Link from "next/link";
 import styles from "./page.module.scss";
 import { cancelFeePayment, createFeePayment } from "./actions";
+import { ActionLink, Badge, Button, SelectInput, TextInput } from "@/components/atoms";
+import {
+  EmptyState,
+  FilterBar,
+  FormField,
+  SummaryCard,
+  SummaryGrid,
+} from "@/components/molecules";
+import { DataPanel, DataTable } from "@/components/organisms";
+import { ManagementPageTemplate } from "@/components/templates";
 import { createClient } from "@/lib/supabase/server";
 import {
   buildFeeBoardRows,
@@ -174,82 +183,64 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
   const today = getTodayInputValue();
 
   return (
-    <section className={styles["fees-page"]}>
-      <header className={styles["fees-header"]}>
-        <div>
-          <p className={styles["fees-kicker"]}>회비 관리</p>
-          <h1>월별 회비 현황</h1>
-        </div>
-        <div className={styles["fees-header-side"]}>
-          <p>
-            월을 선택한 뒤 회원별 납부 상태를 바로 확인하고 미납 행에서 즉시
-            납부 처리합니다. 기본 회비는 30,000원입니다.
-          </p>
-          <Link href="/fees/new">CSV 등록</Link>
-        </div>
-      </header>
-
-      <section className={styles["fees-summary-grid"]} aria-label="회비 요약">
-        <article>
-          <p>청구 대상</p>
-          <strong>{summary.expectedCount}명</strong>
-        </article>
-        <article>
-          <p>납부 완료</p>
-          <strong>{summary.paidCount}명</strong>
-        </article>
-        <article>
-          <p>미납</p>
-          <strong>{summary.unpaidCount}명</strong>
-        </article>
-        <article>
-          <p>납부 합계</p>
-          <strong>{formatCurrency(summary.paidTotal)}원</strong>
-        </article>
-      </section>
-
-      <form className={styles["fees-filters"]}>
-        <label className={styles["fees-month-field"]}>
-          납부 월
-          <input
-            defaultValue={filters.periodMonth.slice(0, 7)}
-            name="month"
-            type="month"
-          />
-        </label>
-        <label className={styles["fees-search-field"]}>
-          검색
-          <input
-            defaultValue={filters.query}
-            name="q"
-            placeholder="이름 또는 뒤 4자리"
-            type="search"
-          />
-        </label>
-        <label className={styles["fees-status-field"]}>
-          상태
-          <select defaultValue={filters.status} name="status">
-            {FEE_PAYMENT_STATUS_FILTERS.map((status) => (
-              <option key={status} value={status}>
-                {formatStatusFilterLabel(status)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit">조회</button>
-      </form>
-
-      <section aria-label="월별 회비 체크판" className={styles["fees-list-panel"]}>
-        <div className={styles["fees-list-summary"]}>
-          <p>
-            {formatPeriodMonth(filters.periodMonth)} · 총 {boardRows.length}명
-          </p>
-          {hasFilters ? <a href="/fees">필터 초기화</a> : null}
-        </div>
-
-        {boardRows.length > 0 ? (
-          <div className={styles["fees-table-wrap"]}>
-            <table className={styles["fees-table"]}>
+    <ManagementPageTemplate
+      action={<ActionLink href="/fees/new">CSV 등록</ActionLink>}
+      description={
+        <>
+          월을 선택한 뒤 회원별 납부 상태를 바로 확인하고 미납 행에서 즉시 납부
+          처리합니다. 기본 회비는 30,000원입니다.
+        </>
+      }
+      filters={
+        <FilterBar aria-label="회비 검색 필터" layout="month-search-status">
+          <FormField label="납부 월">
+            <TextInput
+              defaultValue={filters.periodMonth.slice(0, 7)}
+              name="month"
+              shape="pill"
+              type="month"
+            />
+          </FormField>
+          <FormField label="검색">
+            <TextInput
+              defaultValue={filters.query}
+              name="q"
+              placeholder="이름 또는 뒤 4자리"
+              shape="pill"
+              type="search"
+            />
+          </FormField>
+          <FormField label="상태">
+            <SelectInput defaultValue={filters.status} name="status" shape="pill">
+              {FEE_PAYMENT_STATUS_FILTERS.map((status) => (
+                <option key={status} value={status}>
+                  {formatStatusFilterLabel(status)}
+                </option>
+              ))}
+            </SelectInput>
+          </FormField>
+          <Button type="submit">조회</Button>
+        </FilterBar>
+      }
+      kicker="회비 관리"
+      list={
+        <DataPanel
+          aria-label="월별 회비 체크판"
+          empty={
+            <EmptyState
+              description={
+                <>
+                  납부 월, 검색어, 상태 필터를 조정해서 회비 대상 회원을 확인하세요.
+                </>
+              }
+              title="표시할 회원이 없습니다"
+            />
+          }
+          headerSide={hasFilters ? <a href="/fees">필터 초기화</a> : null}
+          headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${boardRows.length}명`}
+        >
+          {boardRows.length > 0 ? (
+            <DataTable>
               <thead>
                 <tr>
                   <th scope="col">회원</th>
@@ -268,28 +259,21 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                     <th scope="row">{row.memberName}</th>
                     <td>{row.memberPhoneLastFour ?? "-"}</td>
                     <td>
-                      <span
-                        className={
-                          row.operatorProfileId
-                            ? styles["fees-kind-operator"]
-                            : styles["fees-kind-general"]
-                        }
-                      >
+                      <Badge tone={row.operatorProfileId ? "info" : "muted"}>
                         {formatMemberKind(row)}
-                      </span>
+                      </Badge>
                     </td>
                     <td>
-                      <span
-                        className={
-                          row.payment
-                            ? styles["fees-status-paid"]
-                            : styles["fees-status-unpaid"]
-                        }
-                      >
+                      <Badge tone={row.payment ? "success" : "danger"}>
                         {formatPaymentStatus(row)}
-                      </span>
+                      </Badge>
                     </td>
-                    <td>{formatCurrency(row.payment?.amount ?? DEFAULT_MONTHLY_FEE_AMOUNT)}원</td>
+                    <td>
+                      {formatCurrency(
+                        row.payment?.amount ?? DEFAULT_MONTHLY_FEE_AMOUNT,
+                      )}
+                      원
+                    </td>
                     <td>{row.payment ? formatDate(row.payment.paidDate) : "-"}</td>
                     <td>{row.payment?.memo ?? "-"}</td>
                     <td>
@@ -308,12 +292,9 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                             type="hidden"
                             value={filters.periodMonth.slice(0, 7)}
                           />
-                          <button
-                            className={styles["fees-cancel-button"]}
-                            type="submit"
-                          >
+                          <Button size="compact" type="submit" variant="danger">
                             납부 취소
-                          </button>
+                          </Button>
                         </form>
                       ) : (
                         <form
@@ -326,34 +307,37 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                             type="hidden"
                             value={filters.periodMonth.slice(0, 7)}
                           />
-                          <input
-                            name="paidDate"
-                            type="hidden"
-                            value={today}
-                          />
+                          <input name="paidDate" type="hidden" value={today} />
                           <input
                             name="amount"
                             type="hidden"
                             value={DEFAULT_MONTHLY_FEE_AMOUNT}
                           />
-                          <button type="submit">납부 처리</button>
+                          <Button size="compact" type="submit">
+                            납부 처리
+                          </Button>
                         </form>
                       )}
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className={styles["fees-empty-state"]}>
-            <h2>표시할 회원이 없습니다</h2>
-            <p>
-              납부 월, 검색어, 상태 필터를 조정해서 회비 대상 회원을 확인하세요.
-            </p>
-          </div>
-        )}
-      </section>
-    </section>
+            </DataTable>
+          ) : null}
+        </DataPanel>
+      }
+      summary={
+        <SummaryGrid aria-label="회비 요약" columns={4}>
+          <SummaryCard label="청구 대상" value={`${summary.expectedCount}명`} />
+          <SummaryCard label="납부 완료" value={`${summary.paidCount}명`} />
+          <SummaryCard label="미납" value={`${summary.unpaidCount}명`} />
+          <SummaryCard
+            label="납부 합계"
+            value={`${formatCurrency(summary.paidTotal)}원`}
+          />
+        </SummaryGrid>
+      }
+      title="월별 회비 현황"
+    />
   );
 }

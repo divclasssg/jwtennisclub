@@ -1,5 +1,7 @@
 import { createExpense } from "../actions";
-import styles from "./page.module.scss";
+import { FormMessage } from "@/components/molecules";
+import { FormPanel } from "@/components/organisms";
+import { FormPageTemplate } from "@/components/templates";
 import { ExpenseForm } from "@/features/expenses/ExpenseForm";
 import { firstSearchParam } from "@/features/members/member-list";
 
@@ -54,28 +56,23 @@ export default async function NewExpensePage({ searchParams }: NewExpensePagePro
   const errorMessage = getErrorMessage(firstSearchParam(params.error));
 
   return (
-    <section className={styles["expense-create-page"]}>
-      <header className={styles["expense-create-header"]}>
-        <div>
-          <p className={styles["expense-create-kicker"]}>지출 관리</p>
-          <h1>지출 등록</h1>
-        </div>
-        <p>운영 중 발생한 지출 내역을 기록합니다.</p>
-      </header>
-
-      <section className={styles["expense-create-panel"]}>
-        <div className={styles["expense-section-header"]}>
-          <h2>지출 정보</h2>
-          <p>사용일, 카테고리, 내용, 금액과 영수증 파일을 입력하세요.</p>
-        </div>
+    <FormPageTemplate
+      description="운영 중 발생한 지출 내역을 기록합니다."
+      kicker="지출 관리"
+      title="지출 등록"
+    >
+      <FormPanel
+        description="사용일, 카테고리, 내용, 금액과 영수증 파일을 입력하세요."
+        title="지출 정보"
+      >
         <ExpenseForm
           action={createExpense}
           defaultExpenseDate={getTodayInputValue()}
         />
         {errorMessage ? (
-          <p className={styles["expense-form-error"]}>{errorMessage}</p>
+          <FormMessage>{errorMessage}</FormMessage>
         ) : null}
-      </section>
-    </section>
+      </FormPanel>
+    </FormPageTemplate>
   );
 }

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { updateExpense } from "../../actions";
-import styles from "./page.module.scss";
+import { FormMessage } from "@/components/molecules";
+import { FormPanel } from "@/components/organisms";
+import { FormPageTemplate } from "@/components/templates";
 import { ExpenseForm } from "@/features/expenses/ExpenseForm";
 import { mapExpenseRow } from "@/features/expenses/expense-list";
 import { firstSearchParam } from "@/features/members/member-list";
@@ -81,20 +83,15 @@ export default async function EditExpensePage({
   }
 
   return (
-    <section className={styles["expense-edit-page"]}>
-      <header className={styles["expense-edit-header"]}>
-        <div>
-          <p className={styles["expense-edit-kicker"]}>지출 수정</p>
-          <h1>{expense.description}</h1>
-        </div>
-        <p>지출 정보와 영수증 파일을 수정합니다.</p>
-      </header>
-
-      <section className={styles["expense-edit-panel"]}>
-        <div className={styles["expense-section-header"]}>
-          <h2>지출 정보</h2>
-          <p>새 영수증 파일을 선택하면 기존 파일이 교체됩니다.</p>
-        </div>
+    <FormPageTemplate
+      description="지출 정보와 영수증 파일을 수정합니다."
+      kicker="지출 수정"
+      title={expense.description}
+    >
+      <FormPanel
+        description="새 영수증 파일을 선택하면 기존 파일이 교체됩니다."
+        title="지출 정보"
+      >
         <ExpenseForm
           action={updateExpense}
           defaultExpenseDate={expense.expenseDate}
@@ -102,9 +99,9 @@ export default async function EditExpensePage({
           mode="edit"
         />
         {errorMessage ? (
-          <p className={styles["expense-form-error"]}>{errorMessage}</p>
+          <FormMessage>{errorMessage}</FormMessage>
         ) : null}
-      </section>
-    </section>
+      </FormPanel>
+    </FormPageTemplate>
   );
 }

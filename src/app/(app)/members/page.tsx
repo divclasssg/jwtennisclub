@@ -1,5 +1,14 @@
 import Link from "next/link";
-import styles from "./page.module.scss";
+import { ActionLink, Badge, Button, TextInput } from "@/components/atoms";
+import {
+  EmptyState,
+  FilterBar,
+  FormField,
+  TabLink,
+  Tabs,
+} from "@/components/molecules";
+import { DataPanel, DataTable } from "@/components/organisms";
+import { ManagementPageTemplate } from "@/components/templates";
 import { createClient } from "@/lib/supabase/server";
 import {
   applyOperatorPositionInfo,
@@ -122,66 +131,67 @@ function buildStatusHref(status: MemberStatus, query: string) {
   return `/members?${params.toString()}`;
 }
 
+function getMemberStatusTone(status: MemberStatus) {
+  if (status === "active") {
+    return "success";
+  }
+
+  if (status === "withdrawn") {
+    return "danger";
+  }
+
+  return "muted";
+}
+
 export default async function MembersPage({ searchParams }: MembersPageProps) {
   const filters = normalizeMemberListFilters(await searchParams);
   const members = await getMembers(filters);
   const hasFilters = filters.query || filters.status !== "active";
 
   return (
-    <section className={styles["members-page"]}>
-      <header className={styles["members-header"]}>
-        <div>
-          <p className={styles["members-kicker"]}>회원 관리</p>
-          <h1>회원 목록</h1>
-        </div>
-        <div className={styles["members-header-side"]}>
-          <p>
-            활동중, 휴회, 탈퇴 상태를 기준으로 회원을 찾고 이후 회비 기록과
-            연결할 기준 정보를 확인합니다.
-          </p>
-          <Link href="/members/new">회원 등록</Link>
-        </div>
-      </header>
-
-      <nav className={styles["members-tabs"]} aria-label="회원 상태">
-        {MEMBER_STATUSES.map((status) => (
-          <Link
-            aria-current={filters.status === status ? "page" : undefined}
-            className={styles["members-tab-link"]}
-            href={buildStatusHref(status, filters.query)}
-            key={status}
-          >
-            {formatMemberStatusTab(status)}
-          </Link>
-        ))}
-      </nav>
-
-      <form className={styles["members-filters"]}>
-        <label className={styles["members-search-field"]}>
-          검색
-          <input
-            defaultValue={filters.query}
-            name="q"
-            placeholder="이름 또는 끝 4자리"
-            type="search"
-          />
-        </label>
-        <input name="status" type="hidden" value={filters.status} />
-        <button type="submit">조회</button>
-      </form>
-
-      <section
-        aria-label="회원 목록"
-        className={styles["members-list-panel"]}
-      >
-        <div className={styles["members-list-summary"]}>
-          <p>총 {members.length}명</p>
-          {hasFilters ? <a href="/members">필터 초기화</a> : null}
-        </div>
-
-        {members.length > 0 ? (
-          <div className={styles["members-table-wrap"]}>
-            <table className={styles["members-table"]}>
+    <ManagementPageTemplate
+      action={<ActionLink href="/members/new">회원 등록</ActionLink>}
+      description={
+        <>
+          활동중, 휴회, 탈퇴 상태를 기준으로 회원을 찾고 이후 회비 기록과
+          연결할 기준 정보를 확인합니다.
+        </>
+      }
+      filters={
+        <FilterBar aria-label="회원 검색 필터" layout="search">
+          <FormField label="검색">
+            <TextInput
+              defaultValue={filters.query}
+              name="q"
+              placeholder="이름 또는 끝 4자리"
+              shape="pill"
+              type="search"
+            />
+          </FormField>
+          <input name="status" type="hidden" value={filters.status} />
+          <Button type="submit">조회</Button>
+        </FilterBar>
+      }
+      kicker="회원 관리"
+      list={
+        <DataPanel
+          aria-label="회원 목록"
+          empty={
+            <EmptyState
+              description={
+                <>
+                  검색어 또는 상태 필터를 조정하거나 신규 회원 등록 화면에서 첫
+                  회원을 추가하세요.
+                </>
+              }
+              title="표시할 회원이 없습니다"
+            />
+          }
+          headerSide={hasFilters ? <a href="/members">필터 초기화</a> : null}
+          headerTitle={`총 ${members.length}명`}
+        >
+          {members.length > 0 ? (
+            <DataTable>
               <thead>
                 <tr>
                   <th scope="col">이름</th>
@@ -200,24 +210,14 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
                     <th scope="row">{member.name}</th>
                     <td>{member.phoneLastFour ?? "-"}</td>
                     <td>
-                      <span
-                        className={
-                          member.operatorProfileId
-                            ? styles["members-kind-operator"]
-                            : styles["members-kind-general"]
-                        }
-                      >
+                      <Badge tone={member.operatorProfileId ? "info" : "muted"}>
                         {formatMemberKind(member)}
-                      </span>
+                      </Badge>
                     </td>
                     <td>
-                      <span
-                        className={
-                          styles[`members-status-${member.status}`]
-                        }
-                      >
+                      <Badge tone={getMemberStatusTone(member.status)}>
                         {formatMemberStatus(member.status)}
-                      </span>
+                      </Badge>
                     </td>
                     <td>{formatDate(member.joinedDate)}</td>
                     <td>{formatDate(member.withdrawnDate)}</td>
@@ -228,18 +228,24 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className={styles["members-empty-state"]}>
-            <h2>표시할 회원이 없습니다</h2>
-            <p>
-              검색어 또는 상태 필터를 조정하거나 신규 회원 등록 화면에서 첫
-              회원을 추가하세요.
-            </p>
-          </div>
-        )}
-      </section>
-    </section>
+            </DataTable>
+          ) : null}
+        </DataPanel>
+      }
+      tabs={
+        <Tabs aria-label="회원 상태">
+          {MEMBER_STATUSES.map((status) => (
+            <TabLink
+              href={buildStatusHref(status, filters.query)}
+              isCurrent={filters.status === status}
+              key={status}
+            >
+              {formatMemberStatusTab(status)}
+            </TabLink>
+          ))}
+        </Tabs>
+      }
+      title="회원 목록"
+    />
   );
 }

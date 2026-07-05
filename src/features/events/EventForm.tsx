@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { ActionLink, Button } from "@/components/atoms";
+import { FormActions, FormField, FormGrid } from "@/components/molecules";
 import styles from "./EventForm.module.scss";
 
 type EventFormValue = {
@@ -20,27 +21,24 @@ export function EventForm({ action, event, submitLabel }: EventFormProps) {
     <form action={action} className={styles["event-form"]}>
       {event ? <input name="id" type="hidden" value={event.id} /> : null}
 
-      <div className={styles["event-form-grid"]}>
-        <label>
-          일정 날짜
+      <FormGrid>
+        <FormField label="일정 날짜">
           <input
             defaultValue={event?.eventDate}
             name="eventDate"
             required
             type="date"
           />
-        </label>
-        <label>
-          일정 시간
+        </FormField>
+        <FormField label="일정 시간">
           <input
             defaultValue={event?.eventTime}
             name="eventTime"
             required
             type="time"
           />
-        </label>
-        <label>
-          일정 이름
+        </FormField>
+        <FormField label="일정 이름">
           <input
             defaultValue={event?.title}
             maxLength={120}
@@ -48,9 +46,8 @@ export function EventForm({ action, event, submitLabel }: EventFormProps) {
             required
             type="text"
           />
-        </label>
-        <label>
-          장소
+        </FormField>
+        <FormField label="장소">
           <input
             defaultValue={event?.location}
             maxLength={120}
@@ -58,13 +55,15 @@ export function EventForm({ action, event, submitLabel }: EventFormProps) {
             required
             type="text"
           />
-        </label>
-      </div>
+        </FormField>
+      </FormGrid>
 
-      <div className={styles["event-form-actions"]}>
-        <Link href="/schedule">취소</Link>
-        <button type="submit">{submitLabel}</button>
-      </div>
+      <FormActions>
+        <ActionLink href="/schedule" variant="secondary">
+          취소
+        </ActionLink>
+        <Button type="submit">{submitLabel}</Button>
+      </FormActions>
     </form>
   );
 }

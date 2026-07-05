@@ -1,4 +1,12 @@
-import Link from "next/link";
+import {
+  ActionLink,
+  Button,
+  DateInput,
+  SelectInput,
+  TextArea,
+  TextInput,
+} from "@/components/atoms";
+import { FormActions, FormField, FormGrid } from "@/components/molecules";
 import { MEMBER_STATUSES, type MemberStatus } from "./member-model";
 import { formatMemberStatus, type MemberListRow } from "./member-list";
 import styles from "./MemberForm.module.scss";
@@ -14,20 +22,18 @@ export function MemberForm({ action, mode, member }: MemberFormProps) {
     <form action={action} className={styles["member-form"]}>
       {member ? <input name="id" type="hidden" value={member.id} /> : null}
 
-      <div className={styles["member-form-grid"]}>
-        <label>
-          이름
-          <input
+      <FormGrid>
+        <FormField label="이름">
+          <TextInput
             defaultValue={member?.name}
             maxLength={50}
             name="name"
             required
             type="text"
           />
-        </label>
-        <label>
-          전화번호 끝 4자리
-          <input
+        </FormField>
+        <FormField label="전화번호 끝 4자리">
+          <TextInput
             defaultValue={member?.phoneLastFour ?? ""}
             inputMode="numeric"
             maxLength={4}
@@ -36,61 +42,56 @@ export function MemberForm({ action, mode, member }: MemberFormProps) {
             placeholder="1234"
             type="text"
           />
-        </label>
-        <label>
-          가입일
-          <input
+        </FormField>
+        <FormField label="가입일">
+          <DateInput
             defaultValue={member?.joinedDate}
             name="joinedDate"
             required
-            type="date"
           />
-        </label>
-        <label>
-          상태
-          <select defaultValue={member?.status ?? "active"} name="status">
+        </FormField>
+        <FormField label="상태">
+          <SelectInput defaultValue={member?.status ?? "active"} name="status">
             {MEMBER_STATUSES.map((status) => (
               <option key={status} value={status}>
                 {formatMemberStatus(status)}
               </option>
             ))}
-          </select>
-        </label>
-        <label>
-          탈퇴일
-          <input
+          </SelectInput>
+        </FormField>
+        <FormField label="탈퇴일">
+          <DateInput
             defaultValue={member?.withdrawnDate ?? ""}
             name="withdrawnDate"
-            type="date"
           />
-        </label>
-        <label>
-          탈퇴 사유
-          <input
+        </FormField>
+        <FormField label="탈퇴 사유">
+          <TextInput
             defaultValue={member?.withdrawalReason ?? ""}
             maxLength={100}
             name="withdrawalReason"
             type="text"
           />
-        </label>
-      </div>
+        </FormField>
+      </FormGrid>
 
-      <label>
-        메모
-        <textarea
+      <FormField label="메모">
+        <TextArea
           defaultValue={member?.memo ?? ""}
           maxLength={500}
           name="memo"
           rows={4}
         />
-      </label>
+      </FormField>
 
-      <div className={styles["member-form-actions"]}>
-        <Link href="/members">취소</Link>
-        <button type="submit">
+      <FormActions>
+        <ActionLink href="/members" variant="secondary">
+          취소
+        </ActionLink>
+        <Button type="submit">
           {mode === "create" ? "회원 등록" : "변경 저장"}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </form>
   );
 }

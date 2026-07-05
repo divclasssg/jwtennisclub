@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettlementsPage from "./page";
 
@@ -67,6 +67,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 describe("SettlementsPage", () => {
   beforeEach(() => {
+    cleanup();
     queryState.feePayments = feePayments;
     queryState.expenses = expenses;
     from.mockClear();
@@ -98,6 +99,10 @@ describe("SettlementsPage", () => {
     expect(screen.getByText("정산 잔액")).toBeInTheDocument();
     expect(screen.getByText("-50,000원")).toBeInTheDocument();
     expect(screen.getByText("회비 납부 2건 · 지출 2건")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "PDF 다운로드" })).toHaveAttribute(
+      "href",
+      "/reports/monthly?month=2026-07",
+    );
 
     const categories = screen.getByRole("region", { name: "카테고리별 지출" });
     expect(within(categories).getByRole("cell", { name: "코트" })).toBeInTheDocument();

@@ -1,0 +1,28 @@
+.control {
+  width: 100%;
+  border: var(--hairline-width) solid var(--hairline);
+  background: var(--surface-pearl);
+  color: var(--ink);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+}
+
+.pill {
+  height: var(--search-input-height);
+  padding: var(--search-input-padding);
+  border-radius: var(--rounded-pill);
+}
+
+.rounded {
+  height: var(--search-input-height);
+  padding: var(--search-input-padding);
+  border-radius: var(--rounded-md);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: var(--member-form-textarea-min-height);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--rounded-md);
+}

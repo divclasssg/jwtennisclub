@@ -1,16 +1,18 @@
 import { createEvent } from "../actions";
+import { FormPanel } from "@/components/organisms";
+import { FormPageTemplate } from "@/components/templates";
 import { EventForm } from "@/features/events/EventForm";
-import styles from "./page.module.scss";
 
 export default function NewEventPage() {
   return (
-    <section className={styles["event-form-page"]}>
-      <header className={styles["event-form-header"]}>
-        <p className={styles["event-form-kicker"]}>일정 관리</p>
-        <h1>일정 등록</h1>
-      </header>
-
-      <EventForm action={createEvent} submitLabel="일정 등록" />
-    </section>
+    <FormPageTemplate
+      description="운영 일정의 날짜, 시간, 이름, 장소를 등록합니다."
+      kicker="일정 관리"
+      title="일정 등록"
+    >
+      <FormPanel title="일정 정보">
+        <EventForm action={createEvent} submitLabel="일정 등록" />
+      </FormPanel>
+    </FormPageTemplate>
   );
 }

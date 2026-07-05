@@ -1,8 +1,9 @@
 import { updateEvent } from "../../actions";
+import { FormPanel } from "@/components/organisms";
+import { FormPageTemplate } from "@/components/templates";
 import { EventForm } from "@/features/events/EventForm";
 import type { EventRecord } from "@/features/events/event-model";
 import { createClient } from "@/lib/supabase/server";
-import styles from "./page.module.scss";
 
 type EditEventPageProps = {
   params: Promise<{ id: string }>;
@@ -42,14 +43,15 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
   const event = await getEvent(id);
 
   return (
-    <section className={styles["event-form-page"]}>
-      <header className={styles["event-form-header"]}>
-        <p className={styles["event-form-kicker"]}>일정 관리</p>
-        <h1>일정 수정</h1>
-      </header>
-
-      <EventForm action={updateEvent} event={event} submitLabel="변경 저장" />
-    </section>
+    <FormPageTemplate
+      description="등록된 운영 일정의 날짜, 시간, 이름, 장소를 수정합니다."
+      kicker="일정 관리"
+      title="일정 수정"
+    >
+      <FormPanel title="일정 정보">
+        <EventForm action={updateEvent} event={event} submitLabel="변경 저장" />
+      </FormPanel>
+    </FormPageTemplate>
   );
 }
 
