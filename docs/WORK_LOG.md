@@ -217,23 +217,45 @@
   - fee payment and expense counts
   - expense totals grouped by category
 - Implemented monthly PDF report generation:
-  - Added `/reports` with month selection and a `PDF 다운로드` link.
+  - Added `PDF 다운로드` to `/settlements` for the selected settlement month.
   - Added `/reports/monthly?month=YYYY-MM` as an authenticated PDF download route.
+  - Changed `/reports` to redirect to `/settlements` so PDF generation stays inside the settlement workflow.
   - Added a member-facing PDF template with Korean font support through `@react-pdf/renderer` and `@fontsource/noto-sans-kr`.
   - Included income total, expense total, monthly balance, payment and expense counts, expense category totals, major expense rows, generation date, and generator name.
   - Excluded individual payment records, unpaid member names, receipt links/files, and internal expense memos from the PDF.
   - Current PDF generation uses live monthly fee and expense data because monthly closing snapshots are not implemented yet.
 - Removed the unused `설정` item from the primary navigation while keeping the `비밀번호 변경` account action.
+- Removed the separate `PDF` primary navigation item because PDF download is part of the settlement flow.
+- Introduced an atomic UI component structure under `src/components`:
+  - atoms for buttons, action links, badges, and form controls
+  - molecules for filters, tabs, summaries, form fields, form grids, CSV upload fields, form messages, row actions, and table scroll areas
+  - organisms for page headers, data panels, data tables, and form panels
+  - templates for management pages and form pages
+- Refactored repeated member, fee, expense, schedule, settlement, and password-change page structures to use the shared atomic UI components.
+- Moved the schedule calendar UI into `src/features/events/ScheduleCalendar.tsx` with focused tests.
+- Stabilized the monthly report PDF render test by giving the renderer-specific test a longer timeout because font/PDF initialization can exceed the default timeout under full-suite load.
 
 ### Verification Evidence
 - Member tab focused tests: `npm run test -- src/features/members/member-list.test.ts src/app/\(app\)/members/page.test.tsx` passed with 2 files and 9 tests.
 - Settlement focused tests: `npm run test -- src/features/settlements/settlement-summary.test.ts src/app/\(app\)/settlements/page.test.tsx` passed with 2 files and 6 tests.
 - PDF report focused tests: `npm run test -- src/features/reports/monthly-report.test.ts src/features/reports/MonthlyReportPdf.test.tsx src/app/\(app\)/reports/page.test.tsx src/app/\(app\)/reports/monthly/route.test.ts` passed with 4 files and 7 tests.
+- Settlement/PDF navigation focused tests: `npm run test -- src/features/shell/AppShell.test.tsx src/app/\(app\)/settlements/page.test.tsx src/app/\(app\)/reports/page.test.tsx src/app/\(app\)/reports/monthly/route.test.ts` passed with 4 files and 5 tests.
 - Shell navigation focused test: `npm run test -- src/features/shell/AppShell.test.tsx` passed with 1 file and 1 test.
 - Full test suite: `npm run test` passed with 41 files and 135 tests.
 - `npm run lint`: passed.
 - `npx tsc --noEmit`: passed.
 - `npm run build`: passed.
+- Atomic UI refactor focused tests: `npm run test -- src/components/molecules/molecules.test.tsx src/features/members/member-form.test.ts src/features/events src/features/expenses src/features/fees src/app/\(app\)/members src/app/\(app\)/expenses src/app/\(app\)/fees src/app/\(app\)/schedule` passed with 27 files and 80 tests.
+- Full test suite after atomic UI refactor: `npm run test` passed with 46 files and 158 tests.
+- Atomic UI refactor verification: `npm run lint`, `npx tsc --noEmit`, `git diff --check`, and `npm run build` passed.
+
+### Atomic UI Guidelines
+- Prefer existing shared components before adding page-local markup or styles.
+- Use atoms for single controls and display primitives.
+- Use molecules for reusable field groups, filter bars, CSV file inputs, form messages, tabs, summaries, and action rows.
+- Use organisms for larger reusable page regions such as headers, data panels, tables, and form panels.
+- Use templates for route-level management and form page layout.
+- Keep page SCSS only for truly page-specific layout. Shared spacing, panel, table, and form action styling should live in shared components.
 
 ## Next Planned Work
 - Verify CSV member import later when a real CSV file is available.

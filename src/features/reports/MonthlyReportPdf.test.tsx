@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { renderMonthlyReportPdf } from "./MonthlyReportPdf";
 
+const PDF_RENDER_TIMEOUT_MS = 15_000;
+
 describe("renderMonthlyReportPdf", () => {
   it("renders a Korean monthly report as a PDF buffer", async () => {
     const pdf = await renderMonthlyReportPdf({
@@ -25,5 +27,5 @@ describe("renderMonthlyReportPdf", () => {
     });
 
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
-  });
+  }, PDF_RENDER_TIMEOUT_MS);
 });

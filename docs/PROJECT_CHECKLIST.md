@@ -35,7 +35,9 @@
 - [x] Member tabs for separate active, paused, and withdrawn member management implemented
 - [x] Monthly settlement summary implemented
 - [x] Monthly PDF generation implemented
+- [x] PDF download consolidated into settlement screen
 - [x] Unused settings item removed from primary navigation
+- [x] Atomic design UI component structure introduced for shared atoms, molecules, organisms, and templates
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management
@@ -49,6 +51,7 @@
 - [x] Implement expense receipt attachment with Cloudflare R2
 - [x] Implement monthly settlement summary
 - [x] Implement PDF template for monthly report
+- [x] Refactor repeated management pages, data tables, form panels, CSV fields, and form actions into shared atomic UI components
 
 ## Deferred Work
 - [ ] Revisit and finalize the dashboard after enough real operational data has accumulated
