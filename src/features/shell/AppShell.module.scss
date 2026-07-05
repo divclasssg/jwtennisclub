@@ -165,7 +165,7 @@
 }
 
 .shell-content {
-    width: min(100%, 1280px);
+    width: min(100%, 1920px);
     margin: 0 auto;
     padding: var(--spacing-xl) clamp(16px, 4vw, 56px) var(--spacing-section);
 }
@@ -196,7 +196,6 @@
     }
 
     .shell-sub-nav {
-        top: 88px;
         min-height: 64px;
     }
 
