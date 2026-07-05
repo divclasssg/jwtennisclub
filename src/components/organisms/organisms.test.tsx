@@ -17,7 +17,9 @@ describe("organisms", () => {
 
     expect(screen.getByText("회원 관리")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "회원 목록" })).toBeInTheDocument();
-    expect(screen.getByText("회원 상태를 기준으로 관리합니다.")).toBeInTheDocument();
+    expect(
+      screen.queryByText("회원 상태를 기준으로 관리합니다."),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "회원 등록" })).toHaveAttribute(
       "href",
       "/members/new",

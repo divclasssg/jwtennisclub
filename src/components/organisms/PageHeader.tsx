@@ -10,7 +10,6 @@ type PageHeaderProps = {
 
 export function PageHeader({
   action,
-  description,
   kicker,
   title,
 }: PageHeaderProps) {
@@ -20,10 +19,7 @@ export function PageHeader({
         <p className={styles["page-kicker"]}>{kicker}</p>
         <h1 className={styles["page-heading"]}>{title}</h1>
       </div>
-      <div className={styles["page-header-side"]}>
-        {description ? <p>{description}</p> : null}
-        {action}
-      </div>
+      {action ? <div className={styles["page-header-side"]}>{action}</div> : null}
     </header>
   );
 }
