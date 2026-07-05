@@ -1,0 +1,19 @@
+@use "../../_breakpoints" as bp;
+
+.members-table-view {
+  display: block;
+}
+
+.members-mobile-list-view {
+  display: none;
+}
+
+@media (max-width: bp.$breakpoint-phone) {
+  .members-table-view {
+    display: none;
+  }
+
+  .members-mobile-list-view {
+    display: block;
+  }
+}

@@ -123,12 +123,34 @@ describe("MembersPage", () => {
     ).toHaveAttribute("href", "/members?status=withdrawn&q=%EA%B9%80");
 
     const list = screen.getByRole("region", { name: "회원 목록" });
+    const table = within(list).getByRole("table");
     expect(within(list).getByText("총 2명")).toBeInTheDocument();
-    expect(within(list).getByRole("cell", { name: "1234" })).toBeInTheDocument();
-    expect(within(list).getByText("운영진")).toBeInTheDocument();
-    expect(within(list).getByText("일반회원")).toBeInTheDocument();
-    expect(within(list).getByRole("cell", { name: "2026.07.10" })).toBeInTheDocument();
-    expect(within(list).getByRole("cell", { name: "이사" })).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "1234" })).toBeInTheDocument();
+    expect(within(table).getByText("운영진")).toBeInTheDocument();
+    expect(within(table).getByText("일반회원")).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "2026.07.10" })).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "이사" })).toBeInTheDocument();
+  });
+
+  it("renders a mobile member list with the same member details", async () => {
+    render(
+      await MembersPage({
+        searchParams: Promise.resolve({ status: "active" }),
+      }),
+    );
+
+    const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
+    const items = within(mobileList).getAllByRole("listitem");
+
+    expect(items).toHaveLength(2);
+    expect(within(items[0]).getByRole("heading", { name: "김민수" })).toBeInTheDocument();
+    expect(within(items[0]).getByText("연락처 1234")).toBeInTheDocument();
+    expect(within(items[0]).getByText("운영진")).toBeInTheDocument();
+    expect(
+      within(items[0]).getByRole("link", { name: "김민수 수정" }),
+    ).toHaveAttribute("href", "/members/member-1/edit");
+    expect(within(items[1]).getByText("탈퇴일 2026.07.10")).toBeInTheDocument();
+    expect(within(items[1]).getByText("탈퇴 사유 이사")).toBeInTheDocument();
   });
 
   it("renders an empty state when no members match", async () => {

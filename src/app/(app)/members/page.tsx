@@ -1,4 +1,5 @@
 import Link from "next/link";
+import styles from "./page.module.scss";
 import { ActionLink, Badge, Button, TextInput } from "@/components/atoms";
 import {
   EmptyState,
@@ -22,6 +23,7 @@ import {
   type MemberListRow,
   type MemberListSearchParams,
 } from "@/features/members/member-list";
+import { MemberMobileList } from "@/features/members/MemberMobileList";
 import { MEMBER_STATUSES, type MemberStatus } from "@/features/members/member-model";
 
 type MembersPageProps = {
@@ -191,44 +193,51 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
           headerTitle={`총 ${members.length}명`}
         >
           {members.length > 0 ? (
-            <DataTable>
-              <thead>
-                <tr>
-                  <th scope="col">이름</th>
-                  <th scope="col">연락처</th>
-                  <th scope="col">구분</th>
-                  <th scope="col">상태</th>
-                  <th scope="col">가입일</th>
-                  <th scope="col">탈퇴일</th>
-                  <th scope="col">탈퇴 사유</th>
-                  <th scope="col">관리</th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((member) => (
-                  <tr key={member.id}>
-                    <th scope="row">{member.name}</th>
-                    <td>{member.phoneLastFour ?? "-"}</td>
-                    <td>
-                      <Badge tone={member.operatorProfileId ? "info" : "muted"}>
-                        {formatMemberKind(member)}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Badge tone={getMemberStatusTone(member.status)}>
-                        {formatMemberStatus(member.status)}
-                      </Badge>
-                    </td>
-                    <td>{formatDate(member.joinedDate)}</td>
-                    <td>{formatDate(member.withdrawnDate)}</td>
-                    <td>{member.withdrawalReason ?? "-"}</td>
-                    <td>
-                      <Link href={`/members/${member.id}/edit`}>수정</Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
+            <>
+              <div className={styles["members-table-view"]}>
+                <DataTable>
+                  <thead>
+                    <tr>
+                      <th scope="col">이름</th>
+                      <th scope="col">연락처</th>
+                      <th scope="col">구분</th>
+                      <th scope="col">상태</th>
+                      <th scope="col">가입일</th>
+                      <th scope="col">탈퇴일</th>
+                      <th scope="col">탈퇴 사유</th>
+                      <th scope="col">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {members.map((member) => (
+                      <tr key={member.id}>
+                        <th scope="row">{member.name}</th>
+                        <td>{member.phoneLastFour ?? "-"}</td>
+                        <td>
+                          <Badge tone={member.operatorProfileId ? "info" : "muted"}>
+                            {formatMemberKind(member)}
+                          </Badge>
+                        </td>
+                        <td>
+                          <Badge tone={getMemberStatusTone(member.status)}>
+                            {formatMemberStatus(member.status)}
+                          </Badge>
+                        </td>
+                        <td>{formatDate(member.joinedDate)}</td>
+                        <td>{formatDate(member.withdrawnDate)}</td>
+                        <td>{member.withdrawalReason ?? "-"}</td>
+                        <td>
+                          <Link href={`/members/${member.id}/edit`}>수정</Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </DataTable>
+              </div>
+              <div className={styles["members-mobile-list-view"]}>
+                <MemberMobileList members={members} />
+              </div>
+            </>
           ) : null}
         </DataPanel>
       }
