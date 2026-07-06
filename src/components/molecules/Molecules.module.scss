@@ -271,6 +271,7 @@
   position: relative;
   z-index: 1;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   width: min(100%, var(--modal-panel-max-width));
   max-height: var(--modal-panel-max-height);
   overflow: hidden;
@@ -299,6 +300,7 @@
 }
 
 .modal-body {
+  min-height: 0;
   overflow-y: auto;
   padding: var(--spacing-lg);
 }
@@ -329,6 +331,14 @@
 
   .tabs {
     width: 100%;
+  }
+
+  .tabs-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tabs-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .panel-header {

@@ -45,6 +45,7 @@
 - [x] PageHeader organism removed from app page layouts
 - [x] Page-level action buttons moved into data panel or toolbar headers
 - [x] Member, fee CSV, and expense registration actions open as modals during list-page navigation
+- [x] Member page mobile horizontal overflow fixed
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management

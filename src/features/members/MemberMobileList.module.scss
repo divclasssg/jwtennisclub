@@ -27,6 +27,7 @@
 .member-mobile-title {
   display: grid;
   gap: var(--spacing-xs);
+  min-width: 0;
 }
 
 .member-mobile-name {
@@ -36,6 +37,7 @@
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tagline);
   letter-spacing: var(--letter-spacing-tagline);
+  overflow-wrap: anywhere;
 }
 
 .member-mobile-badges {
