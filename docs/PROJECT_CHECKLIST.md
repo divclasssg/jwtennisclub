@@ -46,6 +46,7 @@
 - [x] Page-level action buttons moved into data panel or toolbar headers
 - [x] Member, fee CSV, and expense registration actions open as modals during list-page navigation
 - [x] Member page mobile horizontal overflow fixed
+- [x] Fee board mobile layout implemented as a list view
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management

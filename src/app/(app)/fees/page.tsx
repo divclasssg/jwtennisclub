@@ -21,6 +21,7 @@ import {
   normalizeFeeListFilters,
   type FeeListSearchParams,
 } from "@/features/fees/fee-list";
+import { FeeMobileList } from "@/features/fees/FeeMobileList";
 import {
   DEFAULT_MONTHLY_FEE_AMOUNT,
   getPeriodMonthEnd,
@@ -246,89 +247,106 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
           headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${boardRows.length}명`}
         >
           {boardRows.length > 0 ? (
-            <DataTable>
-              <thead>
-                <tr>
-                  <th scope="col">회원</th>
-                  <th scope="col">연락처</th>
-                  <th scope="col">구분</th>
-                  <th scope="col">상태</th>
-                  <th scope="col">기준 금액</th>
-                  <th scope="col">납부일</th>
-                  <th scope="col">메모</th>
-                  <th scope="col">처리</th>
-                </tr>
-              </thead>
-              <tbody>
-                {boardRows.map((row) => (
-                  <tr key={row.memberId}>
-                    <th scope="row">{row.memberName}</th>
-                    <td>{row.memberPhoneLastFour ?? "-"}</td>
-                    <td>
-                      <Badge tone={row.operatorProfileId ? "info" : "muted"}>
-                        {formatMemberKind(row)}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Badge tone={row.payment ? "success" : "danger"}>
-                        {formatPaymentStatus(row)}
-                      </Badge>
-                    </td>
-                    <td>
-                      {formatCurrency(
-                        row.payment?.amount ?? DEFAULT_MONTHLY_FEE_AMOUNT,
-                      )}
-                      원
-                    </td>
-                    <td>{row.payment ? formatDate(row.payment.paidDate) : "-"}</td>
-                    <td>{row.payment?.memo ?? "-"}</td>
-                    <td>
-                      {row.payment ? (
-                        <form
-                          action={cancelFeePayment}
-                          className={styles["fees-inline-form"]}
-                        >
-                          <input
-                            name="paymentId"
-                            type="hidden"
-                            value={row.payment.id}
-                          />
-                          <input
-                            name="periodMonth"
-                            type="hidden"
-                            value={filters.periodMonth.slice(0, 7)}
-                          />
-                          <Button size="compact" type="submit" variant="danger">
-                            납부 취소
-                          </Button>
-                        </form>
-                      ) : (
-                        <form
-                          action={createFeePayment}
-                          className={styles["fees-inline-form"]}
-                        >
-                          <input name="memberId" type="hidden" value={row.memberId} />
-                          <input
-                            name="periodMonth"
-                            type="hidden"
-                            value={filters.periodMonth.slice(0, 7)}
-                          />
-                          <input name="paidDate" type="hidden" value={today} />
-                          <input
-                            name="amount"
-                            type="hidden"
-                            value={DEFAULT_MONTHLY_FEE_AMOUNT}
-                          />
-                          <Button size="compact" type="submit">
-                            납부 처리
-                          </Button>
-                        </form>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
+            <>
+              <div className={styles["fees-table-view"]}>
+                <DataTable>
+                  <thead>
+                    <tr>
+                      <th scope="col">회원</th>
+                      <th scope="col">연락처</th>
+                      <th scope="col">구분</th>
+                      <th scope="col">상태</th>
+                      <th scope="col">기준 금액</th>
+                      <th scope="col">납부일</th>
+                      <th scope="col">메모</th>
+                      <th scope="col">처리</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {boardRows.map((row) => (
+                      <tr key={row.memberId}>
+                        <th scope="row">{row.memberName}</th>
+                        <td>{row.memberPhoneLastFour ?? "-"}</td>
+                        <td>
+                          <Badge tone={row.operatorProfileId ? "info" : "muted"}>
+                            {formatMemberKind(row)}
+                          </Badge>
+                        </td>
+                        <td>
+                          <Badge tone={row.payment ? "success" : "danger"}>
+                            {formatPaymentStatus(row)}
+                          </Badge>
+                        </td>
+                        <td>
+                          {formatCurrency(
+                            row.payment?.amount ?? DEFAULT_MONTHLY_FEE_AMOUNT,
+                          )}
+                          원
+                        </td>
+                        <td>{row.payment ? formatDate(row.payment.paidDate) : "-"}</td>
+                        <td>{row.payment?.memo ?? "-"}</td>
+                        <td>
+                          {row.payment ? (
+                            <form
+                              action={cancelFeePayment}
+                              className={styles["fees-inline-form"]}
+                            >
+                              <input
+                                name="paymentId"
+                                type="hidden"
+                                value={row.payment.id}
+                              />
+                              <input
+                                name="periodMonth"
+                                type="hidden"
+                                value={filters.periodMonth.slice(0, 7)}
+                              />
+                              <Button size="compact" type="submit" variant="danger">
+                                납부 취소
+                              </Button>
+                            </form>
+                          ) : (
+                            <form
+                              action={createFeePayment}
+                              className={styles["fees-inline-form"]}
+                            >
+                              <input
+                                name="memberId"
+                                type="hidden"
+                                value={row.memberId}
+                              />
+                              <input
+                                name="periodMonth"
+                                type="hidden"
+                                value={filters.periodMonth.slice(0, 7)}
+                              />
+                              <input name="paidDate" type="hidden" value={today} />
+                              <input
+                                name="amount"
+                                type="hidden"
+                                value={DEFAULT_MONTHLY_FEE_AMOUNT}
+                              />
+                              <Button size="compact" type="submit">
+                                납부 처리
+                              </Button>
+                            </form>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </DataTable>
+              </div>
+              <div className={styles["fees-mobile-list-view"]}>
+                <FeeMobileList
+                  cancelPaymentAction={cancelFeePayment}
+                  createPaymentAction={createFeePayment}
+                  periodMonth={filters.periodMonth.slice(0, 7)}
+                  rows={boardRows}
+                  today={today}
+                />
+              </div>
+            </>
           ) : null}
         </DataPanel>
       }

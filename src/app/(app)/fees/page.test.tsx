@@ -176,11 +176,13 @@ describe("FeesPage", () => {
     expect(screen.getAllByText("납부완료").length).toBeGreaterThan(0);
 
     const list = screen.getByRole("region", { name: "월별 회비 체크판" });
+    const table = within(list).getByRole("table");
+
     expect(within(list).getByText("2026.07 · 총 1명")).toBeInTheDocument();
-    expect(within(list).getByRole("cell", { name: "1234" })).toBeInTheDocument();
-    expect(within(list).getByText("운영진")).toBeInTheDocument();
-    expect(within(list).getByRole("cell", { name: "30,000원" })).toBeInTheDocument();
-    expect(within(list).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "1234" })).toBeInTheDocument();
+    expect(within(table).getByText("운영진")).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "30,000원" })).toBeInTheDocument();
+    expect(within(table).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
   });
 
   it("renders unpaid rows with an inline payment action", async () => {
@@ -193,8 +195,32 @@ describe("FeesPage", () => {
     );
 
     const list = screen.getByRole("region", { name: "월별 회비 체크판" });
-    expect(within(list).getAllByRole("button", { name: "납부 처리" })).toHaveLength(2);
-    expect(within(list).getAllByText("운영진")).toHaveLength(2);
+    const table = within(list).getByRole("table");
+
+    expect(within(table).getAllByRole("button", { name: "납부 처리" })).toHaveLength(2);
+    expect(within(table).getAllByText("운영진")).toHaveLength(2);
+  });
+
+  it("renders a mobile fee list with the same payment details", async () => {
+    render(
+      await FeesPage({
+        searchParams: Promise.resolve({ month: "2026-07", status: "all" }),
+      }),
+    );
+
+    const mobileList = screen.getByRole("list", { name: "모바일 회비 목록" });
+    const items = within(mobileList).getAllByRole("listitem");
+
+    expect(items).toHaveLength(2);
+    expect(within(items[0]).getByRole("heading", { name: "이영희" })).toBeInTheDocument();
+    expect(within(items[0]).getByText("연락처 9876")).toBeInTheDocument();
+    expect(within(items[0]).getByText("미납")).toBeInTheDocument();
+    expect(within(items[0]).getByText("기준 금액 30,000원")).toBeInTheDocument();
+    expect(within(items[0]).getByRole("button", { name: "납부 처리" })).toBeInTheDocument();
+    expect(within(items[1]).getByRole("heading", { name: "김민수" })).toBeInTheDocument();
+    expect(within(items[1]).getByText("납부일 2026.07.03")).toBeInTheDocument();
+    expect(within(items[1]).getByText("메모 입금 확인")).toBeInTheDocument();
+    expect(within(items[1]).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
   });
 
   it("renders an empty state when no members match", async () => {

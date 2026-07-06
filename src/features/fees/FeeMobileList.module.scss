@@ -1,0 +1,65 @@
+.fee-mobile-list {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin: 0;
+  padding: var(--spacing-md);
+  list-style: none;
+}
+
+.fee-mobile-item {
+  display: grid;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-bottom: var(--hairline-width) solid var(--divider-soft);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.fee-mobile-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.fee-mobile-title {
+  display: grid;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.fee-mobile-name {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--font-size-tagline);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tagline);
+  letter-spacing: var(--letter-spacing-tagline);
+  overflow-wrap: anywhere;
+}
+
+.fee-mobile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.fee-mobile-action {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.fee-mobile-detail-list {
+  display: grid;
+  gap: var(--spacing-xs);
+}
+
+.fee-mobile-detail {
+  margin: 0;
+  color: var(--ink-muted-48);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-caption);
+}

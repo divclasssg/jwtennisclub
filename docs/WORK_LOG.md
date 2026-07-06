@@ -307,6 +307,9 @@
   - shell account actions can wrap on phone-width screens instead of forcing the sub navigation wider
   - member mobile list titles can shrink and wrap long names
   - segmented tabs switch to zero-minimum grid columns on phone-width screens, fixing `/members` horizontal overflow from the three status tabs
+- Implemented a mobile list view for the fee board:
+  - desktop keeps the table-oriented monthly fee board
+  - mobile shows each member as a list item with member kind, payment status, phone last four, amount, paid date, memo, and the existing payment/cancel action
 
 ### Verification Evidence
 - Page header removal focused tests: `npm run test -- src/components/organisms/organisms.test.tsx src/components/templates/templates.test.tsx src/features/shell/AppShell.test.tsx src/features/events/ScheduleCalendar.test.tsx` passed with 4 files and 11 tests.
@@ -324,6 +327,7 @@
 - Headless browser click verification was not completed because the local `browse` tool could not start without `bun`, and no authenticated browser session was available in the tool context.
 - Mobile layout overflow verification: `npm run test -- src/components/molecules/molecules.test.tsx src/features/shell/AppShell.test.tsx src/features/members src/app/\(app\)/members` passed with 8 files and 42 tests; `npm run lint`, `npx tsc --noEmit`, `git diff --check`, and `npm run build` passed.
 - `/members` horizontal overflow fix verification: `npm run test -- src/components/molecules/molecules.test.tsx src/app/\(app\)/members/page.test.tsx src/features/members` passed with 5 files and 37 tests; `npm run lint`, `npx tsc --noEmit`, `git diff --check`, and `npm run build` passed.
+- Fee board mobile list verification: `npm run test -- src/features/fees src/app/\(app\)/fees` passed with 6 files and 22 tests; full `npm run test` passed with 47 files and 165 tests; `npm run lint`, `npx tsc --noEmit`, `git diff --check`, and `npm run build` passed.
 
 ### UI Layout Guidelines
 - Keep the shell sub navigation as the only persistent page-title location inside the app shell.

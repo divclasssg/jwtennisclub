@@ -1,3 +1,23 @@
+@use "../../_breakpoints" as bp;
+
 .fees-inline-form {
   margin: 0;
+}
+
+.fees-table-view {
+  display: block;
+}
+
+.fees-mobile-list-view {
+  display: none;
+}
+
+@media (max-width: bp.$breakpoint-phone) {
+  .fees-table-view {
+    display: none;
+  }
+
+  .fees-mobile-list-view {
+    display: block;
+  }
 }
