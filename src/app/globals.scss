@@ -102,7 +102,8 @@
   --configurator-chip-padding: 12px 16px;
   --search-input-padding: 12px 20px;
   --search-input-height: 44px;
-  --segmented-tab-height: 48px;
+  --segmented-tab-height: var(--search-input-height);
+  --segmented-tab-min-width: calc(var(--members-status-filter-width) - var(--spacing-xl));
   --segmented-tab-padding: 0;
   --global-nav-height: 44px;
   --sub-nav-height: 52px;

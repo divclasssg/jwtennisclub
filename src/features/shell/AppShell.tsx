@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { logout } from "@/app/(auth)/login/actions";
+import { PageTitleProvider, ShellPageTitle } from "./PageTitleContext";
 import styles from "./AppShell.module.scss";
 
 const navigationItems = [
@@ -29,48 +30,54 @@ export function AppShell({
         .join(" · ");
 
     return (
-        <div className={styles["shell"]}>
-            <header className={styles["shell-global-nav"]}>
-                <Link className={styles["shell-brand"]} href="/dashboard">
-                    JW_TENNIS Club
-                </Link>
-                <nav aria-label="주요 메뉴" className={styles["shell-nav"]}>
-                    {navigationItems.map((item) => (
-                        <Link
-                            className={styles["shell-nav-link"]}
-                            href={item.href}
-                            key={item.href}
-                        >
-                            {item.label}
-                        </Link>
-                    ))}
-                </nav>
-            </header>
-            <div className={styles["shell-sub-nav"]}>
-                <div className={styles["shell-sub-nav-content"]}>
-                    <p className={styles["shell-header-title"]}>
-                        {userDisplayName}
-                    </p>
-                    <p className={styles["shell-kicker"]}>{shellKicker}</p>
-                </div>
-                <div className={styles["shell-account-actions"]}>
-                    <Link
-                        className={styles["shell-password-link"]}
-                        href="/settings/password"
-                    >
-                        비밀번호 변경
+        <PageTitleProvider>
+            <div className={styles["shell"]}>
+                <header className={styles["shell-global-nav"]}>
+                    <Link className={styles["shell-brand"]} href="/dashboard">
+                        JW_TENNIS Club
                     </Link>
-                    <form action={logout}>
-                        <button
-                            className={styles["shell-logout-button"]}
-                            type="submit"
+                    <nav aria-label="주요 메뉴" className={styles["shell-nav"]}>
+                        {navigationItems.map((item) => (
+                            <Link
+                                className={styles["shell-nav-link"]}
+                                href={item.href}
+                                key={item.href}
+                            >
+                                {item.label}
+                            </Link>
+                        ))}
+                    </nav>
+                </header>
+                <div className={styles["shell-sub-nav"]}>
+                    <div className={styles["shell-sub-nav-content"]}>
+                        <ShellPageTitle
+                            className={styles["shell-page-title"]}
+                            fallback={userDisplayName}
+                        />
+                    </div>
+                    <div className={styles["shell-account-actions"]}>
+                        <div className={styles["shell-user-context"]}>
+                            <p className={styles["shell-user-name"]}>{userDisplayName}</p>
+                            <p className={styles["shell-kicker"]}>{shellKicker}</p>
+                        </div>
+                        <Link
+                            className={styles["shell-password-link"]}
+                            href="/settings/password"
                         >
-                            로그아웃
-                        </button>
-                    </form>
+                            비밀번호 변경
+                        </Link>
+                        <form action={logout}>
+                            <button
+                                className={styles["shell-logout-button"]}
+                                type="submit"
+                            >
+                                로그아웃
+                            </button>
+                        </form>
+                    </div>
                 </div>
+                <main className={styles["shell-content"]}>{children}</main>
             </div>
-            <main className={styles["shell-content"]}>{children}</main>
-        </div>
+        </PageTitleProvider>
     );
 }

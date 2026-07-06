@@ -40,6 +40,10 @@
 - [x] Atomic design UI component structure introduced for shared atoms, molecules, organisms, and templates
 - [x] Segmented tab UI revised for desktop and mobile
 - [x] Member list mobile layout implemented as a searchable list/card view
+- [x] Security scan follow-up files configured and gstack reports ignored
+- [x] Page titles moved into the shell sub navigation
+- [x] PageHeader organism removed from app page layouts
+- [x] Page-level action buttons moved into data panel or toolbar headers
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management
@@ -55,6 +59,7 @@
 - [x] Implement PDF template for monthly report
 - [x] Refactor repeated management pages, data tables, form panels, CSV fields, and form actions into shared atomic UI components
 - [x] Implement mobile member list view from the original responsive design plan
+- [x] Consolidate page titles into the shell sub navigation
 
 ## Deferred Work
 - [ ] Revisit and finalize the dashboard after enough real operational data has accumulated
@@ -86,6 +91,8 @@
 - [x] Next.js proxy lives at `src/proxy.ts`
 - [x] Component styles use SCSS Modules with kebab-case hyphen class names
 - [x] SCSS should use `src/app/globals.scss` design tokens and `src/app/_breakpoints.scss` breakpoint variables before hardcoded values
+- [x] `.gstack/` security scan artifacts are local-only and ignored by Git
+- [x] Page body layouts should not reintroduce the removed `PageHeader`; publish route titles to the shell instead
 
 ## Verification Commands
 - [x] `npm run test`

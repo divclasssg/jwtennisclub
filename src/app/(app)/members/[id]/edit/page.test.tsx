@@ -74,7 +74,7 @@ describe("EditMemberPage", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "김민수" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "회원 수정" })).toBeInTheDocument();
     expect(screen.getByLabelText("전화번호 끝 4자리")).toHaveValue("1234");
     expect(screen.getByLabelText("메모")).toHaveValue("초기 등록");
   });

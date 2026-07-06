@@ -88,11 +88,6 @@ export default async function SettlementsPage({
 
   return (
     <ManagementPageTemplate
-      action={
-        <ActionLink href={`/reports/monthly?month=${monthValue}`}>
-          PDF 다운로드
-        </ActionLink>
-      }
       description={
         <>
           선택한 월의 회비 수입과 운영 지출을 합산해 공유용 월간 보고서의 기준
@@ -112,7 +107,7 @@ export default async function SettlementsPage({
           <Button type="submit">조회</Button>
         </FilterBar>
       }
-      kicker="월별 정산"
+      kicker="월별 정산 요약"
       list={
         <DataPanel
           aria-label="카테고리별 지출"
@@ -150,10 +145,15 @@ export default async function SettlementsPage({
         <DataPanel
           aria-label={`${formatPeriodMonth(filters.periodMonth)} 정산`}
           headerSide={
-            <span>
-              회비 납부 {summary.feePaymentCount}건 · 지출{" "}
-              {summary.expenseCount}건
-            </span>
+            <>
+              <span>
+                회비 납부 {summary.feePaymentCount}건 · 지출{" "}
+                {summary.expenseCount}건
+              </span>
+              <ActionLink href={`/reports/monthly?month=${monthValue}`} size="compact">
+                PDF 다운로드
+              </ActionLink>
+            </>
           }
           headerTitle={`${formatPeriodMonth(filters.periodMonth)} 정산`}
         >
@@ -173,7 +173,7 @@ export default async function SettlementsPage({
           </SummaryGrid>
         </DataPanel>
       }
-      title="월별 정산 요약"
+      title="월별 정산"
     />
   );
 }

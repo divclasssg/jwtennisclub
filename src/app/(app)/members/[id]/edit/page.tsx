@@ -72,8 +72,8 @@ export default async function EditMemberPage({
   return (
     <FormPageTemplate
       description="회원 기본 정보, 상태, 탈퇴 처리 정보를 수정합니다."
-      kicker="회원 수정"
-      title={member.name}
+      kicker={member.name}
+      title="회원 수정"
     >
       <FormPanel
         description="상태 변경과 탈퇴 처리가 필요한 경우 관련 날짜와 사유를 함께 입력합니다."

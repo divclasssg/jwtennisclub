@@ -52,7 +52,7 @@ describe("EditExpensePage", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "코트 대관" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "지출 수정" })).toBeInTheDocument();
     expect(screen.getByLabelText("사용일")).toHaveValue("2026-07-03");
     expect(screen.getByLabelText("카테고리")).toHaveValue("court");
     expect(screen.getByLabelText("내용")).toHaveValue("코트 대관");

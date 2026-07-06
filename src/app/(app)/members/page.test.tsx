@@ -108,7 +108,7 @@ describe("MembersPage", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "회원 목록" }),
+      screen.getByRole("heading", { name: "회원 관리" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("검색")).toHaveValue("김");
     expect(screen.getByDisplayValue("paused")).toHaveAttribute("name", "status");

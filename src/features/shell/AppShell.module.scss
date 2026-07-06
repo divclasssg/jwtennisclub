@@ -82,13 +82,30 @@
     min-width: 0;
 }
 
-.shell-header-title {
+.shell-page-title {
     margin: 0;
     color: var(--ink);
     font-size: var(--font-size-body);
     font-weight: var(--font-weight-semibold);
     line-height: 1.12;
     letter-spacing: var(--letter-spacing-body);
+    white-space: nowrap;
+}
+
+.shell-user-context {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-xs);
+    min-width: 0;
+}
+
+.shell-user-name {
+    margin: 0;
+    color: var(--ink-muted-80);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-caption-strong);
+    letter-spacing: var(--letter-spacing-caption);
     white-space: nowrap;
 }
 
@@ -219,6 +236,12 @@
 
     .shell-account-actions {
         width: 100%;
+    }
+
+    .shell-user-context {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: var(--spacing-xxs);
     }
 
     .shell-password-link,

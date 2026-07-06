@@ -1,31 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { ActionLink } from "@/components/atoms";
 import { EmptyState } from "@/components/molecules";
-import { DataPanel, DataTable, FormPanel, PageHeader } from ".";
+import { DataPanel, DataTable, FormPanel } from ".";
 
 describe("organisms", () => {
-  it("renders a reusable page header", () => {
-    render(
-      <PageHeader
-        action={<ActionLink href="/members/new">회원 등록</ActionLink>}
-        description="회원 상태를 기준으로 관리합니다."
-        kicker="회원 관리"
-        title="회원 목록"
-      />,
-    );
-
-    expect(screen.getByText("회원 관리")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "회원 목록" })).toBeInTheDocument();
-    expect(
-      screen.queryByText("회원 상태를 기준으로 관리합니다."),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "회원 등록" })).toHaveAttribute(
-      "href",
-      "/members/new",
-    );
-  });
-
   it("renders a data panel with heading and content or empty state", () => {
     render(
       <DataPanel

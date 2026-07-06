@@ -14,7 +14,7 @@ describe("NewExpensePage", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "지출 등록" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "지출 관리" })).toBeInTheDocument();
     expect(screen.getByLabelText("사용일")).toBeInTheDocument();
     expect(screen.getByLabelText("카테고리")).toBeInTheDocument();
     expect(screen.getByLabelText("내용")).toBeInTheDocument();

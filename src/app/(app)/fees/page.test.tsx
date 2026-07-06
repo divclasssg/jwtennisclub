@@ -164,7 +164,7 @@ describe("FeesPage", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "월별 회비 현황" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "회비 관리" })).toBeInTheDocument();
     expect(screen.getByLabelText("납부 월")).toHaveValue("2026-07");
     expect(screen.getByLabelText("검색")).toHaveValue("김");
     expect(screen.getByLabelText("상태")).toHaveValue("all");

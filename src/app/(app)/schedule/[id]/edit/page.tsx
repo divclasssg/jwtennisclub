@@ -45,8 +45,8 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
   return (
     <FormPageTemplate
       description="등록된 운영 일정의 날짜, 시간, 이름, 장소를 수정합니다."
-      kicker="일정 관리"
-      title="일정 수정"
+      kicker="일정 수정"
+      title="일정 관리"
     >
       <FormPanel title="일정 정보">
         <EventForm action={updateEvent} event={event} submitLabel="변경 저장" />

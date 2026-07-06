@@ -29,6 +29,7 @@ type WeekCalendar = {
 };
 
 type ScheduleToolbarProps = {
+  action?: ReactNode;
   currentLabel: string;
   monthHref: string;
   nextHref: string;
@@ -57,6 +58,7 @@ type SelectedEventListProps = {
 };
 
 export function ScheduleToolbar({
+  action,
   currentLabel,
   monthHref,
   nextHref,
@@ -83,6 +85,8 @@ export function ScheduleToolbar({
           주
         </Link>
       </nav>
+
+      {action ? <div className={styles["schedule-toolbar-action"]}>{action}</div> : null}
     </div>
   );
 }

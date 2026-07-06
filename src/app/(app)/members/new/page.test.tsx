@@ -16,7 +16,7 @@ describe("NewMemberPage", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "새 회원 추가" }),
+      screen.getByRole("heading", { name: "회원 등록" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("이름")).toBeInTheDocument();
     expect(screen.getByLabelText("전화번호 끝 4자리")).toBeInTheDocument();

@@ -155,14 +155,18 @@
 }
 
 .panel-side {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
   color: var(--ink-muted-48);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   letter-spacing: var(--letter-spacing-caption);
 
   a {
-    color: var(--action-blue);
-    font-weight: var(--font-weight-semibold);
+    color: var(--on-primary);
+    font-weight: var(--font-weight-regular);
     line-height: var(--line-height-caption-strong);
     letter-spacing: var(--letter-spacing-caption);
   }
@@ -174,16 +178,16 @@
   width: fit-content;
   max-width: 100%;
   padding: var(--segmented-tab-padding);
-  border-radius: var(--rounded-lg);
+  border-radius: var(--rounded-md);
   background: var(--surface-chip-translucent);
 }
 
 .tabs-3 {
-  grid-template-columns: repeat(3, minmax(var(--members-status-filter-width), 1fr));
+  grid-template-columns: repeat(3, minmax(var(--segmented-tab-min-width), 1fr));
 }
 
 .tabs-2 {
-  grid-template-columns: repeat(2, minmax(var(--members-status-filter-width), 1fr));
+  grid-template-columns: repeat(2, minmax(var(--segmented-tab-min-width), 1fr));
 }
 
 .tab-link {
@@ -192,8 +196,8 @@
   justify-content: center;
   min-width: 0;
   min-height: var(--segmented-tab-height);
-  padding: var(--segmented-tab-padding) var(--spacing-md);
-  border-radius: var(--rounded-lg);
+  padding: var(--segmented-tab-padding) var(--spacing-sm);
+  border-radius: var(--rounded-md);
   color: var(--ink);
   font-size: var(--font-size-button-utility);
   font-weight: var(--font-weight-semibold);
@@ -277,6 +281,10 @@
   .panel-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .panel-side {
+    justify-content: flex-start;
   }
 
   .form-actions {

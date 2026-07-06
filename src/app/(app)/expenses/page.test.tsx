@@ -56,7 +56,7 @@ describe("ExpensesPage", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "월별 지출 현황" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "지출 관리" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "지출 등록" })).toHaveAttribute(
       "href",
       "/expenses/new",

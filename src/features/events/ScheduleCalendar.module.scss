@@ -2,13 +2,14 @@
 
 .schedule-toolbar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: var(--spacing-md);
   align-items: center;
 }
 
 .schedule-nav,
 .schedule-view-tabs,
+.schedule-toolbar-action,
 .schedule-event-actions {
   display: flex;
   align-items: center;
@@ -282,6 +283,7 @@
 @media (max-width: bp.$breakpoint-phone) {
   .schedule-nav,
   .schedule-view-tabs,
+  .schedule-toolbar-action,
   .schedule-event-actions {
     align-items: stretch;
     flex-direction: column;

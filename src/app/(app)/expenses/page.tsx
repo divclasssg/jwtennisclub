@@ -66,7 +66,6 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
 
   return (
     <ManagementPageTemplate
-      action={<ActionLink href="/expenses/new">지출 등록</ActionLink>}
       description="월별 운영 지출을 등록하고 카테고리별로 확인합니다."
       filters={
         <FilterBar aria-label="지출 검색 필터" layout="two-controls">
@@ -91,7 +90,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
           <Button type="submit">조회</Button>
         </FilterBar>
       }
-      kicker="지출 관리"
+      kicker="월별 지출 현황"
       list={
         <DataPanel
           aria-label="월별 지출 목록"
@@ -101,7 +100,14 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
               title="등록된 지출이 없습니다"
             />
           }
-          headerSide={hasFilters ? <a href="/expenses">필터 초기화</a> : null}
+          headerSide={
+            <>
+              {hasFilters ? <a href="/expenses">필터 초기화</a> : null}
+              <ActionLink href="/expenses/new" size="compact">
+                지출 등록
+              </ActionLink>
+            </>
+          }
           headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${expenses.length}건`}
         >
           {expenses.length > 0 ? (
@@ -173,7 +179,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
           />
         </SummaryGrid>
       }
-      title="월별 지출 현황"
+      title="지출 관리"
     />
   );
 }

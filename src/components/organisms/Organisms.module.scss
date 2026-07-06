@@ -1,47 +1,3 @@
-@use "../../app/breakpoints" as bp;
-
-.page-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(var(--dashboard-side-column-min), 0.56fr);
-  gap: var(--spacing-xl);
-  align-items: end;
-  padding: var(--spacing-xl) 0 var(--spacing-md);
-  border-bottom: var(--hairline-width) solid var(--hairline);
-}
-
-.page-heading {
-  margin: var(--spacing-xs) 0 0;
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: var(--font-size-display-lg);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-display-lg);
-  letter-spacing: var(--letter-spacing-display-lg);
-}
-
-.page-kicker {
-  margin: 0;
-  color: var(--action-blue);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-caption-strong);
-  letter-spacing: var(--letter-spacing-caption);
-}
-
-.page-header-side {
-  display: grid;
-  justify-items: start;
-  gap: var(--spacing-md);
-
-  p {
-    margin: 0;
-    color: var(--ink-muted-48);
-    font-size: var(--font-size-body);
-    line-height: var(--line-height-body);
-    letter-spacing: var(--letter-spacing-body);
-  }
-}
-
 .data-panel {
   overflow: hidden;
   border: var(--hairline-width) solid var(--hairline);
@@ -116,23 +72,5 @@
     font-size: var(--font-size-caption);
     line-height: var(--line-height-caption);
     letter-spacing: var(--letter-spacing-caption);
-  }
-}
-
-@media (max-width: bp.$breakpoint-tablet-landscape) {
-  .page-header {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: bp.$breakpoint-phone) {
-  .page-header {
-    padding-top: var(--spacing-lg);
-  }
-
-  .page-heading {
-    font-size: var(--font-size-display-md);
-    line-height: var(--line-height-display-lg);
-    letter-spacing: var(--letter-spacing-display-md);
   }
 }

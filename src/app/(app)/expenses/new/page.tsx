@@ -58,8 +58,8 @@ export default async function NewExpensePage({ searchParams }: NewExpensePagePro
   return (
     <FormPageTemplate
       description="운영 중 발생한 지출 내역을 기록합니다."
-      kicker="지출 관리"
-      title="지출 등록"
+      kicker="지출 등록"
+      title="지출 관리"
     >
       <FormPanel
         description="사용일, 카테고리, 내용, 금액과 영수증 파일을 입력하세요."

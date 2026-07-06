@@ -184,7 +184,6 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
 
   return (
     <ManagementPageTemplate
-      action={<ActionLink href="/fees/new">CSV 등록</ActionLink>}
       description={
         <>
           월을 선택한 뒤 회원별 납부 상태를 바로 확인하고 미납 행에서 즉시 납부
@@ -222,7 +221,7 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
           <Button type="submit">조회</Button>
         </FilterBar>
       }
-      kicker="회비 관리"
+      kicker="월별 회비 현황"
       list={
         <DataPanel
           aria-label="월별 회비 체크판"
@@ -236,7 +235,14 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
               title="표시할 회원이 없습니다"
             />
           }
-          headerSide={hasFilters ? <a href="/fees">필터 초기화</a> : null}
+          headerSide={
+            <>
+              {hasFilters ? <a href="/fees">필터 초기화</a> : null}
+              <ActionLink href="/fees/new" size="compact">
+                CSV 등록
+              </ActionLink>
+            </>
+          }
           headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${boardRows.length}명`}
         >
           {boardRows.length > 0 ? (
@@ -337,7 +343,7 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
           />
         </SummaryGrid>
       }
-      title="월별 회비 현황"
+      title="회비 관리"
     />
   );
 }

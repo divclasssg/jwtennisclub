@@ -273,6 +273,42 @@
 - Use templates for route-level management and form page layout.
 - Keep page SCSS only for truly page-specific layout. Shared spacing, panel, table, and form action styling should live in shared components.
 
+## 2026-07-06
+
+### Completed
+- Ran the gstack CSO security review and recorded the generated report locally under `.gstack/security-reports`.
+- Added `.gstack/` to `.gitignore` so local security scan artifacts are not committed.
+- Added `.gitleaks.toml` using the default gitleaks rule set for repeatable secret scanning.
+- Confirmed the protected password-change page remains part of the authenticated app surface.
+- Reduced the segmented tab footprint while preserving the existing font size:
+  - tab height now follows the search input height token
+  - tab minimum width uses a smaller tokenized value
+  - tab padding and radius were reduced one step
+- Moved route page titles from body-level page headers into the shell sub navigation.
+- Split shell account identity into separate name and role/club-position text, with role and position displayed as `관리자 · 부총무`.
+- Corrected management page title hierarchy so labels such as `회원 관리`, `회비 관리`, `지출 관리`, and `월별 정산` are page titles, while list/status labels remain secondary context.
+- Moved page-level action buttons into the relevant data panel header or schedule toolbar:
+  - member registration in the member list panel
+  - fee CSV upload in the fee board panel
+  - expense registration in the expense list panel
+  - settlement PDF download in the settlement summary panel
+  - schedule registration in the schedule toolbar
+- Removed the `PageHeader` organism, its exports, styles, and dedicated tests.
+- Updated templates and the schedule page to publish titles directly to the shell title context instead of rendering a body page header.
+
+### Verification Evidence
+- Page header removal focused tests: `npm run test -- src/components/organisms/organisms.test.tsx src/components/templates/templates.test.tsx src/features/shell/AppShell.test.tsx src/features/events/ScheduleCalendar.test.tsx` passed with 4 files and 11 tests.
+- Full test suite: `npm run test` passed with 46 files and 160 tests.
+- `npm run lint`: passed.
+- `npx tsc --noEmit`: passed.
+- `npm run build`: passed.
+
+### UI Layout Guidelines
+- Keep the shell sub navigation as the only persistent page-title location inside the app shell.
+- Do not render a separate body-level `PageHeader` for standard app pages.
+- Place primary page actions near the content they affect, usually in `DataPanel.headerSide`; use the schedule toolbar for schedule-specific view actions.
+- Preserve existing font-size tokens when shrinking controls unless the requested change explicitly includes typography.
+
 ## Next Planned Work
 - Verify CSV member import later when a real CSV file is available.
 - Revisit and finalize the dashboard later after enough real operational data has accumulated.

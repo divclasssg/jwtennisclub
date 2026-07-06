@@ -60,8 +60,8 @@ export default async function NewFeePaymentPage({
           등록합니다. 같은 회원과 같은 월은 한 번만 등록할 수 있습니다.
         </>
       }
-      kicker="회비 납부"
-      title="CSV 등록"
+      kicker="CSV 등록"
+      title="회비 납부"
     >
       <FormPanel
         description={

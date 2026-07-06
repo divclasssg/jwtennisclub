@@ -41,7 +41,7 @@ describe("NewFeePaymentPage", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "CSV 등록" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "회비 납부" })).toBeInTheDocument();
     expect(screen.queryByLabelText("회원")).not.toBeInTheDocument();
     expect(screen.getByLabelText("CSV 파일")).toBeInTheDocument();
 

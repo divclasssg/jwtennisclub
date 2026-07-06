@@ -18,6 +18,7 @@
 /out/
 .next-dev-logs/
 .codex/
+.gstack/
 
 # production
 /build

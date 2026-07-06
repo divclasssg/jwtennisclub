@@ -152,7 +152,6 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
 
   return (
     <ManagementPageTemplate
-      action={<ActionLink href="/members/new">회원 등록</ActionLink>}
       description={
         <>
           활동중, 휴회, 탈퇴 상태를 기준으로 회원을 찾고 이후 회비 기록과
@@ -174,7 +173,7 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
           <Button type="submit">조회</Button>
         </FilterBar>
       }
-      kicker="회원 관리"
+      kicker="회원 목록"
       list={
         <DataPanel
           aria-label="회원 목록"
@@ -189,7 +188,14 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
               title="표시할 회원이 없습니다"
             />
           }
-          headerSide={hasFilters ? <a href="/members">필터 초기화</a> : null}
+          headerSide={
+            <>
+              {hasFilters ? <a href="/members">필터 초기화</a> : null}
+              <ActionLink href="/members/new" size="compact">
+                회원 등록
+              </ActionLink>
+            </>
+          }
           headerTitle={`총 ${members.length}명`}
         >
           {members.length > 0 ? (
@@ -254,7 +260,7 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
           ))}
         </Tabs>
       }
-      title="회원 목록"
+      title="회원 관리"
     />
   );
 }

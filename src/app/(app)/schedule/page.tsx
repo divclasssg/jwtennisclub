@@ -1,6 +1,6 @@
 import { deleteEvent } from "./actions";
 import { ActionLink, Button } from "@/components/atoms";
-import { PageHeader } from "@/components/organisms";
+import { PageTitle } from "@/features/shell/PageTitleContext";
 import {
   buildMonthCalendar,
   buildWeekCalendar,
@@ -81,14 +81,10 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
 
   return (
     <section className={styles["schedule-page"]}>
-      <PageHeader
-        action={<ActionLink href="/schedule/new">일정 등록</ActionLink>}
-        description="월별 흐름과 주별 일정을 전환해서 확인합니다."
-        kicker="일정 관리"
-        title="일정 관리"
-      />
+      <PageTitle title="일정 관리" />
 
       <ScheduleToolbar
+        action={<ActionLink href="/schedule/new" size="compact">일정 등록</ActionLink>}
         currentLabel={monthCalendar.label}
         monthHref={buildScheduleHref({
           view: "month",

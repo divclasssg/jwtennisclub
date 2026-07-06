@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
-import { PageHeader } from "@/components/organisms";
+import { PageTitle } from "@/features/shell/PageTitleContext";
 import styles from "./Templates.module.scss";
 
 type ManagementPageTemplateProps = {
-  action?: ReactNode;
   description?: ReactNode;
   filters?: ReactNode;
   kicker: ReactNode;
@@ -14,10 +13,7 @@ type ManagementPageTemplateProps = {
 };
 
 export function ManagementPageTemplate({
-  action,
-  description,
   filters,
-  kicker,
   list,
   summary,
   tabs,
@@ -25,12 +21,7 @@ export function ManagementPageTemplate({
 }: ManagementPageTemplateProps) {
   return (
     <section className={styles["management-page"]}>
-      <PageHeader
-        action={action}
-        description={description}
-        kicker={kicker}
-        title={title}
-      />
+      <PageTitle title={title} />
       {tabs}
       {summary}
       {filters}

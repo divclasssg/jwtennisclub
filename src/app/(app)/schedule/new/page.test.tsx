@@ -10,7 +10,7 @@ describe("NewEventPage", () => {
   it("renders the schedule event form", () => {
     render(<NewEventPage />);
 
-    expect(screen.getByRole("heading", { name: "일정 등록" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "일정 관리" })).toBeInTheDocument();
     expect(screen.getByLabelText("일정 날짜")).toHaveAttribute("type", "date");
     expect(screen.getByLabelText("일정 시간")).toHaveAttribute("type", "time");
     expect(screen.getByLabelText("일정 이름")).toBeInTheDocument();

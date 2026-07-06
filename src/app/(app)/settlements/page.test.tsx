@@ -89,7 +89,7 @@ describe("SettlementsPage", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "월별 정산 요약" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "월별 정산" })).toBeInTheDocument();
     expect(screen.getByLabelText("정산 월")).toHaveValue("2026-07");
     expect(screen.getByText("2026.07 정산")).toBeInTheDocument();
     expect(screen.getByText("수입 합계")).toBeInTheDocument();

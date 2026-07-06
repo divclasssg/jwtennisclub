@@ -34,12 +34,17 @@ const requiredNavigationItems = [
 describe("AppShell", () => {
   it("renders the Korean primary navigation and logout action", () => {
     render(
-      <AppShell>
+      <AppShell
+        userDisplayName="박세익"
+        userPositionLabel="부총무"
+        userRoleLabel="관리자"
+      >
         <h1>업무 화면</h1>
       </AppShell>,
     );
 
-    expect(screen.getAllByText("JW Tennis Club").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("박세익").length).toBeGreaterThan(0);
+    expect(screen.getByText("관리자 · 부총무")).toBeInTheDocument();
     const nav = screen.getByLabelText("주요 메뉴");
 
     for (const item of requiredNavigationItems) {

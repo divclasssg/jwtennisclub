@@ -23,6 +23,7 @@ describe("ScheduleCalendar components", () => {
   it("renders toolbar navigation and view tabs", () => {
     render(
       <ScheduleToolbar
+        action={<a href="/schedule/new">일정 등록</a>}
         currentLabel="2026년 7월"
         nextHref="/schedule?month=2026-08"
         previousHref="/schedule?month=2026-06"
@@ -41,6 +42,10 @@ describe("ScheduleCalendar components", () => {
     expect(screen.getByRole("link", { name: "다음" })).toHaveAttribute(
       "href",
       "/schedule?month=2026-08",
+    );
+    expect(screen.getByRole("link", { name: "일정 등록" })).toHaveAttribute(
+      "href",
+      "/schedule/new",
     );
   });
 

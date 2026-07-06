@@ -72,8 +72,8 @@ export default async function NewMemberPage({
   return (
     <FormPageTemplate
       description="한 명씩 직접 등록하거나 CSV 파일로 여러 회원을 한 번에 등록합니다."
-      kicker="회원 등록"
-      title="새 회원 추가"
+      kicker="새 회원 추가"
+      title="회원 등록"
     >
       <FormPanel
         description="이름, 전화번호 끝 4자리, 가입일을 기준으로 회원을 추가합니다."

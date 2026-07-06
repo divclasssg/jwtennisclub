@@ -54,8 +54,8 @@ export default async function PasswordPage({ searchParams }: PasswordPageProps) 
     return (
         <FormPageTemplate
             description="현재 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다."
-            kicker="계정 보안"
-            title="비밀번호 변경"
+            kicker="비밀번호 변경"
+            title="계정 보안"
         >
             <FormPanel title="새 비밀번호">
                 <form action={changePassword} className={styles["password-form"]}>

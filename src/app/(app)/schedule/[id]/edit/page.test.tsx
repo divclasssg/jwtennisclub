@@ -51,7 +51,7 @@ describe("EditEventPage", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "일정 수정" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "일정 관리" })).toBeInTheDocument();
     expect(screen.getByLabelText("일정 날짜")).toHaveValue("2026-07-11");
     expect(screen.getByLabelText("일정 시간")).toHaveValue("09:30");
     expect(screen.getByLabelText("일정 이름")).toHaveValue("정기 모임");

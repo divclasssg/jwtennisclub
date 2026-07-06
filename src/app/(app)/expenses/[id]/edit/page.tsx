@@ -85,8 +85,8 @@ export default async function EditExpensePage({
   return (
     <FormPageTemplate
       description="지출 정보와 영수증 파일을 수정합니다."
-      kicker="지출 수정"
-      title={expense.description}
+      kicker={expense.description}
+      title="지출 수정"
     >
       <FormPanel
         description="새 영수증 파일을 선택하면 기존 파일이 교체됩니다."

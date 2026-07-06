@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { PageHeader } from "@/components/organisms";
+import { PageTitle } from "@/features/shell/PageTitleContext";
 import styles from "./Templates.module.scss";
 
 type FormPageTemplateProps = {
@@ -11,20 +11,12 @@ type FormPageTemplateProps = {
 };
 
 export function FormPageTemplate({
-  action,
   children,
-  description,
-  kicker,
   title,
 }: FormPageTemplateProps) {
   return (
     <section className={styles["form-page"]}>
-      <PageHeader
-        action={action}
-        description={description}
-        kicker={kicker}
-        title={title}
-      />
+      <PageTitle title={title} />
       {children}
     </section>
   );
