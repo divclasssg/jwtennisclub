@@ -1,5 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Button, TextInput } from "@/components/atoms";
 import {
   EmptyState,
@@ -9,6 +9,7 @@ import {
   FormField,
   FormGrid,
   FormMessage,
+  ModalDialog,
   PanelHeader,
   RowActions,
   SummaryCard,
@@ -18,7 +19,19 @@ import {
   TableScrollArea,
 } from ".";
 
+const back = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    back,
+  }),
+}));
+
 describe("molecules", () => {
+  beforeEach(() => {
+    back.mockClear();
+  });
+
   it("renders summary cards inside a labelled grid", () => {
     render(
       <SummaryGrid aria-label="요약" columns={2}>
@@ -168,5 +181,19 @@ describe("molecules", () => {
 
     expect(screen.getByLabelText("이름")).toHaveAttribute("name", "name");
     expect(screen.getByLabelText("가입일")).toHaveAttribute("type", "date");
+  });
+
+  it("renders a modal dialog with close navigation", () => {
+    render(
+      <ModalDialog title="회원 등록">
+        <p>회원 폼</p>
+      </ModalDialog>,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "회원 등록" });
+    expect(within(dialog).getByText("회원 폼")).toBeInTheDocument();
+
+    screen.getByRole("button", { name: "닫기" }).click();
+    expect(back).toHaveBeenCalledTimes(1);
   });
 });

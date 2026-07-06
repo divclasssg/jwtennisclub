@@ -35,6 +35,7 @@ describe("AppShell", () => {
   it("renders the Korean primary navigation and logout action", () => {
     render(
       <AppShell
+        modal={<aside aria-label="등록 모달">모달 내용</aside>}
         userDisplayName="박세익"
         userPositionLabel="부총무"
         userRoleLabel="관리자"
@@ -66,5 +67,8 @@ describe("AppShell", () => {
     );
     expect(screen.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "업무 화면" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "등록 모달" })).toHaveTextContent(
+      "모달 내용",
+    );
   });
 });

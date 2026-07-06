@@ -250,6 +250,59 @@
   overflow-x: auto;
 }
 
+.modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: var(--modal-z-index);
+  display: grid;
+  place-items: center;
+  padding: var(--spacing-lg);
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: var(--modal-overlay-background);
+  cursor: pointer;
+}
+
+.modal-panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(100%, var(--modal-panel-max-width));
+  max-height: var(--modal-panel-max-height);
+  overflow: hidden;
+  border: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  background: var(--canvas);
+  box-shadow: var(--product-shadow);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: var(--hairline-width) solid var(--divider-soft);
+}
+
+.modal-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--font-size-tagline);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tagline);
+  letter-spacing: var(--letter-spacing-tagline);
+}
+
+.modal-body {
+  overflow-y: auto;
+  padding: var(--spacing-lg);
+}
+
 @media (max-width: bp.$breakpoint-tablet-landscape) {
   .filter-search,
   .filter-month-search-status,
@@ -294,5 +347,18 @@
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .modal-root {
+    padding: var(--spacing-sm);
+  }
+
+  .modal-panel {
+    max-height: var(--modal-panel-compact-max-height);
+  }
+
+  .modal-header,
+  .modal-body {
+    padding: var(--spacing-md);
   }
 }

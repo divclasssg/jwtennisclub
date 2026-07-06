@@ -5,6 +5,7 @@ export { FormActions } from "./FormActions";
 export { FormField } from "./FormField";
 export { FormGrid } from "./FormGrid";
 export { FormMessage } from "./FormMessage";
+export { ModalDialog } from "./ModalDialog";
 export { PanelHeader } from "./PanelHeader";
 export { RowActions } from "./RowActions";
 export { SummaryCard, SummaryGrid } from "./Summary";

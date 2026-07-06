@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 type AppLayoutProps = {
   children: React.ReactNode;
+  modal?: React.ReactNode;
 };
 
 type RelatedLabel =
@@ -23,7 +24,7 @@ function getRelatedLabel(value: RelatedLabel) {
   return record?.label ?? record?.name ?? null;
 }
 
-export default async function AppLayout({ children }: AppLayoutProps) {
+export default async function AppLayout({ children, modal }: AppLayoutProps) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -50,6 +51,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <AppShell
+      modal={modal}
       userDisplayName={userDisplayName}
       userPositionLabel={userPositionLabel}
       userRoleLabel={userRoleLabel}

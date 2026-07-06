@@ -14,6 +14,7 @@ const navigationItems = [
 
 type AppShellProps = {
     children: React.ReactNode;
+    modal?: React.ReactNode;
     userPositionLabel?: string | null;
     userRoleLabel?: string;
     userDisplayName?: string;
@@ -21,6 +22,7 @@ type AppShellProps = {
 
 export function AppShell({
     children,
+    modal,
     userPositionLabel,
     userRoleLabel = "운영 원장",
     userDisplayName = "JW Tennis Club",
@@ -77,6 +79,7 @@ export function AppShell({
                     </div>
                 </div>
                 <main className={styles["shell-content"]}>{children}</main>
+                {modal}
             </div>
         </PageTitleProvider>
     );

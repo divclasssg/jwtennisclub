@@ -295,6 +295,13 @@
   - schedule registration in the schedule toolbar
 - Removed the `PageHeader` organism, its exports, styles, and dedicated tests.
 - Updated templates and the schedule page to publish titles directly to the shell title context instead of rendering a body page header.
+- Replaced non-schedule registration page transitions with intercepted modal routes:
+  - `/members` opens `/members/new` as a modal for member registration during client navigation.
+  - `/fees` opens `/fees/new` as a modal for fee CSV import during client navigation.
+  - `/expenses` opens `/expenses/new` as a modal for expense registration during client navigation.
+  - Direct `/members/new`, `/fees/new`, and `/expenses/new` navigation remains full page fallback.
+- Added the authenticated app `@modal` parallel route slot and shared `ModalDialog` molecule.
+- Kept `/schedule/new` as a normal page navigation and left settlement PDF actions unchanged.
 
 ### Verification Evidence
 - Page header removal focused tests: `npm run test -- src/components/organisms/organisms.test.tsx src/components/templates/templates.test.tsx src/features/shell/AppShell.test.tsx src/features/events/ScheduleCalendar.test.tsx` passed with 4 files and 11 tests.
@@ -302,6 +309,14 @@
 - `npm run lint`: passed.
 - `npx tsc --noEmit`: passed.
 - `npm run build`: passed.
+- Registration modal focused tests passed:
+  - `npm run test -- src/components/molecules/molecules.test.tsx`
+  - `npm run test -- src/app/(app)/members/new/page.test.tsx src/app/(app)/fees/new/page.test.tsx src/app/(app)/expenses/new/page.test.tsx`
+  - `npm run test -- src/features/shell/AppShell.test.tsx src/app/(app)/@modal/registration-modal-routes.test.tsx`
+  - `npm run test -- src/app/(app)/members/page.test.tsx src/app/(app)/fees/page.test.tsx src/app/(app)/expenses/page.test.tsx src/app/(app)/schedule/page.test.tsx src/features/events/ScheduleCalendar.test.tsx`
+- Registration modal full verification passed: `npm run test` passed with 47 files and 164 tests; `npm run lint`, `npx tsc --noEmit`, `git diff --check`, and `npm run build` passed.
+- HTTP unauthenticated checks confirmed protected registration routes still redirect to `/login?next=...`.
+- Headless browser click verification was not completed because the local `browse` tool could not start without `bun`, and no authenticated browser session was available in the tool context.
 
 ### UI Layout Guidelines
 - Keep the shell sub navigation as the only persistent page-title location inside the app shell.

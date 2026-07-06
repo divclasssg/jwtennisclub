@@ -125,6 +125,11 @@
   --member-status-pill-height: 28px;
   --member-empty-copy-max-width: 420px;
   --member-form-textarea-min-height: 112px;
+  --modal-overlay-background: rgb(0 0 0 / 36%);
+  --modal-panel-max-width: 760px;
+  --modal-panel-max-height: calc(100dvh - var(--spacing-xxl));
+  --modal-panel-compact-max-height: calc(100dvh - var(--spacing-lg));
+  --modal-z-index: 40;
   --product-tile-padding: var(--spacing-section);
   --utility-card-padding: var(--spacing-lg);
   --active-scale: 0.95;
