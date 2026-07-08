@@ -18,13 +18,13 @@
   border: var(--hairline-width) solid var(--hairline);
   border-radius: var(--rounded-lg);
   background: var(--canvas);
-  box-shadow: var(--product-shadow);
+  box-shadow: none;
 
   h1 {
     margin: 0;
     font-family: var(--font-display);
-    font-size: var(--font-size-tagline);
-    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-lead-airy);
+    font-weight: var(--font-weight-bold);
     line-height: var(--line-height-tagline);
     letter-spacing: var(--letter-spacing-tagline);
   }
@@ -47,9 +47,9 @@
   input {
     height: var(--search-input-height);
     border: var(--hairline-width) solid var(--hairline);
-    border-radius: var(--rounded-pill);
+    border-radius: var(--rounded-md);
     padding: var(--search-input-padding);
-    background: var(--surface-pearl);
+    background: var(--canvas);
     color: var(--ink);
     font: inherit;
   }
@@ -58,7 +58,7 @@
     min-height: var(--search-input-height);
     padding: var(--button-primary-padding);
     border: 0;
-    border-radius: var(--rounded-pill);
+    border-radius: var(--rounded-md);
     background: var(--action-blue);
     color: var(--on-primary);
     cursor: pointer;

@@ -30,7 +30,7 @@ export default async function AppLayout({ children, modal }: AppLayoutProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let userDisplayName = "JW Tennis Club";
+  let userDisplayName = "JW TENNIS CLUB";
   let userRoleLabel = "운영 원장";
 
   userRoleLabel = "운영 원장";

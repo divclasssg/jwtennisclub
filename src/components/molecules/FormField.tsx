@@ -14,7 +14,7 @@ export function FormField({
 }: FormFieldProps) {
   return (
     <label className={classNames(styles["form-field"], className)} {...props}>
-      {label}
+      <span className={styles["form-field-label"]}>{label}</span>
       {children}
     </label>
   );

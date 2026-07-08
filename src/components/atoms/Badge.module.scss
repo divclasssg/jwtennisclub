@@ -6,22 +6,25 @@
   padding: var(--button-pearl-capsule-padding);
   border: var(--hairline-width) solid var(--hairline);
   border-radius: var(--rounded-pill);
-  background: var(--surface-pearl);
+  background: var(--canvas);
   font-size: var(--font-size-fine-print);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   line-height: var(--line-height-button);
   letter-spacing: var(--letter-spacing-fine-print);
 }
 
 .success {
+  border-color: var(--color-accent-border-soft);
   color: var(--success-text);
 }
 
 .danger {
+  border-color: var(--color-error-border-soft);
   color: var(--error-text);
 }
 
 .info {
+  border-color: var(--color-accent-border-soft);
   color: var(--action-blue);
 }
 

@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 import { logout } from "@/app/(auth)/login/actions";
 import { PageTitleProvider, ShellPageTitle } from "./PageTitleContext";
+import { ShellNavigation } from "./ShellNavigation";
 import styles from "./AppShell.module.scss";
 
 const navigationItems = [
@@ -25,7 +26,7 @@ export function AppShell({
     modal,
     userPositionLabel,
     userRoleLabel = "운영 원장",
-    userDisplayName = "JW Tennis Club",
+    userDisplayName = "JW TENNIS CLUB",
 }: AppShellProps) {
     const shellKicker = [userRoleLabel, userPositionLabel]
         .filter(Boolean)
@@ -36,49 +37,47 @@ export function AppShell({
             <div className={styles["shell"]}>
                 <header className={styles["shell-global-nav"]}>
                     <Link className={styles["shell-brand"]} href="/dashboard">
-                        JW_TENNIS Club
+                        JW TENNIS CLUB
                     </Link>
-                    <nav aria-label="주요 메뉴" className={styles["shell-nav"]}>
-                        {navigationItems.map((item) => (
-                            <Link
-                                className={styles["shell-nav-link"]}
-                                href={item.href}
-                                key={item.href}
-                            >
-                                {item.label}
-                            </Link>
-                        ))}
-                    </nav>
                 </header>
-                <div className={styles["shell-sub-nav"]}>
-                    <div className={styles["shell-sub-nav-content"]}>
-                        <ShellPageTitle
-                            className={styles["shell-page-title"]}
-                            fallback={userDisplayName}
-                        />
-                    </div>
-                    <div className={styles["shell-account-actions"]}>
-                        <div className={styles["shell-user-context"]}>
-                            <p className={styles["shell-user-name"]}>{userDisplayName}</p>
-                            <p className={styles["shell-kicker"]}>{shellKicker}</p>
+                <div className={styles["shell-layout"]}>
+                    <aside className={styles["shell-sidebar"]}>
+                        <ShellNavigation items={navigationItems} />
+                    </aside>
+                    <div className={styles["shell-workspace"]}>
+                        <div className={styles["shell-user-bar"]}>
+                            <div className={styles["shell-user-context"]}>
+                                <p className={styles["shell-user-name"]}>
+                                    {userDisplayName}
+                                </p>
+                                <p className={styles["shell-kicker"]}>{shellKicker}</p>
+                            </div>
+                            <div className={styles["shell-account-actions"]}>
+                                <Link
+                                    className={styles["shell-password-link"]}
+                                    href="/settings/password"
+                                >
+                                    비밀번호 변경
+                                </Link>
+                                <form action={logout}>
+                                    <button
+                                        className={styles["shell-logout-button"]}
+                                        type="submit"
+                                    >
+                                        로그아웃
+                                    </button>
+                                </form>
+                            </div>
                         </div>
-                        <Link
-                            className={styles["shell-password-link"]}
-                            href="/settings/password"
-                        >
-                            비밀번호 변경
-                        </Link>
-                        <form action={logout}>
-                            <button
-                                className={styles["shell-logout-button"]}
-                                type="submit"
-                            >
-                                로그아웃
-                            </button>
-                        </form>
+                        <div className={styles["shell-title-bar"]}>
+                            <ShellPageTitle
+                                className={styles["shell-page-title"]}
+                                fallback={userDisplayName}
+                            />
+                        </div>
+                        <main className={styles["shell-content"]}>{children}</main>
                     </div>
                 </div>
-                <main className={styles["shell-content"]}>{children}</main>
                 {modal}
             </div>
         </PageTitleProvider>

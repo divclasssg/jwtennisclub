@@ -91,6 +91,10 @@ export function ScheduleToolbar({
   );
 }
 
+export function ScheduleScrollArea({ children }: { children: ReactNode }) {
+  return <div className={styles["schedule-scroll-area"]}>{children}</div>;
+}
+
 export function MonthCalendarView({
   buildHref,
   calendar,

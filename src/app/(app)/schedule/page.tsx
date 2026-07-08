@@ -12,6 +12,7 @@ import {
 import {
   MonthCalendarView,
   ScheduleEventActions,
+  ScheduleScrollArea,
   ScheduleToolbar,
   SelectedEventList,
   WeekCalendarView,
@@ -100,27 +101,29 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         })}
       />
 
-      {filters.view === "week" ? (
-        <WeekCalendarView calendar={weekCalendar} />
-      ) : (
-        <>
-          <MonthCalendarView
-            buildHref={buildScheduleHref}
-            calendar={monthCalendar}
-            selectedDate={filters.selectedDate}
-          />
+      <ScheduleScrollArea>
+        {filters.view === "week" ? (
+          <WeekCalendarView calendar={weekCalendar} />
+        ) : (
+          <>
+            <MonthCalendarView
+              buildHref={buildScheduleHref}
+              calendar={monthCalendar}
+              selectedDate={filters.selectedDate}
+            />
 
-          <SelectedEventList
-            events={selectedEvents}
-            formatDateLong={formatDateLong}
-            month={filters.periodMonth}
-            renderActions={(event, month) => (
-              <EventActions event={event} month={month} />
-            )}
-            selectedDate={filters.selectedDate}
-          />
-        </>
-      )}
+            <SelectedEventList
+              events={selectedEvents}
+              formatDateLong={formatDateLong}
+              month={filters.periodMonth}
+              renderActions={(event, month) => (
+                <EventActions event={event} month={month} />
+              )}
+              selectedDate={filters.selectedDate}
+            />
+          </>
+        )}
+      </ScheduleScrollArea>
     </section>
   );
 }

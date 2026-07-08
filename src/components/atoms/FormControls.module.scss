@@ -1,22 +1,26 @@
 .control {
   width: 100%;
   border: var(--hairline-width) solid var(--hairline);
-  background: var(--surface-pearl);
+  background: var(--canvas);
   color: var(--ink);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line-height);
   letter-spacing: var(--letter-spacing-body);
+
+  &:focus {
+    border-color: var(--action-blue);
+  }
 }
 
 .pill {
   height: var(--search-input-height);
-  padding: var(--search-input-padding);
-  border-radius: var(--rounded-pill);
+  padding: 0 var(--spacing-xs);
+  border-radius: var(--rounded-md);
 }
 
 .rounded {
   height: var(--search-input-height);
-  padding: var(--search-input-padding);
+  padding: 0 var(--spacing-xs);
   border-radius: var(--rounded-md);
 }
 

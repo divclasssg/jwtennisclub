@@ -3,6 +3,9 @@
 .dashboard-page {
   display: grid;
   gap: var(--section-gap);
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
 }
 
 .dashboard-header {
@@ -10,7 +13,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(var(--dashboard-side-column-min), 0.56fr);
   gap: var(--spacing-xl);
   align-items: end;
-  padding: var(--spacing-xl) 0 var(--spacing-md);
+  padding: var(--spacing-xl) 0 var(--spacing-lg);
   border-bottom: var(--hairline-width) solid var(--hairline);
 
   h1 {
@@ -18,7 +21,7 @@
     color: var(--ink);
     font-family: var(--font-display);
     font-size: var(--font-size-display-lg);
-    font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-bold);
     line-height: var(--line-height-display-lg);
     letter-spacing: var(--letter-spacing-display-lg);
   }
@@ -35,7 +38,7 @@
 .dashboard-kicker {
   color: var(--action-blue);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   line-height: var(--line-height-caption-strong);
   letter-spacing: var(--letter-spacing-caption);
 }
@@ -58,13 +61,13 @@
 .dashboard-metric-card {
   display: grid;
   gap: var(--spacing-xs);
-  padding: var(--spacing-lg);
+  padding: var(--spacing-md);
 }
 
 .dashboard-metric-label {
   color: var(--ink-muted-48);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   line-height: var(--line-height-caption-strong);
   letter-spacing: var(--letter-spacing-caption);
 }
@@ -72,8 +75,8 @@
 .dashboard-metric-value {
   margin: 0;
   color: var(--ink);
-  font-size: var(--font-size-lead);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lead-airy);
+  font-weight: var(--font-weight-bold);
   line-height: var(--line-height-lead);
   letter-spacing: var(--letter-spacing-lead);
 }
@@ -104,6 +107,7 @@
 
   &:hover {
     border-color: var(--action-blue);
+    color: var(--action-blue);
   }
 
   &:active {
@@ -113,7 +117,7 @@
   span {
     color: var(--action-blue);
     font-size: var(--font-size-caption);
-    font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-bold);
     line-height: var(--line-height-caption-strong);
   }
 
@@ -121,7 +125,7 @@
     align-self: end;
     max-width: var(--dashboard-utility-title-max-width);
     font-size: var(--font-size-lead-airy);
-    font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-bold);
     line-height: var(--dashboard-utility-title-line-height);
     letter-spacing: var(--dashboard-utility-title-letter-spacing);
   }
@@ -137,7 +141,7 @@
   h2 {
     margin: var(--spacing-xs) 0 0;
     font-size: var(--font-size-lead-airy);
-    font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-bold);
     line-height: var(--line-height-lead);
     letter-spacing: var(--letter-spacing-lead-airy);
   }
@@ -147,7 +151,7 @@
   margin: 0;
   color: var(--action-blue);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   line-height: var(--line-height-caption-strong);
   letter-spacing: var(--letter-spacing-caption);
 }
@@ -165,7 +169,7 @@
 
   li {
     padding-bottom: var(--spacing-sm);
-    border-bottom: var(--hairline-width) solid var(--divider-soft);
+    border-bottom: var(--hairline-width) solid var(--hairline);
 
     &:last-child {
       padding-bottom: 0;

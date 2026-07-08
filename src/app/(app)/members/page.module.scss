@@ -2,10 +2,16 @@
 
 .members-table-view {
   display: block;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .members-mobile-list-view {
   display: none;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
 }
 
 @media (max-width: bp.$breakpoint-phone) {

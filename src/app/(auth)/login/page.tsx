@@ -29,7 +29,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className={styles["login-page"]}>
       <section className={styles["login-panel"]}>
-        <h1>JW_TENNIS Club</h1>
+        <h1>JW TENNIS CLUB</h1>
         <form action={login} className={styles["login-form"]}>
           <input type="hidden" name="next" value={next} />
           <label>

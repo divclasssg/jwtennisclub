@@ -2,12 +2,21 @@
 
 .form-field {
   display: grid;
-  gap: var(--spacing-xs);
+  gap: 0;
   color: var(--ink-muted-48);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-caption-strong);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-line-height);
   letter-spacing: var(--letter-spacing-caption);
+}
+
+.form-field-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .csv-upload-field {
@@ -24,7 +33,7 @@
     padding: var(--spacing-sm) var(--spacing-md);
     border: var(--hairline-width) solid var(--hairline);
     border-radius: var(--rounded-md);
-    background: var(--surface-pearl);
+    background: var(--canvas);
     color: var(--ink);
   }
 }
@@ -59,16 +68,18 @@
 
 .filter-bar {
   display: grid;
-  gap: var(--spacing-sm);
-  align-items: end;
-  padding: var(--spacing-lg);
-  border: var(--hairline-width) solid var(--hairline);
-  border-radius: var(--rounded-lg);
+  gap: var(--spacing-xs);
+  align-items: center;
+  min-height: 64px;
+  padding: 0 var(--spacing-lg);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-none);
   background: var(--canvas);
 }
 
 .filter-search {
-  grid-template-columns: minmax(0, 1fr) auto;
+  justify-content: start;
+  grid-template-columns: 200px auto;
 }
 
 .filter-month-search-status {
@@ -102,15 +113,15 @@
 
 .summary-grid-divided {
   gap: var(--hairline-width);
-  background: var(--divider-soft);
+  background: var(--hairline);
 }
 
 .summary-card {
   display: grid;
   gap: var(--spacing-xs);
-  padding: var(--spacing-lg);
+  padding: var(--spacing-md);
   border: var(--hairline-width) solid var(--hairline);
-  border-radius: var(--rounded-lg);
+  border-radius: var(--rounded-none);
   background: var(--canvas);
 }
 
@@ -122,17 +133,17 @@
 .summary-label {
   margin: 0;
   color: var(--ink-muted-48);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-caption-strong);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-line-height);
   letter-spacing: var(--letter-spacing-caption);
 }
 
 .summary-value {
   color: var(--ink);
-  font-size: var(--font-size-lead-airy);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-lead);
+  font-size: var(--text-title-size);
+  font-weight: var(--text-title-weight);
+  line-height: var(--text-title-line-height);
   letter-spacing: var(--letter-spacing-lead-airy);
 }
 
@@ -141,16 +152,18 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: var(--hairline-width) solid var(--divider-soft);
+  min-height: 56px;
+  padding: 0 var(--spacing-lg);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+  background: var(--canvas);
 }
 
 .panel-title {
   margin: 0;
   color: var(--ink);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-caption-strong);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-body-line-height);
   letter-spacing: var(--letter-spacing-caption);
 }
 
@@ -166,28 +179,32 @@
 
   a {
     color: var(--on-primary);
-    font-weight: var(--font-weight-regular);
-    line-height: var(--line-height-caption-strong);
+    font-weight: var(--text-caption-weight);
+    line-height: var(--text-caption-line-height);
     letter-spacing: var(--letter-spacing-caption);
   }
 }
 
 .tabs {
-  display: grid;
-  gap: var(--segmented-tab-padding);
-  width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  width: 100%;
   max-width: 100%;
-  padding: var(--segmented-tab-padding);
-  border-radius: var(--rounded-md);
-  background: var(--surface-chip-translucent);
+  min-height: 56px;
+  padding: 0 var(--spacing-lg);
+  border: 0;
+  border-bottom: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-none);
+  background: var(--canvas);
 }
 
 .tabs-3 {
-  grid-template-columns: repeat(3, minmax(var(--segmented-tab-min-width), 1fr));
+  grid-template-columns: none;
 }
 
 .tabs-2 {
-  grid-template-columns: repeat(2, minmax(var(--segmented-tab-min-width), 1fr));
+  grid-template-columns: none;
 }
 
 .tab-link {
@@ -195,19 +212,22 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
-  min-height: var(--segmented-tab-height);
-  padding: var(--segmented-tab-padding) var(--spacing-sm);
-  border-radius: var(--rounded-md);
-  color: var(--ink);
-  font-size: var(--font-size-button-utility);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-tagline);
+  height: 56px;
+  padding: 0;
+  border-right: 0;
+  border-bottom: var(--selected-ring-width) solid transparent;
+  border-radius: var(--rounded-none);
+  color: var(--ink-muted-80);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-body-line-height);
   letter-spacing: var(--letter-spacing-tagline);
   white-space: nowrap;
 
   &[aria-current="page"] {
-    background: var(--action-blue-focus);
-    color: var(--on-primary);
+    background: transparent;
+    border-bottom-color: var(--action-blue);
+    color: var(--action-blue);
   }
 }
 
@@ -224,7 +244,7 @@
 .empty-state {
   display: grid;
   gap: var(--spacing-xs);
-  padding: var(--spacing-xxl) var(--spacing-lg);
+  padding: var(--spacing-40) var(--spacing-lg);
   text-align: center;
 }
 
@@ -247,7 +267,9 @@
 }
 
 .table-scroll-area {
-  overflow-x: auto;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
 }
 
 .modal-root {
@@ -287,7 +309,7 @@
   justify-content: space-between;
   gap: var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: var(--hairline-width) solid var(--divider-soft);
+  border-bottom: var(--hairline-width) solid var(--hairline);
 }
 
 .modal-title {

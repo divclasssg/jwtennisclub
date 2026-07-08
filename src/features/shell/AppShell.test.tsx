@@ -7,15 +7,21 @@ vi.mock("next/link", () => ({
     children,
     href,
     className,
+    ...props
   }: {
     children: React.ReactNode;
     href: string;
     className?: string;
+    [key: string]: unknown;
   }) => (
-    <a className={className} href={href}>
+    <a className={className} href={href} {...props}>
       {children}
     </a>
   ),
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/members",
 }));
 
 vi.mock("@/app/(auth)/login/actions", () => ({
@@ -48,12 +54,21 @@ describe("AppShell", () => {
     expect(screen.getByText("관리자 · 부총무")).toBeInTheDocument();
     const nav = screen.getByLabelText("주요 메뉴");
 
+    expect(screen.getByRole("link", { name: "JW TENNIS CLUB" })).toHaveAttribute(
+      "href",
+      "/dashboard",
+    );
+
     for (const item of requiredNavigationItems) {
       expect(within(nav).getByRole("link", { name: item.label })).toHaveAttribute(
         "href",
         item.href,
       );
     }
+    expect(within(nav).getByRole("link", { name: "회원" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
 
     expect(
       within(nav).queryByRole("link", { name: "설정" }),

@@ -1,8 +1,13 @@
 .data-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
-  border: var(--hairline-width) solid var(--hairline);
-  border-radius: var(--rounded-lg);
+  border: 0;
+  border-radius: var(--rounded-none);
   background: var(--canvas);
+  box-shadow: none;
 }
 
 .data-table {
@@ -12,11 +17,13 @@
 
   th,
   td {
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-bottom: var(--hairline-width) solid var(--divider-soft);
-    color: var(--ink-muted-80);
-    font-size: var(--font-size-caption);
-    line-height: var(--line-height-caption);
+    height: 24px;
+    padding: 0 var(--spacing-lg);
+    border-bottom: 0;
+    color: var(--ink);
+    font-size: var(--text-body-size);
+    font-weight: var(--text-body-weight);
+    line-height: var(--text-body-line-height);
     letter-spacing: var(--letter-spacing-caption);
     text-align: left;
     vertical-align: middle;
@@ -24,18 +31,29 @@
   }
 
   thead th {
-    color: var(--ink-muted-48);
-    font-weight: var(--font-weight-semibold);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    height: 48px;
+    background: var(--canvas);
+    color: var(--ink);
+    font-size: var(--text-body-size);
+    font-weight: var(--text-caption-weight);
+    line-height: var(--text-body-line-height);
   }
 
   tbody th {
     color: var(--ink);
-    font-weight: var(--font-weight-semibold);
+    font-weight: var(--text-body-weight);
+  }
+
+  tbody tr:nth-child(even) {
+    background: var(--surface-pearl);
   }
 
   tbody a {
     color: var(--action-blue);
-    font-weight: var(--font-weight-semibold);
+    font-weight: var(--text-body-weight);
   }
 
   tbody tr:last-child th,
@@ -46,7 +64,7 @@
 
 .form-panel {
   display: grid;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
   padding: var(--spacing-lg);
   border: var(--hairline-width) solid var(--hairline);
   border-radius: var(--rounded-lg);
@@ -61,7 +79,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--font-size-lead-airy);
-    font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-bold);
     line-height: var(--line-height-lead);
     letter-spacing: var(--letter-spacing-lead-airy);
   }

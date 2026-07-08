@@ -25,7 +25,7 @@ export function ManagementPageTemplate({
       {tabs}
       {summary}
       {filters}
-      {list}
+      <div className={styles["management-list"]}>{list}</div>
     </section>
   );
 }

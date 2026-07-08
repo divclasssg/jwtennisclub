@@ -1,5 +1,23 @@
 .management-page,
 .form-page {
   display: grid;
-  gap: var(--section-gap);
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.management-page {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.management-list {
+  grid-row: 4;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.form-page {
+  align-content: start;
+  overflow: auto;
 }

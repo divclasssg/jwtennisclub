@@ -1,4 +1,8 @@
 .schedule-page {
   display: grid;
-  gap: var(--spacing-xl);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--spacing-lg);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }

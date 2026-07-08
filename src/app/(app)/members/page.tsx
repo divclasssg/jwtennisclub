@@ -1,6 +1,6 @@
 import Link from "next/link";
 import styles from "./page.module.scss";
-import { ActionLink, Badge, Button, TextInput } from "@/components/atoms";
+import { ActionLink, Button, TextInput } from "@/components/atoms";
 import {
   EmptyState,
   FilterBar,
@@ -133,18 +133,6 @@ function buildStatusHref(status: MemberStatus, query: string) {
   return `/members?${params.toString()}`;
 }
 
-function getMemberStatusTone(status: MemberStatus) {
-  if (status === "active") {
-    return "success";
-  }
-
-  if (status === "withdrawn") {
-    return "danger";
-  }
-
-  return "muted";
-}
-
 export default async function MembersPage({ searchParams }: MembersPageProps) {
   const filters = normalizeMemberListFilters(await searchParams);
   const members = await getMembers(filters);
@@ -219,16 +207,8 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
                       <tr key={member.id}>
                         <th scope="row">{member.name}</th>
                         <td>{member.phoneLastFour ?? "-"}</td>
-                        <td>
-                          <Badge tone={member.operatorProfileId ? "info" : "muted"}>
-                            {formatMemberKind(member)}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Badge tone={getMemberStatusTone(member.status)}>
-                            {formatMemberStatus(member.status)}
-                          </Badge>
-                        </td>
+                        <td>{formatMemberKind(member)}</td>
+                        <td>{formatMemberStatus(member.status)}</td>
                         <td>{formatDate(member.joinedDate)}</td>
                         <td>{formatDate(member.withdrawnDate)}</td>
                         <td>{member.withdrawalReason ?? "-"}</td>
