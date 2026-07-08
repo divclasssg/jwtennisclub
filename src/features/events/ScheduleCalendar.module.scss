@@ -5,13 +5,28 @@
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: var(--spacing-md);
   align-items: center;
+  min-height: var(--schedule-toolbar-height);
+  padding: 0 var(--spacing-lg);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+  background: var(--canvas);
 }
 
 .schedule-scroll-area {
   display: grid;
   gap: var(--spacing-lg);
+  align-content: start;
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
-  overflow: auto;
+  padding: var(--spacing-lg);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.schedule-scroll-area-month {
+  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+  align-items: stretch;
 }
 
 .schedule-nav,
@@ -63,13 +78,20 @@
 
 .schedule-month {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--spacing-xs);
+  height: 100%;
   min-height: 0;
 }
 
-.schedule-weekdays,
+.schedule-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
 .schedule-month-grid {
   display: grid;
+  grid-auto-rows: minmax(var(--schedule-month-day-min-height), 1fr);
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
@@ -87,7 +109,7 @@
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: var(--spacing-xs);
-  min-height: 138px;
+  min-height: var(--schedule-month-day-min-height);
   padding: var(--spacing-sm);
   border-right: var(--hairline-width) solid var(--hairline);
   border-bottom: var(--hairline-width) solid var(--hairline);
@@ -278,6 +300,10 @@
 @media (max-width: bp.$breakpoint-tablet-landscape) {
   .schedule-toolbar,
   .schedule-selected-events li {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-scroll-area-month {
     grid-template-columns: 1fr;
   }
 

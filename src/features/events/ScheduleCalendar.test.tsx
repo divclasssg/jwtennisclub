@@ -4,7 +4,13 @@ import {
   buildMonthCalendar,
   buildWeekCalendar,
 } from "./event-calendar";
-import { MonthCalendarView, ScheduleToolbar, SelectedEventList, WeekCalendarView } from "./ScheduleCalendar";
+import {
+  MonthCalendarView,
+  ScheduleScrollArea,
+  ScheduleToolbar,
+  SelectedEventList,
+  WeekCalendarView,
+} from "./ScheduleCalendar";
 import type { EventRecord } from "./event-model";
 
 const events: EventRecord[] = [
@@ -75,6 +81,35 @@ describe("ScheduleCalendar components", () => {
     const selected = screen.getByRole("region", { name: "선택한 날짜 일정" });
     expect(within(selected).getByText("12:00")).toBeInTheDocument();
     expect(within(selected).getByText("관리 event-4")).toBeInTheDocument();
+  });
+
+  it("groups the month calendar and selected-date list in a two-column layout", () => {
+    const monthCalendar = buildMonthCalendar("2026-07", events);
+
+    render(
+      <ScheduleScrollArea layout="month">
+        <MonthCalendarView
+          calendar={monthCalendar}
+          buildHref={buildHref}
+          selectedDate="2026-07-11"
+        />
+        <SelectedEventList
+          events={events}
+          formatDateLong={() => "2026.07.11"}
+          month="2026-07"
+          renderActions={(event) => <span>관리 {event.id}</span>}
+          selectedDate="2026-07-11"
+        />
+      </ScheduleScrollArea>,
+    );
+
+    const monthLayout = screen.getByRole("group", { name: "월간 일정과 선택 날짜 일정" });
+    expect(monthLayout).toContainElement(
+      screen.getByRole("region", { name: "월별 일정" }),
+    );
+    expect(monthLayout).toContainElement(
+      screen.getByRole("region", { name: "선택한 날짜 일정" }),
+    );
   });
 
   it("renders selected-date empty state through the shared empty pattern", () => {

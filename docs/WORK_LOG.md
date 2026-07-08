@@ -335,6 +335,30 @@
 - Place primary page actions near the content they affect, usually in `DataPanel.headerSide`; use the schedule toolbar for schedule-specific view actions.
 - Preserve existing font-size tokens when shrinking controls unless the requested change explicitly includes typography.
 
+## 2026-07-08
+
+### Completed
+- Reworked authenticated desktop user screens against the provided Figma design while preserving existing app functionality.
+- Applied the Figma foundation and component styling across the app shell, route title area, tables, summary cards, controls, and login surface.
+- Kept the app frame fixed to the viewport so the whole page does not scroll, while bounded content regions such as tables, lists, calendars, and schedule details scroll internally when needed.
+- Fixed `/schedule` month view overflow by making the schedule toolbar a fixed row and moving calendar content into a bounded scroll area.
+- Changed `/schedule` month view from vertical stacking to a desktop two-column layout:
+  - monthly calendar uses the left 70%
+  - selected-date schedule details use the right 30%
+- Made the month calendar fill the available vertical space inside the schedule content area, reducing the large empty area below the calendar grid.
+- Added schedule layout regression coverage for the fixed toolbar, internal scroll area, 70/30 month layout, and accessible grouping of the month calendar with the selected-date detail panel.
+
+### Verification Evidence
+- `npm run test` passed with 50 files and 172 tests.
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed.
+- `npm run build` passed.
+
+### UI Layout Guidelines
+- Authenticated desktop pages should keep the shell and page frame fixed to the viewport.
+- When content exceeds the available space, scroll the content region itself rather than the whole document.
+- Schedule month view should remain a side-by-side desktop layout with the calendar and selected-date details grouped in one bounded content area.
+
 ## Next Planned Work
 - Verify CSV member import later when a real CSV file is available.
 - Revisit and finalize the dashboard later after enough real operational data has accumulated.

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { EmptyState, RowActions } from "@/components/molecules";
+import { classNames } from "@/components/ui/class-names";
 import type {
   CalendarEventPreview,
   MonthCalendarDay,
@@ -91,8 +92,25 @@ export function ScheduleToolbar({
   );
 }
 
-export function ScheduleScrollArea({ children }: { children: ReactNode }) {
-  return <div className={styles["schedule-scroll-area"]}>{children}</div>;
+export function ScheduleScrollArea({
+  children,
+  layout = "default",
+}: {
+  children: ReactNode;
+  layout?: "default" | "month";
+}) {
+  return (
+    <div
+      aria-label={layout === "month" ? "월간 일정과 선택 날짜 일정" : undefined}
+      className={classNames(
+        styles["schedule-scroll-area"],
+        layout === "month" ? styles["schedule-scroll-area-month"] : undefined,
+      )}
+      role={layout === "month" ? "group" : undefined}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function MonthCalendarView({

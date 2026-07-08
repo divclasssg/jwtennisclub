@@ -40,6 +40,7 @@
     font-size: var(--text-body-size);
     font-weight: var(--text-caption-weight);
     line-height: var(--text-body-line-height);
+    border-bottom: var(--hairline-width) solid var(--hairline);
   }
 
   tbody th {

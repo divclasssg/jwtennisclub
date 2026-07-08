@@ -101,7 +101,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         })}
       />
 
-      <ScheduleScrollArea>
+      <ScheduleScrollArea layout={filters.view === "month" ? "month" : "default"}>
         {filters.view === "week" ? (
           <WeekCalendarView calendar={weekCalendar} />
         ) : (

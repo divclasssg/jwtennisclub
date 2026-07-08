@@ -109,6 +109,7 @@
 
 .summary-grid-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: var(--hairline-width) solid var(--hairline);
 }
 
 .summary-grid-divided {
@@ -120,9 +121,12 @@
   display: grid;
   gap: var(--spacing-xs);
   padding: var(--spacing-md);
-  border: var(--hairline-width) solid var(--hairline);
-  border-radius: var(--rounded-none);
+  border-left: var(--hairline-width) solid var(--hairline);
   background: var(--canvas);
+
+  &:first-child {
+    border-left: none;
+  }
 }
 
 .summary-grid-divided .summary-card {

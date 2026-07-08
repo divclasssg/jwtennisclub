@@ -47,6 +47,9 @@
 - [x] Member, fee CSV, and expense registration actions open as modals during list-page navigation
 - [x] Member page mobile horizontal overflow fixed
 - [x] Fee board mobile layout implemented as a list view
+- [x] Authenticated user screens refreshed against the Figma desktop design
+- [x] App shell changed to fixed viewport height with internal content scrolling
+- [x] Schedule month view changed to a 70/30 calendar and selected-date detail layout
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management
@@ -96,6 +99,8 @@
 - [x] SCSS should use `src/app/globals.scss` design tokens and `src/app/_breakpoints.scss` breakpoint variables before hardcoded values
 - [x] `.gstack/` security scan artifacts are local-only and ignored by Git
 - [x] Page body layouts should not reintroduce the removed `PageHeader`; publish route titles to the shell instead
+- [x] Desktop app pages should avoid whole-page scrolling; overflowing tables, lists, calendars, and form bodies scroll inside their bounded content area
+- [x] Schedule month view uses a desktop two-column layout: monthly calendar on the left and selected-date schedule details on the right
 
 ## Verification Commands
 - [x] `npm run test`
