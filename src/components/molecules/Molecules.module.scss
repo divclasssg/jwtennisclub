@@ -67,9 +67,11 @@
 }
 
 .filter-bar {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-xs);
   align-items: center;
+  justify-content: flex-start;
   min-height: 64px;
   padding: 0 var(--spacing-lg);
   border-bottom: var(--hairline-width) solid var(--hairline);
@@ -78,25 +80,25 @@
 }
 
 .filter-search {
-  justify-content: start;
-  grid-template-columns: 200px auto;
+  justify-content: flex-start;
 }
 
 .filter-month-search-status {
-  grid-template-columns: minmax(var(--members-status-filter-width), 0.24fr) minmax(0, 1fr) minmax(var(--members-status-filter-width), 0.24fr) auto;
+  justify-content: flex-start;
 }
 
 .filter-two-controls {
-  grid-template-columns: minmax(var(--members-status-filter-width), 0.24fr) minmax(var(--members-status-filter-width), 0.24fr) auto;
+  justify-content: flex-start;
 }
 
 .filter-single-control {
-  grid-template-columns: minmax(var(--members-status-filter-width), 0.24fr) auto;
+  justify-content: flex-start;
 }
 
 .summary-grid {
   display: grid;
-  gap: var(--spacing-sm);
+      padding: 0 var(--spacing-lg);
+    border-bottom: var(--hairline-width) solid var(--hairline);
 }
 
 .summary-grid-2 {
@@ -114,7 +116,6 @@
 
 .summary-grid-divided {
   gap: var(--hairline-width);
-  background: var(--hairline);
 }
 
 .summary-card {
@@ -130,8 +131,12 @@
 }
 
 .summary-grid-divided .summary-card {
-  border: 0;
+  border-left: var(--hairline-width) solid var(--hairline);
   border-radius: var(--rounded-none);
+
+  &:first-child {
+    border-left: none;
+  }
 }
 
 .summary-label {
@@ -166,7 +171,7 @@
   margin: 0;
   color: var(--ink);
   font-size: var(--text-body-size);
-  font-weight: var(--text-caption-weight);
+  font-weight: var(--font-weight-bold);
   line-height: var(--text-body-line-height);
   letter-spacing: var(--letter-spacing-caption);
 }
@@ -221,9 +226,9 @@
   border-right: 0;
   border-bottom: var(--selected-ring-width) solid transparent;
   border-radius: var(--rounded-none);
-  color: var(--ink-muted-80);
+  color: var(--ink-muted-48);
   font-size: var(--text-body-size);
-  font-weight: var(--text-caption-weight);
+  font-weight: var(--font-weight-medium);
   line-height: var(--text-body-line-height);
   letter-spacing: var(--letter-spacing-tagline);
   white-space: nowrap;
@@ -336,7 +341,7 @@
   .filter-month-search-status,
   .filter-two-controls,
   .filter-single-control {
-    grid-template-columns: 1fr;
+    justify-content: flex-start;
   }
 
   .summary-grid-4 {

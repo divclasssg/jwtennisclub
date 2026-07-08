@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Button, TextInput } from "@/components/atoms";
@@ -20,6 +21,10 @@ import {
 } from ".";
 
 const back = vi.fn();
+const moleculesStyles = readFileSync(
+  "src/components/molecules/Molecules.module.scss",
+  "utf8",
+);
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -58,6 +63,26 @@ describe("molecules", () => {
     expect(screen.getByRole("form", { name: "검색 필터" })).toBeInTheDocument();
     expect(screen.getByLabelText("검색")).toHaveAttribute("name", "q");
     expect(screen.getByRole("button", { name: "조회" })).toBeInTheDocument();
+  });
+
+  it("keeps filter bars from using grid-based column splits", () => {
+    const filterBarRule = moleculesStyles.match(/\.filter-bar\s*\{(?<body>[^}]*)\}/);
+    const layoutRules = [
+      ".filter-search",
+      ".filter-month-search-status",
+      ".filter-two-controls",
+      ".filter-single-control",
+    ];
+
+    expect(filterBarRule?.groups?.body).not.toContain("display: grid");
+
+    for (const selector of layoutRules) {
+      const rule = moleculesStyles.match(
+        new RegExp(`${selector.replace(".", "\\.")}\\s*\\{(?<body>[^}]*)\\}`),
+      );
+
+      expect(rule?.groups?.body).not.toContain("grid-template-columns");
+    }
   });
 
   it("renders panel headings with optional side content", () => {

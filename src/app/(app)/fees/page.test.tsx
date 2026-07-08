@@ -180,7 +180,11 @@ describe("FeesPage", () => {
 
     expect(within(list).getByText("2026.07 · 총 1명")).toBeInTheDocument();
     expect(within(table).getByRole("cell", { name: "1234" })).toBeInTheDocument();
-    expect(within(table).getByText("운영진")).toBeInTheDocument();
+    const memberKindCell = within(table).getByRole("cell", { name: "운영진" });
+    const paymentStatusCell = within(table).getByRole("cell", { name: "납부완료" });
+
+    expect(memberKindCell.querySelector("span")).toBeNull();
+    expect(paymentStatusCell.querySelector("span")).toBeNull();
     expect(within(table).getByRole("cell", { name: "30,000원" })).toBeInTheDocument();
     expect(within(table).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
   });

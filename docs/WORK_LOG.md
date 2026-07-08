@@ -347,12 +347,27 @@
   - selected-date schedule details use the right 30%
 - Made the month calendar fill the available vertical space inside the schedule content area, reducing the large empty area below the calendar grid.
 - Added schedule layout regression coverage for the fixed toolbar, internal scroll area, 70/30 month layout, and accessible grouping of the month calendar with the selected-date detail panel.
+- Simplified table status presentation in the fee board:
+  - removed badge pills from the desktop fee table member-kind and payment-status cells
+  - kept the same Korean text labels as plain table text
+  - added regression coverage so those table cells do not reintroduce nested badge spans
+- Simplified shared filter bar layout:
+  - changed `FilterBar` styling from grid-based column splits to a wrapping flex row
+  - removed layout-specific `grid-template-columns` from shared filter bar variants
+  - added regression coverage to keep filter bars from returning to grid column splitting
+- Increased shared data table row height from 24px to 32px for more readable dense table rows.
 
 ### Verification Evidence
 - `npm run test` passed with 50 files and 172 tests.
 - `npm run lint` passed.
 - `npx tsc --noEmit` passed.
 - `npm run build` passed.
+- Fee table badge removal verification:
+  - `npm run test -- 'src/app/(app)/fees/page.test.tsx'` passed with 1 file and 4 tests.
+  - `npm run lint` passed.
+- Filter bar layout verification:
+  - `npm run test -- src/components/molecules/molecules.test.tsx` passed with 1 file and 12 tests.
+  - `npm run lint` passed.
 
 ### UI Layout Guidelines
 - Authenticated desktop pages should keep the shell and page frame fixed to the viewport.

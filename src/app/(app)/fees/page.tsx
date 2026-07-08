@@ -1,6 +1,6 @@
 import styles from "./page.module.scss";
 import { cancelFeePayment, createFeePayment } from "./actions";
-import { ActionLink, Badge, Button, SelectInput, TextInput } from "@/components/atoms";
+import { ActionLink, Button, SelectInput, TextInput } from "@/components/atoms";
 import {
   EmptyState,
   FilterBar,
@@ -267,16 +267,8 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                       <tr key={row.memberId}>
                         <th scope="row">{row.memberName}</th>
                         <td>{row.memberPhoneLastFour ?? "-"}</td>
-                        <td>
-                          <Badge tone={row.operatorProfileId ? "info" : "muted"}>
-                            {formatMemberKind(row)}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Badge tone={row.payment ? "success" : "danger"}>
-                            {formatPaymentStatus(row)}
-                          </Badge>
-                        </td>
+                        <td>{formatMemberKind(row)}</td>
+                        <td>{formatPaymentStatus(row)}</td>
                         <td>
                           {formatCurrency(
                             row.payment?.amount ?? DEFAULT_MONTHLY_FEE_AMOUNT,
