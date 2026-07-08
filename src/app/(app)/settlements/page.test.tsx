@@ -98,8 +98,34 @@ describe("SettlementsPage", () => {
     expect(screen.getByText("130,000원")).toBeInTheDocument();
     expect(screen.getByText("정산 잔액")).toBeInTheDocument();
     expect(screen.getByText("-50,000원")).toBeInTheDocument();
-    expect(screen.getByText("회비 납부 2건 · 지출 2건")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "PDF 다운로드" })).toHaveAttribute(
+
+    const settlementPanel = screen.getByRole("region", { name: "2026.07 정산" });
+    const settlementSummary = within(settlementPanel).getByRole("region", {
+      name: "정산 요약",
+    });
+    const feePaymentCard = within(settlementSummary)
+      .getByText("회비 납부")
+      .closest("article");
+    const expenseCountCard = within(settlementSummary)
+      .getByText("지출")
+      .closest("article");
+
+    expect(feePaymentCard).not.toBeNull();
+    expect(expenseCountCard).not.toBeNull();
+    expect(within(feePaymentCard as HTMLElement).getByText("2건")).toBeInTheDocument();
+    expect(within(expenseCountCard as HTMLElement).getByText("2건")).toBeInTheDocument();
+    expect(
+      within(settlementSummary).queryByText("회비 납부 2건 · 지출 2건"),
+    ).not.toBeInTheDocument();
+    const filterForm = screen.getByRole("form", { name: "정산 검색 필터" });
+    const pdfLink = within(filterForm).getByRole("link", { name: "PDF 다운로드" });
+    const submitButton = within(filterForm).getByRole("button", { name: "조회" });
+    const filterChildren = Array.from(filterForm.children);
+
+    expect(filterChildren.indexOf(pdfLink)).toBe(
+      filterChildren.indexOf(submitButton) + 1,
+    );
+    expect(pdfLink).toHaveAttribute(
       "href",
       "/reports/monthly?month=2026-07",
     );
@@ -112,7 +138,7 @@ describe("SettlementsPage", () => {
   });
 
   it("renders an empty category state when the month has no expenses", async () => {
-    queryState.feePayments = [];
+    queryState.feePayments = [feePayments[0]];
     queryState.expenses = [];
 
     render(
@@ -121,7 +147,20 @@ describe("SettlementsPage", () => {
       }),
     );
 
-    expect(screen.getAllByText("0원").length).toBeGreaterThan(0);
+    const settlementSummary = screen.getByRole("region", { name: "정산 요약" });
+    const feePaymentCard = within(settlementSummary)
+      .getByText("회비 납부")
+      .closest("article");
+    const expenseCountCard = within(settlementSummary)
+      .getByText("지출")
+      .closest("article");
+
+    expect(feePaymentCard).not.toBeNull();
+    expect(expenseCountCard).not.toBeNull();
+    expect(within(feePaymentCard as HTMLElement).getByText("1건")).toBeInTheDocument();
+    expect(within(expenseCountCard as HTMLElement).getByText("0건")).toBeInTheDocument();
+    expect(screen.getByText("30,000원")).toBeInTheDocument();
+    expect(screen.getByText("+30,000원")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "카테고리별 지출이 없습니다" })).toBeInTheDocument();
   });
 });

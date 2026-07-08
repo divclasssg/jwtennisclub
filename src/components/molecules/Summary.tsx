@@ -2,7 +2,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { classNames } from "@/components/ui/class-names";
 import styles from "./Molecules.module.scss";
 
-type SummaryGridColumns = 2 | 3 | 4;
+type SummaryGridColumns = 2 | 3 | 4 | 5;
 
 type SummaryGridProps = HTMLAttributes<HTMLElement> & {
   columns?: SummaryGridColumns;

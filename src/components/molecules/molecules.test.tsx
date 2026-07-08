@@ -66,7 +66,7 @@ describe("molecules", () => {
   });
 
   it("keeps filter bars from using grid-based column splits", () => {
-    const filterBarRule = moleculesStyles.match(/\.filter-bar\s*\{(?<body>[^}]*)\}/);
+    const filterBarRule = moleculesStyles.match(/\.filter-bar\s*\{([^}]*)\}/);
     const layoutRules = [
       ".filter-search",
       ".filter-month-search-status",
@@ -74,14 +74,14 @@ describe("molecules", () => {
       ".filter-single-control",
     ];
 
-    expect(filterBarRule?.groups?.body).not.toContain("display: grid");
+    expect(filterBarRule?.[1]).not.toContain("display: grid");
 
     for (const selector of layoutRules) {
       const rule = moleculesStyles.match(
-        new RegExp(`${selector.replace(".", "\\.")}\\s*\\{(?<body>[^}]*)\\}`),
+        new RegExp(`${selector.replace(".", "\\.")}\\s*\\{([^}]*)\\}`),
       );
 
-      expect(rule?.groups?.body).not.toContain("grid-template-columns");
+      expect(rule?.[1]).not.toContain("grid-template-columns");
     }
   });
 

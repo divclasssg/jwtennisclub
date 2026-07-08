@@ -105,6 +105,9 @@ export default async function SettlementsPage({
             />
           </FormField>
           <Button type="submit">조회</Button>
+          <ActionLink href={`/reports/monthly?month=${monthValue}`} size="compact">
+            PDF 다운로드
+          </ActionLink>
         </FilterBar>
       }
       kicker="월별 정산 요약"
@@ -144,20 +147,17 @@ export default async function SettlementsPage({
       summary={
         <DataPanel
           aria-label={`${formatPeriodMonth(filters.periodMonth)} 정산`}
-          headerSide={
-            <>
-              <span>
-                회비 납부 {summary.feePaymentCount}건 · 지출{" "}
-                {summary.expenseCount}건
-              </span>
-              <ActionLink href={`/reports/monthly?month=${monthValue}`} size="compact">
-                PDF 다운로드
-              </ActionLink>
-            </>
-          }
           headerTitle={`${formatPeriodMonth(filters.periodMonth)} 정산`}
         >
-          <SummaryGrid columns={3} variant="divided">
+          <SummaryGrid aria-label="정산 요약" columns={5} variant="divided">
+            <SummaryCard
+              label="회비 납부"
+              value={`${summary.feePaymentCount}건`}
+            />
+            <SummaryCard
+              label="지출"
+              value={`${summary.expenseCount}건`}
+            />
             <SummaryCard
               label="수입 합계"
               value={`${formatCurrency(summary.incomeTotal)}원`}

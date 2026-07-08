@@ -356,6 +356,11 @@
   - removed layout-specific `grid-template-columns` from shared filter bar variants
   - added regression coverage to keep filter bars from returning to grid column splitting
 - Increased shared data table row height from 24px to 32px for more readable dense table rows.
+- Refined monthly settlement summary actions and metrics:
+  - moved `PDF 다운로드` from the settlement panel header to the settlement filter bar next to `조회`
+  - split combined transaction counts into separate `회비 납부` and `지출` summary cards
+  - added 5-column `SummaryGrid` support for the expanded settlement summary card set
+  - kept regression coverage for `회비 납부 1건` and `지출 0건` as separate summary values
 
 ### Verification Evidence
 - `npm run test` passed with 50 files and 172 tests.
@@ -368,6 +373,10 @@
 - Filter bar layout verification:
   - `npm run test -- src/components/molecules/molecules.test.tsx` passed with 1 file and 12 tests.
   - `npm run lint` passed.
+- Settlement summary action verification:
+  - `npm run test -- 'src/app/(app)/settlements/page.test.tsx' src/components/molecules/molecules.test.tsx` passed with 2 files and 14 tests.
+  - `npm run lint` passed.
+  - `npx tsc --noEmit` passed.
 
 ### UI Layout Guidelines
 - Authenticated desktop pages should keep the shell and page frame fixed to the viewport.
