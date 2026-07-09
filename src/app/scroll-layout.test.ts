@@ -13,6 +13,12 @@ const organismStyles = readSource("src/components/organisms/Organisms.module.scs
 const schedulePageStyles = readSource("src/app/(app)/schedule/page.module.scss");
 const scheduleStyles = readSource("src/features/events/ScheduleCalendar.module.scss");
 
+function cssRuleBody(source: string, selector: string) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = source.match(new RegExp(`${escapedSelector}\\s*{([\\s\\S]*?)\\n}`));
+  return match?.[1] ?? "";
+}
+
 describe("scroll layout", () => {
   it("keeps the app frame fixed instead of scrolling the document", () => {
     expect(globals).toContain("--app-frame-height: 100dvh;");
@@ -53,8 +59,8 @@ describe("scroll layout", () => {
     expect(scheduleStyles).toMatch(
       /\.schedule-scroll-area\s*{[\s\S]*?overflow-y:\s*auto;/,
     );
-    expect(scheduleStyles).toMatch(
-      /\.schedule-scroll-area\s*{[\s\S]*?padding:\s*var\(--spacing-lg\);/,
+    expect(cssRuleBody(scheduleStyles, ".schedule-scroll-area")).not.toMatch(
+      /\s+padding:/,
     );
     expect(scheduleStyles).toMatch(
       /\.schedule-scroll-area-month\s*{[\s\S]*?grid-template-columns:\s*minmax\(0, 7fr\) minmax\(0, 3fr\);/,
@@ -69,5 +75,95 @@ describe("scroll layout", () => {
       /\.schedule-month-grid\s*{[\s\S]*?grid-auto-rows:\s*minmax\(var\(--schedule-month-day-min-height\), 1fr\);/,
     );
     expect(scheduleStyles).toMatch(/\.schedule-week\s*{[\s\S]*?min-height:\s*0;/);
+  });
+
+  it("keeps schedule selected-date details directly below the selected date header", () => {
+    expect(scheduleStyles).toMatch(
+      /\.schedule-selected-events,\s*\.schedule-week\s*{[\s\S]*?align-content:\s*start;/,
+    );
+    expect(scheduleStyles).toMatch(
+      /\.schedule-selected-events\s*{[\s\S]*?align-self:\s*start;/,
+    );
+    expect(scheduleStyles).toMatch(
+      /\.schedule-selected-events ol,\s*\.schedule-week-day ol\s*{[\s\S]*?align-content:\s*start;/,
+    );
+  });
+
+  it("keeps selected-date schedule rows unframed", () => {
+    const selectedEventRowStyles = cssRuleBody(
+      scheduleStyles,
+      ".schedule-selected-events li",
+    );
+
+    expect(selectedEventRowStyles).not.toMatch(/\s+padding:/);
+    expect(selectedEventRowStyles).not.toMatch(/\s+border:/);
+    expect(selectedEventRowStyles).not.toMatch(/\s+border-radius:/);
+  });
+
+  it("lets the full week time range define scrollable height", () => {
+    const weekTimeboardStyles = cssRuleBody(
+      scheduleStyles,
+      ".schedule-week-timeboard",
+    );
+    const weekBodyStyles = cssRuleBody(scheduleStyles, ".schedule-week-body");
+
+    expect(weekTimeboardStyles).toMatch(
+      /grid-template-rows:\s*var\(--schedule-week-header-height\) auto;/,
+    );
+    expect(weekTimeboardStyles).toMatch(
+      /height:\s*calc\(var\(--schedule-week-header-height\) \+ var\(--button-utility-height\) \+ \(18 \* var\(--schedule-week-hour-height\)\)\);/,
+    );
+    expect(weekTimeboardStyles).not.toMatch(/\s+overflow:\s*hidden;/);
+    expect(weekBodyStyles).toMatch(
+      /min-height:\s*calc\(var\(--button-utility-height\) \+ \(18 \* var\(--schedule-week-hour-height\)\)\);/,
+    );
+  });
+
+  it("keeps week time-grid borders single and complete", () => {
+    const weekHeaderSharedStyles = cssRuleBody(
+      scheduleStyles,
+      ".schedule-week-time-gutter,\n.schedule-week-day-header",
+    );
+    const weekInteriorHeaderStyles = cssRuleBody(
+      scheduleStyles,
+      ".schedule-week-day-header:not(:last-child)",
+    );
+    const weekGridStyles = cssRuleBody(scheduleStyles, ".schedule-week-grid-lines");
+    const weekGridLastColumnStyles = cssRuleBody(
+      scheduleStyles,
+      ".schedule-week-grid-lines span:nth-child(7n)",
+    );
+    const weekGridLastRowStyles = cssRuleBody(
+      scheduleStyles,
+      ".schedule-week-grid-lines span:nth-last-child(-n + 7)",
+    );
+    const weekTimeColumnLastRowStyles = cssRuleBody(
+      scheduleStyles,
+      ".schedule-week-time-column span:last-child",
+    );
+
+    expect(weekHeaderSharedStyles).not.toMatch(/\s+border-right:/);
+    expect(weekInteriorHeaderStyles).toMatch(
+      /border-right:\s*var\(--hairline-width\) solid var\(--hairline\);/,
+    );
+    expect(weekGridStyles).toMatch(
+      /border-top:\s*var\(--hairline-width\) solid var\(--divider-soft\);/,
+    );
+    expect(weekGridLastColumnStyles).toMatch(/border-right:\s*0;/);
+    expect(weekGridLastRowStyles).toMatch(/border-bottom:\s*0;/);
+    expect(weekTimeColumnLastRowStyles).toMatch(/border-bottom:\s*0;/);
+  });
+
+  it("keeps the week timeboard unframed while preserving its full calendar sizing", () => {
+    const weekTimeboardStyles = cssRuleBody(
+      scheduleStyles,
+      ".schedule-week-timeboard",
+    );
+
+    expect(weekTimeboardStyles).toMatch(/width:\s*100%;/);
+    expect(weekTimeboardStyles).toMatch(/min-width:\s*960px;/);
+    expect(weekTimeboardStyles).toMatch(/box-sizing:\s*border-box;/);
+    expect(weekTimeboardStyles).not.toMatch(/\s+border:/);
+    expect(weekTimeboardStyles).not.toMatch(/\s+border-radius:/);
   });
 });

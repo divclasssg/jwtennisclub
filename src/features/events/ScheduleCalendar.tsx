@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { EmptyState, RowActions } from "@/components/molecules";
 import { classNames } from "@/components/ui/class-names";
 import type {
@@ -10,6 +10,13 @@ import type {
 import styles from "./ScheduleCalendar.module.scss";
 
 const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+const weekStartHour = 6;
+const weekEndHour = 24;
+const weekHours = Array.from(
+  { length: weekEndHour - weekStartHour },
+  (_, index) => weekStartHour + index,
+);
+const weekEventTones = ["blue", "rose", "warm"] as const;
 
 type ScheduleHrefParams = {
   view?: "month" | "week";
@@ -48,6 +55,12 @@ type MonthCalendarViewProps = {
 
 type WeekCalendarViewProps = {
   calendar: WeekCalendar;
+};
+
+type WeekEventStyle = CSSProperties & {
+  "--week-event-day": string;
+  "--week-event-offset": string;
+  "--week-event-row": string;
 };
 
 type SelectedEventListProps = {
@@ -128,22 +141,22 @@ export function MonthCalendarView({
       <div className={styles["schedule-month-grid"]}>
         {calendar.weeks.flat().map((day) => (
           <article
-            className={[
+            className={classNames(
               styles["schedule-day-cell"],
-              day.isCurrentMonth ? "" : styles["schedule-day-cell-muted"],
-              day.date === selectedDate ? styles["schedule-day-cell-selected"] : "",
-            ].join(" ")}
+              day.isCurrentMonth ? undefined : styles["schedule-day-cell-muted"],
+              day.date === selectedDate ? styles["schedule-day-cell-selected"] : undefined,
+            )}
             key={day.date}
           >
             <Link
-              className={styles["schedule-day-number"]}
+              aria-label={`${formatDateLong(day.date)} 일정 보기`}
+              className={styles["schedule-day-cell-link"]}
               href={buildHref({
                 month: calendar.periodMonth,
                 selectedDate: day.date,
               })}
-            >
-              {day.dayNumber}
-            </Link>
+            />
+            <span className={styles["schedule-day-number"]}>{day.dayNumber}</span>
             <ol className={styles["schedule-day-events"]}>
               {day.visibleEvents.map((event) => (
                 <li key={event.id}>
@@ -172,30 +185,74 @@ export function MonthCalendarView({
 }
 
 export function WeekCalendarView({ calendar }: WeekCalendarViewProps) {
+  const events = calendar.days.flatMap((day, dayIndex) =>
+    day.events.map((event) => ({
+      dayIndex,
+      event,
+      style: getWeekEventStyle(dayIndex, event.eventTime),
+    })),
+  );
+
   return (
     <section aria-label="주별 일정" className={styles["schedule-week"]}>
-      {calendar.days.map((day) => (
-        <article className={styles["schedule-week-day"]} key={day.date}>
-          <header>
-            <span>{weekdays[new Date(`${day.date}T00:00:00Z`).getUTCDay()]}</span>
-            <strong>{formatDateShort(day.date)}</strong>
-          </header>
-          {day.events.length > 0 ? (
-            <ol>
-              {day.events.map((event) => (
-                <li key={event.id}>
-                  <Link href={`/schedule/${event.id}/edit`}>
-                    {formatEventTime(event.eventTime)} {event.title}
-                  </Link>
-                  <span>{event.location}</span>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p>일정 없음</p>
-          )}
-        </article>
-      ))}
+      <div
+        aria-label="주간 시간표"
+        className={styles["schedule-week-timeboard"]}
+        role="grid"
+      >
+        <div className={styles["schedule-week-header-row"]} role="row">
+          <span aria-hidden="true" className={styles["schedule-week-time-gutter"]} />
+          {calendar.days.map((day) => (
+            <div
+              className={classNames(
+                styles["schedule-week-day-header"],
+                day.date === calendar.selectedDate
+                  ? styles["schedule-week-day-header-selected"]
+                  : undefined,
+              )}
+              key={day.date}
+              role="columnheader"
+            >
+              {formatWeekDayHeader(day.date)}
+            </div>
+          ))}
+        </div>
+
+        <div className={styles["schedule-week-body"]}>
+          <div className={styles["schedule-week-time-column"]}>
+            <span role="rowheader">하루 종일</span>
+            {weekHours.map((hour) => (
+              <span key={hour} role="rowheader">
+                {formatHourLabel(hour)}
+              </span>
+            ))}
+          </div>
+
+          <div aria-hidden="true" className={styles["schedule-week-grid-lines"]}>
+            {calendar.days.flatMap((day) =>
+              weekHours.map((hour) => (
+                <span key={`${day.date}-${hour}`} />
+              )),
+            )}
+          </div>
+
+          <ol className={styles["schedule-week-event-layer"]}>
+            {events.map(({ event, style }) => (
+              <li
+                aria-label={`${event.title} ${formatEventTime(event.eventTime)} ${event.location}`}
+                data-tone={getWeekEventTone(event.id)}
+                key={event.id}
+                style={style}
+              >
+                <Link aria-label={event.title} href={`/schedule/${event.id}/edit`}>
+                  {formatEventTime(event.eventTime)} {event.title}
+                </Link>
+                <span>{event.location}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
     </section>
   );
 }
@@ -252,7 +309,35 @@ function formatEventTime(value: string) {
   return value.slice(0, 5);
 }
 
-function formatDateShort(value: string) {
-  const [, month, day] = value.split("-");
-  return `${Number(month)}.${Number(day)}`;
+function formatDateLong(value: string) {
+  const [year, month, day] = value.split("-");
+  return `${year}년 ${Number(month)}월 ${Number(day)}일`;
+}
+
+function formatWeekDayHeader(value: string) {
+  const [, , day] = value.split("-");
+  const weekday = weekdays[new Date(`${value}T00:00:00Z`).getUTCDay()];
+  return `${Number(day)}일 (${weekday})`;
+}
+
+function formatHourLabel(hour: number) {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function getWeekEventStyle(dayIndex: number, eventTime: string): WeekEventStyle {
+  const [rawHour, rawMinute] = eventTime.split(":").map(Number);
+  const hour = Math.min(Math.max(rawHour, weekStartHour), weekEndHour - 1);
+  const minute = Math.min(Math.max(rawMinute, 0), 55);
+
+  return {
+    "--week-event-day": String(dayIndex + 1),
+    "--week-event-offset": String(minute),
+    "--week-event-row": String(hour - weekStartHour + 1),
+  };
+}
+
+function getWeekEventTone(id: string) {
+  const toneIndex = [...id].reduce((sum, char) => sum + char.charCodeAt(0), 0) %
+    weekEventTones.length;
+  return weekEventTones[toneIndex];
 }

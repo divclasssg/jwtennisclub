@@ -383,6 +383,70 @@
 - When content exceeds the available space, scroll the content region itself rather than the whole document.
 - Schedule month view should remain a side-by-side desktop layout with the calendar and selected-date details grouped in one bounded content area.
 
+## 2026-07-09
+
+### Completed
+- Expanded `/schedule` month calendar date selection so each day cell has a full-cell selected-date navigation target.
+- Kept existing schedule event edit links and overflow links independently clickable above the day-cell selection target.
+- Added regression coverage for accessible day-cell selection links.
+- Fixed the `/schedule` selected-date detail panel so schedule cards sit directly below the date header and the panel consumes only content height instead of stretching down the column.
+- Added schedule scroll-layout regression coverage for top-aligned, content-sized selected-date details.
+- Removed padding, border, and border radius from selected-date schedule rows in the detail panel.
+- Added scroll-layout regression coverage so selected-date schedule rows stay unframed.
+- Reworked `/schedule` week view from day cards into a reference-style weekly time-grid calendar:
+  - 7 day columns with a time gutter
+  - hourly grid lines from morning through late evening
+  - event blocks positioned by event start time and weekday
+  - event title, location, and time retained inside the block
+- Added schedule week time-grid regression coverage.
+- Fixed week time-grid clipping where the board only showed down to around 15:00 by letting the full 18-hour grid define the scrollable height instead of hiding overflow inside the timeboard.
+- Added scroll-layout regression coverage for full week time range height.
+- Fixed week time-grid borders by separating outer frame borders from internal separators, removing duplicate last-column and last-row borders, and adding the missing all-day row separator across day columns.
+- Added scroll-layout regression coverage for complete, non-overlapping week time-grid borders.
+- Fixed the week timeboard outer border so it wraps the full calendar width by giving the timeboard its own full-width, minimum-width, border-box sizing instead of relying only on the parent week container.
+- Added scroll-layout regression coverage for the full week timeboard border box.
+- Fixed the week timeboard border height so the outer border wraps the full header plus all-day row plus 18 hourly rows, instead of ending mid-grid while internal lines continued.
+- Extended scroll-layout regression coverage to require the full week timeboard height calculation.
+- Removed padding from the schedule scroll area so the calendar content sits flush with the surrounding schedule layout.
+- Removed the week timeboard frame styling so the weekly calendar is defined by the internal grid separators instead of an extra outer border.
+- Updated scroll-layout regression coverage to keep the schedule scroll area unpadded and the week timeboard unframed.
+
+### Verification Evidence
+- `npm run test -- src/features/events/ScheduleCalendar.test.tsx` passed with 1 file and 6 tests.
+- `npm run test -- 'src/app/(app)/schedule/page.test.tsx' src/features/events/ScheduleCalendar.test.tsx` passed with 2 files and 9 tests.
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed.
+- `npm run test` passed with 50 files and 174 tests.
+- `npm run build` passed.
+- `npm run test -- src/app/scroll-layout.test.ts` passed with 1 file and 4 tests.
+- `npm run test -- src/app/scroll-layout.test.ts src/features/events/ScheduleCalendar.test.tsx 'src/app/(app)/schedule/page.test.tsx'` passed with 3 files and 13 tests.
+- `npm run test` passed with 50 files and 175 tests.
+- `npm run test -- src/app/scroll-layout.test.ts` passed with 1 file and 5 tests.
+- `npm run test -- src/app/scroll-layout.test.ts src/features/events/ScheduleCalendar.test.tsx 'src/app/(app)/schedule/page.test.tsx'` passed with 3 files and 14 tests.
+- `npm run test` passed with 50 files and 176 tests.
+- `npm run test -- src/features/events/ScheduleCalendar.test.tsx` passed with 1 file and 7 tests.
+- `npm run test -- src/features/events src/app/scroll-layout.test.ts 'src/app/(app)/schedule/page.test.tsx'` passed with 5 files and 22 tests.
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed.
+- `npm run test` passed with 50 files and 177 tests.
+- `npm run build` passed.
+- `npm run test -- src/app/scroll-layout.test.ts` passed with 1 file and 6 tests.
+- `npm run test -- src/app/scroll-layout.test.ts src/features/events/ScheduleCalendar.test.tsx 'src/app/(app)/schedule/page.test.tsx'` passed with 3 files and 16 tests.
+- `npm run test` passed with 50 files and 178 tests.
+- `npm run test -- src/app/scroll-layout.test.ts` passed with 1 file and 7 tests.
+- `npm run test -- src/app/scroll-layout.test.ts src/features/events/ScheduleCalendar.test.tsx 'src/app/(app)/schedule/page.test.tsx'` passed with 3 files and 17 tests.
+- `npm run test` passed with 50 files and 179 tests.
+- `npm run test -- src/app/scroll-layout.test.ts` passed with 1 file and 8 tests.
+- `npm run test -- src/app/scroll-layout.test.ts src/features/events/ScheduleCalendar.test.tsx 'src/app/(app)/schedule/page.test.tsx'` passed with 3 files and 18 tests.
+- `npm run test` passed with 50 files and 180 tests.
+- `npm run test -- src/app/scroll-layout.test.ts` passed with 1 file and 8 tests after removing schedule scroll padding and the week timeboard border.
+- `npm run test -- src/app/scroll-layout.test.ts src/features/events/ScheduleCalendar.test.tsx 'src/app/(app)/schedule/page.test.tsx'` passed with 3 files and 18 tests after the final schedule layout cleanup.
+- `git diff --check` passed after the final schedule style cleanup.
+- `npm run lint` passed before commit.
+- `npx tsc --noEmit` passed before commit.
+- `npm run test` passed with 50 files and 180 tests before commit.
+- `npm run build` passed before commit.
+
 ## Next Planned Work
 - Verify CSV member import later when a real CSV file is available.
 - Revisit and finalize the dashboard later after enough real operational data has accumulated.

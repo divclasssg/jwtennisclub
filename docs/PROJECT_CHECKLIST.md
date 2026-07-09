@@ -50,6 +50,9 @@
 - [x] Authenticated user screens refreshed against the Figma desktop design
 - [x] App shell changed to fixed viewport height with internal content scrolling
 - [x] Schedule month view changed to a 70/30 calendar and selected-date detail layout
+- [x] Schedule month day cells made fully selectable for selected-date navigation
+- [x] Schedule selected-date detail panel top-aligned and sized to its content
+- [x] Schedule week view changed to a reference-style time-grid calendar
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management

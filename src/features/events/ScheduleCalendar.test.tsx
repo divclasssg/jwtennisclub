@@ -12,6 +12,7 @@ import {
   WeekCalendarView,
 } from "./ScheduleCalendar";
 import type { EventRecord } from "./event-model";
+import styles from "./ScheduleCalendar.module.scss";
 
 const events: EventRecord[] = [
   event("event-1", "2026-07-11", "09:00", "첫 번째", "올림픽공원"),
@@ -83,6 +84,27 @@ describe("ScheduleCalendar components", () => {
     expect(within(selected).getByText("관리 event-4")).toBeInTheDocument();
   });
 
+  it("lets each month calendar day select that date from the whole day cell", () => {
+    const monthCalendar = buildMonthCalendar("2026-07", events);
+
+    render(
+      <MonthCalendarView
+        calendar={monthCalendar}
+        buildHref={buildHref}
+        selectedDate="2026-07-11"
+      />,
+    );
+
+    const dayLink = screen.getByRole("link", {
+      name: "2026년 7월 12일 일정 보기",
+    });
+    expect(dayLink).toHaveAttribute(
+      "href",
+      "/schedule?month=2026-07&selectedDate=2026-07-12",
+    );
+    expect(dayLink).toHaveClass(styles["schedule-day-cell-link"]);
+  });
+
   it("groups the month calendar and selected-date list in a two-column layout", () => {
     const monthCalendar = buildMonthCalendar("2026-07", events);
 
@@ -139,6 +161,26 @@ describe("ScheduleCalendar components", () => {
     const week = screen.getByRole("region", { name: "주별 일정" });
     expect(within(week).getByText("09:00 첫 번째")).toBeInTheDocument();
     expect(within(week).getAllByText("올림픽공원").length).toBeGreaterThan(0);
+  });
+
+  it("renders week calendar as a time-grid schedule", () => {
+    const weekCalendar = buildWeekCalendar("2026-07-11", events);
+
+    render(<WeekCalendarView calendar={weekCalendar} />);
+
+    const timeGrid = screen.getByRole("grid", { name: "주간 시간표" });
+    expect(within(timeGrid).getAllByRole("columnheader")).toHaveLength(7);
+    expect(within(timeGrid).getByRole("columnheader", { name: "11일 (토)" })).toBeInTheDocument();
+    expect(within(timeGrid).getByRole("rowheader", { name: "09:00" })).toBeInTheDocument();
+
+    const eventCard = within(timeGrid).getByRole("listitem", { name: /첫 번째/ });
+    expect(within(eventCard).getByRole("link", { name: "첫 번째" })).toHaveAttribute(
+      "href",
+      "/schedule/event-1/edit",
+    );
+    expect(eventCard).toHaveAttribute("style", expect.stringContaining("--week-event-day: 7"));
+    expect(eventCard).toHaveAttribute("style", expect.stringContaining("--week-event-row: 4"));
+    expect(eventCard).toHaveAttribute("style", expect.stringContaining("--week-event-offset: 0"));
   });
 });
 
