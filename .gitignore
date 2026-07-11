@@ -27,6 +27,7 @@
 .DS_Store
 *.pem
 .worktrees/
+/members/
 
 # debug
 npm-debug.log*

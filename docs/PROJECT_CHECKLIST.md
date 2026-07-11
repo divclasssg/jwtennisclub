@@ -53,6 +53,7 @@
 - [x] Schedule month day cells made fully selectable for selected-date navigation
 - [x] Schedule selected-date detail panel top-aligned and sized to its content
 - [x] Schedule week view changed to a reference-style time-grid calendar
+- [x] Local member source-data directory excluded from Git after full-phone security review
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management
@@ -101,6 +102,7 @@
 - [x] Component styles use SCSS Modules with kebab-case hyphen class names
 - [x] SCSS should use `src/app/globals.scss` design tokens and `src/app/_breakpoints.scss` breakpoint variables before hardcoded values
 - [x] `.gstack/` security scan artifacts are local-only and ignored by Git
+- [x] `/members/` is local-only and ignored by Git so real member CSV data cannot be committed
 - [x] Page body layouts should not reintroduce the removed `PageHeader`; publish route titles to the shell instead
 - [x] Desktop app pages should avoid whole-page scrolling; overflowing tables, lists, calendars, and form bodies scroll inside their bounded content area
 - [x] Schedule month view uses a desktop two-column layout: monthly calendar on the left and selected-date schedule details on the right

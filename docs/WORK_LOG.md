@@ -451,3 +451,28 @@
 - Verify CSV member import later when a real CSV file is available.
 - Revisit and finalize the dashboard later after enough real operational data has accumulated.
 - Deferred by user: verify member/fee kind columns and operator-first sorting later after real data is accumulated.
+
+## 2026-07-11
+
+### Completed
+- Ran a focused gstack CSO comprehensive security review for changing member phone storage from the last four digits to the full phone number.
+- Confirmed that the current authentication and RLS boundaries block anonymous member-row access.
+- Determined that replacing `phone_last_four` in place is unsafe because the default `members.view` permission would expose the full value across member and fee views.
+- Identified URL-backed full-phone search, login redirect query propagation, fee-board projections, CSV workflows, and contact retention as areas that require separate controls before full-phone storage.
+- Established the recommended direction: keep `members.phone_last_four` for routine member and fee workflows and isolate full contact data behind a separate table, permission, and RLS policy.
+- Kept the generated gstack report local under `.gstack/security-reports` so it is not committed.
+- Added `/members/` to `.gitignore` so local CSV files containing real member data cannot be staged or committed.
+
+### Verification Evidence
+- Focused auth, member, fee, and permission tests passed with 5 files and 20 tests.
+- Independent proxy and login URL verification passed with 18 tests.
+- `npm audit --audit-level=low --json` reported 0 vulnerabilities across 630 dependencies.
+- `git check-ignore -v members members/members.csv` confirmed that the directory and contained CSV are ignored by `/members/`.
+- `git diff --check` passed after the ignore and documentation updates.
+
+### Security Guidelines
+- Do not replace `members.phone_last_four` with a broadly readable full-phone column.
+- Store full contact data only in a separate private table with dedicated view/manage permissions and RLS.
+- Do not select or serialize full phone numbers in `/fees`, default member lists, or fee CSV matching.
+- Keep sensitive full-phone lookup values out of GET query strings and login redirect parameters.
+- Keep real member source files outside tracked repository paths; `/members/` is reserved for ignored local data only.
