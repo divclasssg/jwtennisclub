@@ -31,7 +31,6 @@ const members = [
     status: "active",
     joined_date: "2026-07-01",
     withdrawn_date: null,
-    withdrawal_reason: null,
     memo: null,
   },
   {
@@ -42,7 +41,6 @@ const members = [
     status: "active",
     joined_date: "2026-07-01",
     withdrawn_date: null,
-    withdrawal_reason: null,
     memo: null,
   },
 ];
@@ -188,6 +186,9 @@ describe("FeesPage", () => {
     expect(paymentStatusCell.querySelector("span")).toBeNull();
     expect(within(table).getByRole("cell", { name: "30,000원" })).toBeInTheDocument();
     expect(within(table).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
+    expect(membersQuery.select).toHaveBeenCalledWith(
+      "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, memo",
+    );
   });
 
   it("renders unpaid rows with an inline payment action", async () => {

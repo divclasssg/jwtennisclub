@@ -17,16 +17,15 @@ describe("member form validation", () => {
     });
 
     expect(validateMemberForm(member)).toEqual([]);
-    expect(toMemberDatabaseInput(member)).toMatchObject({
+    expect(toMemberDatabaseInput(member)).toEqual({
       name: "홍길동",
       phone_number: "01012345678",
       group_id: "group-a",
       status: "active",
       joined_date: "2026-07-01",
+      withdrawn_date: null,
+      memo: null,
     });
-    expect(toMemberDatabaseInput(member)).not.toHaveProperty(
-      "withdrawal_reason",
-    );
   });
 
   it("rejects invalid full phone numbers and dates", () => {

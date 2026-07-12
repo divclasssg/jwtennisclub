@@ -9,7 +9,6 @@ import {
 import {
   firstSearchParam,
   sortMemberListRows,
-  type MemberListRow,
 } from "@/features/members/member-list";
 
 export type FeeListSearchParams = {
@@ -72,13 +71,8 @@ type FeeBoardSourceMember = {
   memberCode: string;
   name: string;
   operatorProfileId: string | null;
-  operatorPositionName?: string | null;
-  operatorPositionSortOrder?: number | null;
-  status?: string;
-  joinedDate?: string;
-  withdrawnDate?: string | null;
-  withdrawalReason?: string | null;
-  memo?: string | null;
+  operatorPositionName: string | null;
+  operatorPositionSortOrder: number | null;
 };
 
 export function normalizeFeeListFilters(
@@ -159,7 +153,7 @@ export function buildFeeBoardRows(input: {
   const query = input.query?.toLowerCase() ?? "";
   const status = input.status ?? "all";
 
-  return sortMemberListRows(input.members as MemberListRow[])
+  return sortMemberListRows(input.members)
     .map((member) => ({
       memberId: member.id,
       memberName: member.name,

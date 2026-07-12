@@ -14,7 +14,6 @@ const membersQuery = {
         status: "active",
         joined_date: "2026-07-01",
         withdrawn_date: null,
-        withdrawal_reason: null,
         memo: null,
       },
     ],

@@ -15,14 +15,12 @@ export type MemberListRow = {
   id: string;
   memberCode: string;
   name: string;
-  phoneLastFour: string | null;
   operatorProfileId: string | null;
   operatorPositionName: string | null;
   operatorPositionSortOrder: number | null;
   status: MemberStatus;
   joinedDate: string;
   withdrawnDate: string | null;
-  withdrawalReason: string | null;
   memo: string | null;
 };
 
@@ -51,12 +49,10 @@ type MemberDatabaseRow = {
   id: string;
   member_code: string;
   name: string;
-  phone_last_four?: string | null;
   operator_profile_id?: string | null;
   status: MemberStatus;
   joined_date: string;
   withdrawn_date: string | null;
-  withdrawal_reason: string | null;
   memo?: string | null;
 };
 
@@ -88,14 +84,12 @@ export function mapMemberRow(row: MemberDatabaseRow): MemberListRow {
     id: row.id,
     memberCode: row.member_code,
     name: row.name,
-    phoneLastFour: row.phone_last_four ?? null,
     operatorProfileId: row.operator_profile_id ?? null,
     operatorPositionName: null,
     operatorPositionSortOrder: null,
     status: row.status,
     joinedDate: row.joined_date,
     withdrawnDate: row.withdrawn_date,
-    withdrawalReason: row.withdrawal_reason,
     memo: row.memo ?? null,
   };
 }
@@ -114,7 +108,15 @@ export function applyOperatorPositionInfo(
   };
 }
 
-export function sortMemberListRows(rows: MemberListRow[]): MemberListRow[] {
+type OperatorSortableMember = Pick<
+  MemberListRow,
+  | "name"
+  | "operatorProfileId"
+  | "operatorPositionName"
+  | "operatorPositionSortOrder"
+>;
+
+export function sortMemberListRows<T extends OperatorSortableMember>(rows: T[]): T[] {
   return [...rows].sort((left, right) => {
     const leftGroup = left.operatorProfileId ? 0 : 1;
     const rightGroup = right.operatorProfileId ? 0 : 1;

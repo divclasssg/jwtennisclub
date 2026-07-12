@@ -95,7 +95,7 @@ async function getFeeTargetMembers(periodMonth: string, query: string) {
   let request = supabase
     .from("members")
     .select(
-      "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, withdrawal_reason, memo",
+      "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, memo",
     )
     .eq("status", "active")
     .lte("joined_date", getPeriodMonthEnd(periodMonth))
