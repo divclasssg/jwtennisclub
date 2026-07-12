@@ -35,6 +35,17 @@ export type MemberListSearchParams = {
   status?: string | string[];
 };
 
+export function buildMemberSearchFilter(query: string) {
+  const escapedQuery = query
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"')
+    .replaceAll("%", "\\%")
+    .replaceAll("_", "\\_");
+  const pattern = `"%${escapedQuery}%"`;
+
+  return `name.ilike.${pattern},member_code.ilike.${pattern}`;
+}
+
 type MemberDatabaseRow = {
   id: string;
   name: string;

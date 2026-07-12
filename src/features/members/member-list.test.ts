@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildMemberSearchFilter,
   formatDate,
   formatMemberKind,
   formatMemberStatus,
@@ -8,6 +9,17 @@ import {
   normalizeMemberListFilters,
   sortMemberListRows,
 } from "./member-list";
+
+describe("buildMemberSearchFilter", () => {
+  it("escapes wildcard input and searches only names and member codes", () => {
+    const filter = buildMemberSearchFilter('A_01%,memo.eq."secret"');
+
+    expect(filter).toBe(
+      'name.ilike."%A\\_01\\%,memo.eq.\\"secret\\"%",member_code.ilike."%A\\_01\\%,memo.eq.\\"secret\\"%"',
+    );
+    expect(filter).not.toContain("phone");
+  });
+});
 
 describe("normalizeMemberListFilters", () => {
   it("trims the search query and keeps supported statuses", () => {
