@@ -149,6 +149,37 @@ describe("member roster preparation migration", () => {
     expect(validationPosition).toBeLessThan(deletePosition);
   });
 
+  it("locks profiles before snapshot validation and before the allocator lock", () => {
+    const resetFunctionStart = migrationSql.indexOf(
+      "create or replace function public.admin_reset_member_roster",
+    );
+    const resetFunctionEnd = migrationSql.indexOf(
+      "revoke execute on function public.admin_reset_member_roster",
+      resetFunctionStart,
+    );
+    const resetFunction = migrationSql.slice(resetFunctionStart, resetFunctionEnd);
+    const profilesLockPosition = resetFunction.indexOf(
+      "lock table public.profiles in share mode",
+    );
+    const snapshotValidationPosition = resetFunction.indexOf(
+      "active profile set changed since preview",
+    );
+    const snapshotTablePosition = resetFunction.indexOf(
+      "create temporary table roster_profile_links",
+    );
+    const allocatorLockPosition = resetFunction.indexOf(
+      "from public.member_code_allocator where singleton for update",
+    );
+
+    expect(profilesLockPosition).toBeGreaterThan(-1);
+    expect(profilesLockPosition).toBeLessThan(snapshotValidationPosition);
+    expect(profilesLockPosition).toBeLessThan(snapshotTablePosition);
+    expect(profilesLockPosition).toBeLessThan(allocatorLockPosition);
+    expect(resetFunction).toContain(
+      "Lock order: profiles, then member_code_allocator, then member rows",
+    );
+  });
+
   it("stores canonical contact digits consistently", () => {
     expect(migrationSql).toContain("phone_number = phone_normalized");
     expect(migrationSql).toContain("saved_member_id, normalized_phone, normalized_phone");
@@ -247,6 +278,15 @@ describe("member roster finalization migration", () => {
     expect(finalizeMigrationSql).toContain("members_member_code_unique");
     expect(finalizeMigrationSql).toContain("members_prevent_member_code_change");
     expect(finalizeMigrationSql).toContain("public.prevent_member_code_change()");
+  });
+
+  it("requires the reset marker count to equal the exact current roster count", () => {
+    expect(finalizeMigrationSql).toContain(
+      "member_count = (select count(*) from public.members)",
+    );
+    expect(finalizeMigrationSql).not.toContain(
+      "member_count > 0 and exists (select 1 from public.members)",
+    );
   });
 
   it("replaces the rollout partial index with a global member-code unique index", () => {

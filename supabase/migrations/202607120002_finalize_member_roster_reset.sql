@@ -17,7 +17,9 @@ begin
        where singleton
          and marker_kind in ('reset_complete', 'bootstrap_empty')
          and (
-           (marker_kind = 'reset_complete' and member_count > 0 and exists (select 1 from public.members))
+           (marker_kind = 'reset_complete'
+             and member_count > 0
+             and member_count = (select count(*) from public.members))
            or (marker_kind = 'bootstrap_empty' and member_count = 0 and not exists (select 1 from public.members))
          )
      ) then

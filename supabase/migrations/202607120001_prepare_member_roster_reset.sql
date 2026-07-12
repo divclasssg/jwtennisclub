@@ -395,6 +395,10 @@ begin
     raise exception 'import_rows must be a JSON array';
   end if;
 
+  -- Lock order: profiles, then member_code_allocator, then member rows.
+  -- Profile insert/update triggers follow this order when they allocate or sync members.
+  lock table public.profiles in share mode;
+
   if coalesce(expected_active_profile_ids, array[]::uuid[]) is distinct from (
     select coalesce(array_agg(id order by id), array[]::uuid[])
     from public.profiles
