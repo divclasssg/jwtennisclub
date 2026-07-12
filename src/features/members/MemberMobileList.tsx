@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Badge } from "@/components/atoms";
 import {
   formatDate,
+  formatMemberDirectoryKind,
+  formatMemberPosition,
   formatMemberStatus,
 } from "./member-list";
 import type { MemberListRow } from "./member-directory";
@@ -54,6 +56,8 @@ export function MemberMobileList({ canUpdate = true, members }: MemberMobileList
               연락처 {member.phoneDisplay}
             </p>
             <p className={styles["member-mobile-detail"]}>그룹 {member.groupCode ?? "없음"}</p>
+            <p className={styles["member-mobile-detail"]}>구분 {formatMemberDirectoryKind(member)}</p>
+            <p className={styles["member-mobile-detail"]}>직책 {formatMemberPosition(member)}</p>
             <p className={styles["member-mobile-detail"]}>
               가입일 {formatDate(member.joinedDate)}
             </p>

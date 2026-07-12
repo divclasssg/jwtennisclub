@@ -5,7 +5,7 @@ import { EmptyState, FilterBar, FormField, TabLink, Tabs } from "@/components/mo
 import { DataPanel, DataTable } from "@/components/organisms";
 import { ManagementPageTemplate } from "@/components/templates";
 import { hasCurrentUserPermission, loadMemberDirectory } from "@/features/members/member-directory";
-import { formatDate, formatMemberStatus, formatMemberStatusTab } from "@/features/members/member-list";
+import { formatDate, formatMemberDirectoryKind, formatMemberPosition, formatMemberStatus, formatMemberStatusTab } from "@/features/members/member-list";
 import { MemberMobileList } from "@/features/members/MemberMobileList";
 import { MEMBER_STATUSES, type MemberStatus } from "@/features/members/member-model";
 
@@ -46,9 +46,9 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
       headerSide={<>{hasFilters ? <a href="/members">필터 초기화</a> : null}{canCreate ? <ActionLink href="/members/new" size="compact">회원 등록</ActionLink> : null}</>}
       headerTitle={`총 ${members.length}명`}>
       {members.length ? <><div className={styles["members-table-view"]}><DataTable><thead><tr>
-        <th scope="col">회원번호</th><th scope="col">이름</th><th scope="col">연락처</th><th scope="col">그룹</th><th scope="col">상태</th><th scope="col">가입일</th><th scope="col">관리</th>
+        <th scope="col">회원번호</th><th scope="col">이름</th><th scope="col">전화번호</th><th scope="col">구분</th><th scope="col">직책</th><th scope="col">그룹</th><th scope="col">상태</th><th scope="col">가입일</th><th scope="col">관리</th>
       </tr></thead><tbody>{members.map((member) => <tr key={member.id}>
-        <td className={styles["member-code-cell"]}>{member.memberCode}</td><th scope="row">{member.name}</th><td>{member.phoneDisplay}</td><td>{member.groupCode ?? "없음"}</td><td>{formatMemberStatus(member.status)}</td><td>{formatDate(member.joinedDate)}</td><td>{canUpdate ? <Link href={`/members/${member.id}/edit`}>수정</Link> : null}</td>
+        <td className={styles["member-code-cell"]}>{member.memberCode}</td><th scope="row">{member.name}</th><td>{member.phoneDisplay}</td><td>{formatMemberDirectoryKind(member)}</td><td>{formatMemberPosition(member)}</td><td>{member.groupCode ?? "없음"}</td><td>{formatMemberStatus(member.status)}</td><td>{formatDate(member.joinedDate)}</td><td>{canUpdate ? <Link href={`/members/${member.id}/edit`}>수정</Link> : null}</td>
       </tr>)}</tbody></DataTable></div><div className={styles["members-mobile-list-view"]}><MemberMobileList canUpdate={canUpdate} members={members} /></div></> : null}
     </DataPanel>}
     tabs={<Tabs aria-label="회원 상태" columns={3}>{MEMBER_STATUSES.map((item) => <TabLink href={statusHref(item, q, group)} isCurrent={status === item} key={item}>{formatMemberStatusTab(item)}</TabLink>)}</Tabs>}

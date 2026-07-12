@@ -1,4 +1,5 @@
 export const DEFAULT_MONTHLY_FEE_AMOUNT = 30000;
+export const FEE_EXEMPT_MEMBER_CODE = "#0000";
 
 export type FeePaymentRecord = {
   id: string;

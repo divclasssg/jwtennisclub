@@ -16,6 +16,8 @@ export type MemberListRow = {
   id: string;
   memberCode: string;
   name: string;
+  operatorProfileId: string | null;
+  clubPositionLabel: string | null;
   phoneDisplay: string;
   groupCode: string | null;
   status: MemberStatus;
@@ -49,6 +51,7 @@ type MemberDatabaseRow = {
   member_code: string;
   member_groups: { code: string } | { code: string }[] | null;
   name: string;
+  operator_profile_id: string | null;
   status: MemberStatus;
   joined_date: string;
   withdrawn_date: string | null;
@@ -63,6 +66,14 @@ type ContactDisplayRow = {
   member_id: string;
   phone_masked?: string | null;
   phone_number?: string | null;
+};
+
+type OperatorPositionDatabaseRow = {
+  id: string;
+  club_positions:
+    | { label: string | null }
+    | { label: string | null }[]
+    | null;
 };
 
 function relatedGroupCode(value: MemberDatabaseRow["member_groups"]) {
@@ -91,11 +102,14 @@ function mapMemberRecord(row: MemberEditDatabaseRow): MemberRecord {
 function mapMemberListRow(
   row: MemberDatabaseRow,
   phoneDisplay: string | null,
+  positionInfo?: { label: string | null },
 ): MemberListRow {
   return {
     id: row.id,
     memberCode: row.member_code,
     name: row.name,
+    operatorProfileId: row.operator_profile_id,
+    clubPositionLabel: positionInfo?.label ?? null,
     phoneDisplay: phoneDisplay ?? maskPhoneNumber(null),
     groupCode: relatedGroupCode(row.member_groups),
     status: row.status,
@@ -124,6 +138,8 @@ export function toMemberListRow(
     id: member.id,
     memberCode: member.memberCode,
     name: member.name,
+    operatorProfileId: null,
+    clubPositionLabel: null,
     phoneDisplay: phoneDisplay ?? maskPhoneNumber(null),
     groupCode: member.groupCode,
     status: member.status,
@@ -216,9 +232,9 @@ export async function loadMemberDirectory(input: {
   let request = supabase
     .from("members")
     .select(
-      `id, member_code, ${groupRelation}, name, status, joined_date, withdrawn_date, memo`,
+      `id, member_code, ${groupRelation}, name, operator_profile_id, status, joined_date, withdrawn_date, memo`,
     )
-    .order("name", { ascending: true });
+    .order("member_code", { ascending: true });
 
   if (input.status) {
     request = request.eq("status", input.status);
@@ -252,8 +268,38 @@ export async function loadMemberDirectory(input: {
     rows.map((row) => row.id),
   );
 
-  return rows.map((row) =>
-    mapMemberListRow(row, contactDisplays.get(row.id) ?? null),
+  const operatorProfileIds = rows
+    .map((row) => row.operator_profile_id)
+    .filter((id): id is string => id !== null);
+  let positionMap = new Map<string, { label: string | null }>();
+
+  if (operatorProfileIds.length > 0) {
+    const { data: positionRows, error: positionError } = await supabase
+      .from("profiles")
+      .select("id, club_positions(label)")
+      .in("id", operatorProfileIds);
+
+    if (positionError) {
+      throw new Error("운영진 직책을 불러오지 못했습니다.");
+    }
+
+    positionMap = new Map(
+      ((positionRows ?? []) as OperatorPositionDatabaseRow[]).map((row) => {
+        const position = Array.isArray(row.club_positions)
+          ? row.club_positions[0]
+          : row.club_positions;
+        return [row.id, { label: position?.label ?? null }];
+      }),
+    );
+  }
+
+  return rows.map((row) => {
+    const position = row.operator_profile_id
+      ? positionMap.get(row.operator_profile_id)
+      : undefined;
+    return mapMemberListRow(row, contactDisplays.get(row.id) ?? null, position);
+  }).sort((left, right) =>
+    left.memberCode.localeCompare(right.memberCode, "ko-KR", { numeric: true }),
   );
 }
 

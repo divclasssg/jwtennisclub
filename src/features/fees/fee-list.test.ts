@@ -92,12 +92,20 @@ describe("fee payment list helpers", () => {
     });
   });
 
-  it("keeps operator members above general members by club position order", () => {
+  it("sorts fee board members by member code", () => {
     const rows = buildFeeBoardRows({
       members: [
         {
+          id: "excluded",
+          memberCode: "#0000",
+          name: "회비 제외 회원",
+          operatorProfileId: null,
+          operatorPositionName: null,
+          operatorPositionSortOrder: null,
+        },
+        {
           id: "general",
-          memberCode: "M0003",
+          memberCode: "M0001",
           name: "일반회원",
           operatorProfileId: null,
           operatorPositionName: null,
@@ -113,7 +121,7 @@ describe("fee payment list helpers", () => {
         },
         {
           id: "president",
-          memberCode: "M0001",
+          memberCode: "M0003",
           name: "회장",
           operatorProfileId: "profile-president",
           operatorPositionName: "president",
@@ -124,14 +132,15 @@ describe("fee payment list helpers", () => {
     });
 
     expect(rows.map((row) => row.memberId)).toEqual([
-      "president",
-      "treasurer",
       "general",
+      "treasurer",
+      "president",
     ]);
+    expect(rows.map((row) => row.memberId)).not.toContain("excluded");
     expect(rows.map((row) => row.operatorProfileId)).toEqual([
-      "profile-president",
-      "profile-treasurer",
       null,
+      "profile-treasurer",
+      "profile-president",
     ]);
   });
 });

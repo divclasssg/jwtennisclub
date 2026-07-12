@@ -140,6 +140,21 @@ export function formatMemberKind(member: Pick<MemberListRow, "operatorProfileId"
   return member.operatorProfileId ? "운영진" : "일반회원";
 }
 
+export function formatMemberDirectoryKind(
+  member: Pick<MemberListRow, "operatorProfileId">,
+) {
+  return member.operatorProfileId ? "운영진" : "-";
+}
+
+export function formatMemberPosition(member: {
+  operatorProfileId: string | null;
+  clubPositionLabel: string | null;
+}) {
+  return member.operatorProfileId
+    ? (member.clubPositionLabel ?? "-")
+    : "일반회원";
+}
+
 export function formatMemberStatus(status: MemberStatus) {
   return MEMBER_STATUS_LABELS[status];
 }

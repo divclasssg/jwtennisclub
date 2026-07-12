@@ -71,6 +71,7 @@ function createQueryBuilder() {
     select: vi.fn(() => queryBuilder),
     eq: vi.fn(() => queryBuilder),
     lte: vi.fn(() => queryBuilder),
+    neq: vi.fn(() => queryBuilder),
     order: vi.fn(() => queryBuilder),
     in: vi.fn(() => queryBuilder),
     or: vi.fn(() => queryBuilder),
@@ -138,6 +139,7 @@ describe("FeesPage", () => {
       query.select.mockClear();
       query.eq.mockClear();
       query.lte.mockClear();
+      query.neq.mockClear();
       query.order.mockClear();
       query.in.mockClear();
       query.or.mockClear();
@@ -177,6 +179,16 @@ describe("FeesPage", () => {
     const table = within(list).getByRole("table");
 
     expect(within(list).getByText("2026.07 · 총 1명")).toBeInTheDocument();
+    expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
+      "회원번호",
+      "이름",
+      "구분",
+      "상태",
+      "기준 금액",
+      "납부일",
+      "메모",
+      "처리",
+    ]);
     expect(within(table).getByRole("cell", { name: "M0001" })).toBeInTheDocument();
     expect(within(table).queryByText("1234")).not.toBeInTheDocument();
     const memberKindCell = within(table).getByRole("cell", { name: "운영진" });
@@ -189,6 +201,7 @@ describe("FeesPage", () => {
     expect(membersQuery.select).toHaveBeenCalledWith(
       "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, memo",
     );
+    expect(membersQuery.neq).toHaveBeenCalledWith("member_code", "#0000");
   });
 
   it("renders unpaid rows with an inline payment action", async () => {
@@ -218,15 +231,16 @@ describe("FeesPage", () => {
     const items = within(mobileList).getAllByRole("listitem");
 
     expect(items).toHaveLength(2);
-    expect(within(items[0]).getByRole("heading", { name: "이영희" })).toBeInTheDocument();
-    expect(within(items[0]).getByText("회원번호 M0002")).toBeInTheDocument();
-    expect(within(items[0]).getByText("미납")).toBeInTheDocument();
+    expect(within(items[0]).getByRole("heading", { name: "김민수" })).toBeInTheDocument();
+    expect(within(items[0]).getByText("회원번호 M0001")).toBeInTheDocument();
+    expect(within(items[0]).getByText("납부일 2026.07.03")).toBeInTheDocument();
+    expect(within(items[0]).getByText("메모 입금 확인")).toBeInTheDocument();
+    expect(within(items[0]).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
+    expect(within(items[1]).getByRole("heading", { name: "이영희" })).toBeInTheDocument();
+    expect(within(items[1]).getByText("회원번호 M0002")).toBeInTheDocument();
+    expect(within(items[1]).getByText("미납")).toBeInTheDocument();
     expect(within(items[0]).getByText("기준 금액 30,000원")).toBeInTheDocument();
-    expect(within(items[0]).getByRole("button", { name: "납부 처리" })).toBeInTheDocument();
-    expect(within(items[1]).getByRole("heading", { name: "김민수" })).toBeInTheDocument();
-    expect(within(items[1]).getByText("납부일 2026.07.03")).toBeInTheDocument();
-    expect(within(items[1]).getByText("메모 입금 확인")).toBeInTheDocument();
-    expect(within(items[1]).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
+    expect(within(items[1]).getByRole("button", { name: "납부 처리" })).toBeInTheDocument();
   });
 
   it("renders an empty state when no members match", async () => {

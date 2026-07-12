@@ -14,6 +14,8 @@ const member = {
   id: "member-1",
   memberCode: "JW-000001",
   name: "김민수",
+  operatorProfileId: "profile-id",
+  clubPositionLabel: "총무",
   phoneDisplay: "010-****-5678",
   groupCode: "A",
   status: "active" as const,
@@ -47,8 +49,19 @@ describe("MembersPage", () => {
     });
 
     const table = screen.getByRole("table");
-    expect(within(table).getByRole("columnheader", { name: "회원번호" })).toBeInTheDocument();
-    expect(within(table).getByRole("columnheader", { name: "그룹" })).toBeInTheDocument();
+    expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
+      "회원번호",
+      "이름",
+      "전화번호",
+      "구분",
+      "직책",
+      "그룹",
+      "상태",
+      "가입일",
+      "관리",
+    ]);
+    expect(within(table).getByRole("cell", { name: "운영진" })).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "총무" })).toBeInTheDocument();
     expect(within(table).getByRole("cell", { name: "JW-000001" })).toBeInTheDocument();
     expect(within(table).getByRole("cell", { name: "010-****-5678" })).toBeInTheDocument();
     expect(screen.queryByText("탈퇴 사유")).not.toBeInTheDocument();
@@ -64,6 +77,21 @@ describe("MembersPage", () => {
     expect(screen.getByText("010-1234-5678")).toBeInTheDocument();
   });
 
+  it("shows 일반회원 in the position column for a non-operator member", async () => {
+    loadMemberDirectory.mockResolvedValue([
+      { ...member, operatorProfileId: null, clubPositionLabel: null },
+    ]);
+
+    render(await MembersPage({ searchParams: Promise.resolve({}) }));
+
+    const table = screen.getByRole("table");
+    expect(within(table).getByRole("cell", { name: "-" })).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "일반회원" })).toBeInTheDocument();
+    const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
+    expect(within(mobileList).getByText("구분 -")).toBeInTheDocument();
+    expect(within(mobileList).getByText("직책 일반회원")).toBeInTheDocument();
+  });
+
   it("renders member code, group, and protected contact on mobile", async () => {
     render(await MembersPage({ searchParams: Promise.resolve({}) }));
 
@@ -71,6 +99,8 @@ describe("MembersPage", () => {
     expect(within(mobileList).getByText("회원번호 JW-000001")).toBeInTheDocument();
     expect(within(mobileList).getByText("연락처 010-****-5678")).toBeInTheDocument();
     expect(within(mobileList).getByText("그룹 A")).toBeInTheDocument();
+    expect(within(mobileList).getByText("구분 운영진")).toBeInTheDocument();
+    expect(within(mobileList).getByText("직책 총무")).toBeInTheDocument();
   });
 
   it("hides member management links without create and update permissions", async () => {

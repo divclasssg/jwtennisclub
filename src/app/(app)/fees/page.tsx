@@ -24,6 +24,7 @@ import {
 import { FeeMobileList } from "@/features/fees/FeeMobileList";
 import {
   DEFAULT_MONTHLY_FEE_AMOUNT,
+  FEE_EXEMPT_MEMBER_CODE,
   getPeriodMonthEnd,
 } from "@/features/fees/fee-model";
 import {
@@ -98,8 +99,9 @@ async function getFeeTargetMembers(periodMonth: string, query: string) {
       "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, memo",
     )
     .eq("status", "active")
+    .neq("member_code", FEE_EXEMPT_MEMBER_CODE)
     .lte("joined_date", getPeriodMonthEnd(periodMonth))
-    .order("name", { ascending: true });
+    .order("member_code", { ascending: true });
 
   if (query) {
     const pattern = buildSearchPattern(query);
@@ -252,8 +254,8 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                 <DataTable>
                   <thead>
                     <tr>
-                      <th scope="col">회원</th>
                       <th scope="col">회원번호</th>
+                      <th scope="col">이름</th>
                       <th scope="col">구분</th>
                       <th scope="col">상태</th>
                       <th scope="col">기준 금액</th>
@@ -265,8 +267,8 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                   <tbody>
                     {boardRows.map((row) => (
                       <tr key={row.memberId}>
-                        <th scope="row">{row.memberName}</th>
                         <td>{row.memberCode}</td>
+                        <th scope="row">{row.memberName}</th>
                         <td>{formatMemberKind(row)}</td>
                         <td>{formatPaymentStatus(row)}</td>
                         <td>

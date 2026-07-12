@@ -1,15 +1,13 @@
 import {
   DEFAULT_MONTHLY_FEE_AMOUNT,
+  FEE_EXEMPT_MEMBER_CODE,
   formatCurrency,
   formatPeriodMonth,
   getCurrentPeriodMonth,
   normalizePeriodMonth,
   type FeePaymentRecord,
 } from "./fee-model";
-import {
-  firstSearchParam,
-  sortMemberListRows,
-} from "@/features/members/member-list";
+import { firstSearchParam } from "@/features/members/member-list";
 
 export type FeeListSearchParams = {
   month?: string | string[];
@@ -153,7 +151,11 @@ export function buildFeeBoardRows(input: {
   const query = input.query?.toLowerCase() ?? "";
   const status = input.status ?? "all";
 
-  return sortMemberListRows(input.members)
+  return input.members
+    .filter((member) => member.memberCode !== FEE_EXEMPT_MEMBER_CODE)
+    .sort((left, right) =>
+      left.memberCode.localeCompare(right.memberCode, "ko-KR", { numeric: true }),
+    )
     .map((member) => ({
       memberId: member.id,
       memberName: member.name,

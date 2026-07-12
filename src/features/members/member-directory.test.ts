@@ -40,6 +40,7 @@ const databaseMemberRow = {
   group_id: "group-id",
   member_groups: { code: "A" },
   name: "김민수",
+  operator_profile_id: "profile-id",
   status: "active",
   joined_date: "2026-07-01",
   withdrawn_date: null,
@@ -70,6 +71,7 @@ function mockDirectoryClient(options: {
   members: unknown[];
   canManageContacts: boolean;
   contactData?: unknown[];
+  positionData?: unknown[];
 }) {
   const profile = queryResult({ role_id: "role-id" });
   const permission = queryResult(
@@ -79,6 +81,7 @@ function mockDirectoryClient(options: {
   );
   const members = queryResult(options.members);
   const contacts = queryResult(options.contactData ?? []);
+  const positions = queryResult(options.positionData ?? []);
   members.maybeSingle.mockResolvedValue({
     data: options.members[0] ?? null,
     error: null,
@@ -91,8 +94,9 @@ function mockDirectoryClient(options: {
     data: options.contactData ?? [],
     error: null,
   });
+  let profileQueryCount = 0;
   const from = vi.fn((table: string) => {
-    if (table === "profiles") return profile;
+    if (table === "profiles") return profileQueryCount++ === 0 ? profile : positions;
     if (table === "role_permissions") return permission;
     if (table === "members") return members;
     if (table === "member_contacts") return contacts;
@@ -110,7 +114,7 @@ function mockDirectoryClient(options: {
     rpc,
   });
 
-  return { contacts, from, members, rpc };
+  return { contacts, from, members, positions, rpc };
 }
 
 describe("member directory DTO", () => {
@@ -146,6 +150,41 @@ describe("member directory contact query scope", () => {
     await loadMemberDirectory({ q: "A0012" });
 
     expect(contacts.in).toHaveBeenCalledWith("member_id", ["member-id"]);
+  });
+
+  it("운영진 회원에는 프로필의 직책 라벨을 결합한다", async () => {
+    const { positions } = mockDirectoryClient({
+      members: [databaseMemberRow],
+      canManageContacts: false,
+      contactData: [],
+      positionData: [
+        { id: "profile-id", club_positions: { label: "총무", sort_order: 30 } },
+      ],
+    });
+
+    const [member] = await loadMemberDirectory({ status: "active" });
+
+    expect(positions.in).toHaveBeenCalledWith("id", ["profile-id"]);
+    expect(member.clubPositionLabel).toBe("총무");
+  });
+
+  it("회원 목록을 ID 오름차순으로 정렬한다", async () => {
+    mockDirectoryClient({
+      members: [
+        { ...databaseMemberRow, id: "member-2", member_code: "JW-000002" },
+        { ...databaseMemberRow, id: "member-1", member_code: "JW-000001" },
+      ],
+      canManageContacts: false,
+      contactData: [],
+      positionData: [],
+    });
+
+    const members = await loadMemberDirectory({ status: "active" });
+
+    expect(members.map((member) => member.memberCode)).toEqual([
+      "JW-000001",
+      "JW-000002",
+    ]);
   });
 
   it("일반 조회자는 필터 결과 회원 ID만 마스킹 RPC에 전달한다", async () => {
