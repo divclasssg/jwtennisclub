@@ -22,6 +22,8 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import { createMember, importMembersCsv, updateMember } from "./actions";
 
+const initialState = { status: "idle" as const };
+
 function memberFormData(confirmation?: "phone-reuse" | "name-without-phone") {
   const formData = new FormData();
   formData.set("name", "홍길동");
@@ -52,9 +54,17 @@ describe("member actions", () => {
       error: null,
     });
 
-    await expect(createMember(memberFormData())).rejects.toThrow(
-      "redirect:/members/new?duplicate=phone-reuse",
-    );
+    await expect(createMember(initialState, memberFormData())).resolves.toEqual({
+      status: "confirmation-required",
+      reason: "phone-reuse",
+      candidate: expect.objectContaining({
+        name: "홍길동",
+        phoneNumber: "010-1234-5678",
+        groupId: "group-a",
+        status: "active",
+        joinedDate: "2026-07-01",
+      }),
+    });
 
     expect(mocks.rpc).toHaveBeenCalledWith("save_member_with_contact", {
       member_id: null,
@@ -78,7 +88,7 @@ describe("member actions", () => {
       error: null,
     });
 
-    await expect(createMember(memberFormData("phone-reuse"))).rejects.toThrow(
+    await expect(createMember(initialState, memberFormData("phone-reuse"))).rejects.toThrow(
       "redirect:/members?status=created&memberCode=A0001",
     );
 
@@ -117,9 +127,11 @@ describe("member actions", () => {
     const formData = memberFormData();
     formData.set("id", "member-id");
 
-    await expect(updateMember(formData)).rejects.toThrow(
-      "redirect:/members/member-id/edit?duplicate=name-without-phone",
-    );
+    await expect(updateMember(initialState, formData)).resolves.toEqual({
+      status: "confirmation-required",
+      reason: "name-without-phone",
+      candidate: expect.objectContaining({ name: "홍길동" }),
+    });
 
     expect(mocks.rpc).toHaveBeenCalledWith(
       "save_member_with_contact",
@@ -136,11 +148,33 @@ describe("member actions", () => {
     const formData = memberFormData();
     formData.set("id", "member-id");
 
-    await expect(updateMember(formData)).rejects.toThrow(
+    await expect(updateMember(initialState, formData)).rejects.toThrow(
       "redirect:/members/member-id/edit?error=duplicate-member",
     );
 
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it("omits contact data when a non-contact manager updates other fields", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { status: "SAVED", member_code: "A0001" },
+      error: null,
+    });
+    const formData = memberFormData();
+    formData.set("id", "member-id");
+    formData.delete("phoneNumber");
+    formData.set("memo", "연락처 외 변경");
+
+    await expect(updateMember(initialState, formData)).rejects.toThrow(
+      "redirect:/members?status=updated",
+    );
+
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "save_member_with_contact",
+      expect.objectContaining({
+        member_data: expect.not.objectContaining({ phone_number: expect.anything() }),
+      }),
+    );
   });
 });

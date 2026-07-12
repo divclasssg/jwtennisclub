@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   type MemberFormInput,
+  type MemberActionState,
   type MemberSaveResult,
   parseMemberFormData,
   parseMemberSaveResult,
@@ -60,7 +61,10 @@ async function getAuthenticatedUserId() {
   return { supabase, userId: user.id };
 }
 
-export async function createMember(formData: FormData) {
+export async function createMember(
+  _previousState: MemberActionState,
+  formData: FormData,
+): Promise<MemberActionState> {
   const member = parseMemberFormData(formData);
   const errors = validateMemberForm(member);
 
@@ -69,13 +73,15 @@ export async function createMember(formData: FormData) {
   }
 
   const { supabase } = await getAuthenticatedUserId();
-  const result = await saveMember(supabase, null, member);
+  const result = await saveMember(supabase, null, member, true);
 
   if (!result) {
     redirect(buildRedirect(memberCreatePath, { error: "save-failed" }));
   }
 
-  redirectForDuplicateResult(result, memberCreatePath);
+  const confirmationState = confirmationStateFor(result, member, formData);
+  if (confirmationState) return confirmationState;
+  redirectForBlockedResult(result, memberCreatePath);
 
   revalidatePath(membersPath);
   redirect(
@@ -86,7 +92,10 @@ export async function createMember(formData: FormData) {
   );
 }
 
-export async function updateMember(formData: FormData) {
+export async function updateMember(
+  _previousState: MemberActionState,
+  formData: FormData,
+): Promise<MemberActionState> {
   const memberId = String(formData.get("id") ?? "");
   const member = parseMemberFormData(formData);
   const errors = validateMemberForm(member);
@@ -101,13 +110,20 @@ export async function updateMember(formData: FormData) {
   }
 
   const { supabase } = await getAuthenticatedUserId();
-  const result = await saveMember(supabase, memberId, member);
+  const result = await saveMember(
+    supabase,
+    memberId,
+    member,
+    formData.has("phoneNumber"),
+  );
 
   if (!result) {
     redirect(buildRedirect(editPath, { error: "save-failed" }));
   }
 
-  redirectForDuplicateResult(result, editPath);
+  const confirmationState = confirmationStateFor(result, member, formData);
+  if (confirmationState) return confirmationState;
+  redirectForBlockedResult(result, editPath);
 
   revalidatePath(membersPath);
   revalidatePath(editPath);
@@ -130,10 +146,11 @@ async function saveMember(
   supabase: MemberRpcClient,
   memberId: string | null,
   member: MemberFormInput,
+  includeContact: boolean,
 ): Promise<MemberSaveResult | null> {
   const { data, error } = await supabase.rpc("save_member_with_contact", {
     member_id: memberId,
-    member_data: toMemberDatabaseInput(member),
+    member_data: toMemberDatabaseInput(member, { includeContact }),
     duplicate_confirmation: toDatabaseDuplicateConfirmation(
       member.duplicateConfirmation,
     ),
@@ -148,14 +165,30 @@ async function saveMember(
   }
 }
 
-function redirectForDuplicateResult(
+function confirmationStateFor(
+  result: MemberSaveResult,
+  candidate: MemberFormInput,
+  formData: FormData,
+): MemberActionState | null {
+  if (result.status === "confirmation-required") {
+    return {
+      status: "confirmation-required",
+      reason: result.reason,
+      candidate: {
+        ...candidate,
+        phoneNumber: formData.has("phoneNumber")
+          ? String(formData.get("phoneNumber") ?? "")
+          : candidate.phoneNumber,
+      },
+    };
+  }
+  return null;
+}
+
+function redirectForBlockedResult(
   result: MemberSaveResult,
   formPath: string,
 ): asserts result is Extract<MemberSaveResult, { status: "saved" }> {
-  if (result.status === "confirmation-required") {
-    redirect(buildRedirect(formPath, { duplicate: result.reason }));
-  }
-
   if (result.status === "blocked") {
     redirect(buildRedirect(formPath, { error: "duplicate-member" }));
   }

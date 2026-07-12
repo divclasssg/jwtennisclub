@@ -22,9 +22,19 @@ export type MemberFormInput = {
   duplicateConfirmation: DuplicateConfirmation;
 };
 
+export type MemberActionState =
+  | { status: "idle" }
+  | {
+      status: "confirmation-required";
+      reason: Exclude<DuplicateConfirmation, null>;
+      candidate: MemberFormInput;
+    };
+
+export const initialMemberActionState: MemberActionState = { status: "idle" };
+
 export type MemberDatabaseInput = {
   name: string;
-  phone_number: string | null;
+  phone_number?: string | null;
   group_id: string | null;
   status: MemberStatus;
   joined_date: string;
@@ -114,16 +124,20 @@ export function validateMemberForm(input: MemberFormInput): string[] {
 
 export function toMemberDatabaseInput(
   input: MemberFormInput,
+  options: { includeContact?: boolean } = {},
 ): MemberDatabaseInput {
-  return {
+  const databaseInput: MemberDatabaseInput = {
     name: input.name,
-    phone_number: input.phoneNumber,
     group_id: input.groupId,
     status: input.status,
     joined_date: input.joinedDate,
     withdrawn_date: input.withdrawnDate,
     memo: input.memo,
   };
+  if (options.includeContact !== false) {
+    databaseInput.phone_number = input.phoneNumber;
+  }
+  return databaseInput;
 }
 
 export function toDatabaseDuplicateConfirmation(

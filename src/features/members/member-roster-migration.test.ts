@@ -32,6 +32,16 @@ describe("member roster preparation migration", () => {
     expect(migrationSql.match(/pg_advisory_xact_lock/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
+  it("preserves contacts for non-contact updates and rejects unauthorized contact changes", () => {
+    expect(migrationSql).toContain("contact_update_requested boolean := member_data ? 'phone_number'");
+    expect(migrationSql).toContain(
+      "(member_id is null or contact_update_requested)",
+    );
+    expect(migrationSql).toContain("not public.has_permission('members.contacts.manage')");
+    expect(migrationSql).toContain("if contact_update_requested then");
+    expect(migrationSql).toContain("phone_last_four = case when contact_update_requested");
+  });
+
   it("rejects every ambiguous or inconsistent operator reconnect before deletion", () => {
     const validationPosition = migrationSql.indexOf("operator profile member UUID/name mismatch");
     const deletePosition = migrationSql.indexOf("delete from public.fee_payments");

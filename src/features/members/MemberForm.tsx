@@ -1,3 +1,6 @@
+"use client";
+
+import { useActionState } from "react";
 import {
   ActionLink,
   Button,
@@ -10,11 +13,15 @@ import { FormActions, FormField, FormGrid } from "@/components/molecules";
 import { MEMBER_STATUSES, type MemberStatus } from "./member-model";
 import { formatMemberStatus } from "./member-list";
 import type { MemberEditRecord, MemberGroupOption } from "./member-directory";
-import type { DuplicateConfirmation } from "./member-form";
+import {
+  initialMemberActionState,
+  type DuplicateConfirmation,
+  type MemberActionState,
+} from "./member-form";
 import styles from "./MemberForm.module.scss";
 
 type MemberFormProps = {
-  action: (formData: FormData) => void;
+  action: (state: MemberActionState, formData: FormData) => Promise<MemberActionState>;
   mode: "create" | "edit";
   member?: MemberEditRecord;
   groups: MemberGroupOption[];
@@ -28,17 +35,28 @@ export function MemberForm({
   groups,
   duplicateConfirmation = null,
 }: MemberFormProps) {
-  const duplicateMessage = duplicateConfirmation === "phone-reuse"
+  const [actionState, formAction] = useActionState(action, initialMemberActionState);
+  const activeConfirmation = actionState.status === "confirmation-required"
+    ? actionState.reason
+    : duplicateConfirmation;
+  const candidate = actionState.status === "confirmation-required"
+    ? actionState.candidate
+    : null;
+  const duplicateMessage = activeConfirmation === "phone-reuse"
     ? "같은 연락처가 다른 이름으로 등록되어 있습니다."
-    : duplicateConfirmation === "name-without-phone"
+    : activeConfirmation === "name-without-phone"
       ? "같은 이름이며 연락처가 없습니다."
       : null;
 
   return (
-    <form action={action} className={styles["member-form"]}>
+    <form
+      action={formAction}
+      className={styles["member-form"]}
+      key={activeConfirmation ?? "editing"}
+    >
       {member ? <input name="id" type="hidden" value={member.id} /> : null}
-      {duplicateConfirmation ? (
-        <input name="duplicateConfirmation" type="hidden" value={duplicateConfirmation} />
+      {activeConfirmation ? (
+        <input name="duplicateConfirmation" type="hidden" value={activeConfirmation} />
       ) : null}
 
       <p className={styles["member-code-note"]}>
@@ -48,7 +66,7 @@ export function MemberForm({
       <FormGrid>
         <FormField label="이름">
           <TextInput
-            defaultValue={member?.name}
+            defaultValue={candidate?.name ?? member?.name}
             maxLength={50}
             name="name"
             required
@@ -59,7 +77,7 @@ export function MemberForm({
           <FormField label="연락처">
             <TextInput
               autoComplete="tel"
-              defaultValue={member?.phoneNumber ?? ""}
+              defaultValue={candidate?.phoneNumber ?? member?.phoneNumber ?? ""}
               inputMode="tel"
               maxLength={13}
               name="phoneNumber"
@@ -74,20 +92,20 @@ export function MemberForm({
           </div>
         )}
         <FormField label="그룹">
-          <SelectInput defaultValue={member?.groupId ?? ""} name="groupId">
+          <SelectInput defaultValue={candidate?.groupId ?? member?.groupId ?? ""} name="groupId">
             <option value="">그룹 없음</option>
             {groups.map((group) => <option key={group.id} value={group.id}>{group.code}</option>)}
           </SelectInput>
         </FormField>
         <FormField label="가입일">
           <DateInput
-            defaultValue={member?.joinedDate}
+            defaultValue={candidate?.joinedDate ?? member?.joinedDate}
             name="joinedDate"
             required
           />
         </FormField>
         <FormField label="상태">
-          <SelectInput defaultValue={member?.status ?? "active"} name="status">
+          <SelectInput defaultValue={candidate?.status ?? member?.status ?? "active"} name="status">
             {MEMBER_STATUSES.map((status) => (
               <option key={status} value={status}>
                 {formatMemberStatus(status)}
@@ -97,7 +115,7 @@ export function MemberForm({
         </FormField>
         <FormField label="탈퇴일">
           <DateInput
-            defaultValue={member?.withdrawnDate ?? ""}
+            defaultValue={candidate?.withdrawnDate ?? member?.withdrawnDate ?? ""}
             name="withdrawnDate"
           />
         </FormField>
@@ -109,7 +127,7 @@ export function MemberForm({
 
       <FormField label="메모">
         <TextArea
-          defaultValue={member?.memo ?? ""}
+          defaultValue={candidate?.memo ?? member?.memo ?? ""}
           maxLength={500}
           name="memo"
           rows={4}
@@ -121,7 +139,7 @@ export function MemberForm({
           취소
         </ActionLink>
         <Button type="submit">
-          {duplicateConfirmation ? "확인 후 등록" : mode === "create" ? "회원 등록" : "변경 저장"}
+          {activeConfirmation ? "확인 후 등록" : mode === "create" ? "회원 등록" : "변경 저장"}
         </Button>
       </FormActions>
     </form>

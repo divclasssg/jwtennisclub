@@ -228,6 +228,7 @@ declare
   duplicate_id uuid;
   name_exists boolean;
   assigned_code text;
+  contact_update_requested boolean := member_data ? 'phone_number';
 begin
   if member_id is null and not public.has_permission('members.create') then
     raise exception 'members.create permission required';
@@ -235,7 +236,8 @@ begin
     raise exception 'members.update permission required';
   end if;
 
-  if not public.has_permission('members.contacts.manage') then
+  if (member_id is null or contact_update_requested)
+     and not public.has_permission('members.contacts.manage') then
     raise exception 'members.contacts.manage permission required';
   end if;
 
@@ -248,20 +250,24 @@ begin
     raise exception 'invalid phone number';
   end if;
 
-  perform pg_advisory_xact_lock(
-    hashtextextended('member-contact-phone:' || coalesce(normalized_phone, '<none>'), 0)
-  );
+  if contact_update_requested then
+    perform pg_advisory_xact_lock(
+      hashtextextended('member-contact-phone:' || coalesce(normalized_phone, '<none>'), 0)
+    );
+  end if;
   perform pg_advisory_xact_lock(
     hashtextextended('member-contact-name:' || lower(requested_name), 0)
   );
 
-  select contacts.member_id into duplicate_id
-  from public.member_contacts contacts
-  join public.members duplicate_member on duplicate_member.id = contacts.member_id
-  where contacts.phone_normalized = normalized_phone
-    and contacts.member_id is distinct from member_id
-  order by (lower(btrim(duplicate_member.name)) = lower(requested_name)) desc
-  limit 1;
+  if contact_update_requested then
+    select contacts.member_id into duplicate_id
+    from public.member_contacts contacts
+    join public.members duplicate_member on duplicate_member.id = contacts.member_id
+    where contacts.phone_normalized = normalized_phone
+      and contacts.member_id is distinct from member_id
+    order by (lower(btrim(duplicate_member.name)) = lower(requested_name)) desc
+    limit 1;
+  end if;
 
   if duplicate_id is not null then
     if exists (
@@ -280,7 +286,7 @@ begin
       and lower(btrim(name)) = lower(requested_name)
   ) into name_exists;
 
-  if normalized_phone is null and name_exists
+  if contact_update_requested and normalized_phone is null and name_exists
      and duplicate_confirmation is distinct from 'CONFIRM_NAME_ONLY' then
     return jsonb_build_object('status', 'NAME_ONLY_CONFIRMATION_REQUIRED');
   end if;
@@ -301,7 +307,7 @@ begin
   else
     update public.members set
       name = requested_name,
-      phone_last_four = right(normalized_phone, 4),
+      phone_last_four = case when contact_update_requested then right(normalized_phone, 4) else phone_last_four end,
       status = coalesce((member_data->>'status')::public.member_status, status),
       joined_date = coalesce((member_data->>'joined_date')::date, joined_date),
       withdrawn_date = (member_data->>'withdrawn_date')::date,
@@ -316,18 +322,20 @@ begin
     end if;
   end if;
 
-  if requested_phone is not null then
-    insert into public.member_contacts (
-      member_id, phone_number, phone_normalized, updated_by, updated_at
-    ) values (
-      saved_member_id, requested_phone, normalized_phone, auth.uid(), now()
-    ) on conflict (member_id) do update set
-      phone_number = excluded.phone_number,
-      phone_normalized = excluded.phone_normalized,
-      updated_by = excluded.updated_by,
-      updated_at = excluded.updated_at;
-  else
-    delete from public.member_contacts where member_contacts.member_id = saved_member_id;
+  if contact_update_requested then
+    if requested_phone is not null then
+      insert into public.member_contacts (
+        member_id, phone_number, phone_normalized, updated_by, updated_at
+      ) values (
+        saved_member_id, requested_phone, normalized_phone, auth.uid(), now()
+      ) on conflict (member_id) do update set
+        phone_number = excluded.phone_number,
+        phone_normalized = excluded.phone_normalized,
+        updated_by = excluded.updated_by,
+        updated_at = excluded.updated_at;
+    else
+      delete from public.member_contacts where member_contacts.member_id = saved_member_id;
+    end if;
   end if;
 
   return jsonb_build_object(
