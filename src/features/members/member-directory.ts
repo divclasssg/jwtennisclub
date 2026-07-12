@@ -31,13 +31,16 @@ export type MemberEditRecord = MemberListRow & {
 type MemberDatabaseRow = {
   id: string;
   member_code: string;
-  group_id: string | null;
   member_groups: { code: string } | { code: string }[] | null;
   name: string;
   status: MemberStatus;
   joined_date: string;
   withdrawn_date: string | null;
   memo: string | null;
+};
+
+type MemberEditDatabaseRow = MemberDatabaseRow & {
+  group_id: string | null;
 };
 
 type ContactDisplayRow = {
@@ -51,7 +54,7 @@ function relatedGroupCode(value: MemberDatabaseRow["member_groups"]) {
   return group?.code ?? null;
 }
 
-function mapMemberRecord(row: MemberDatabaseRow): MemberRecord {
+function mapMemberRecord(row: MemberEditDatabaseRow): MemberRecord {
   return {
     id: row.id,
     memberCode: row.member_code,
@@ -66,6 +69,23 @@ function mapMemberRecord(row: MemberDatabaseRow): MemberRecord {
     updatedBy: null,
     createdAt: "",
     updatedAt: "",
+  };
+}
+
+function mapMemberListRow(
+  row: MemberDatabaseRow,
+  phoneDisplay: string | null,
+): MemberListRow {
+  return {
+    id: row.id,
+    memberCode: row.member_code,
+    name: row.name,
+    phoneDisplay: phoneDisplay ?? maskPhoneNumber(null),
+    groupCode: relatedGroupCode(row.member_groups),
+    status: row.status,
+    joinedDate: row.joined_date,
+    withdrawnDate: row.withdrawn_date,
+    memo: row.memo,
   };
 }
 
@@ -134,10 +154,16 @@ async function canManageMemberContacts(supabase: Awaited<ReturnType<typeof creat
 async function loadContactDisplays(
   supabase: Awaited<ReturnType<typeof createClient>>,
   canManageContacts: boolean,
+  memberIds: string[],
 ) {
   const result = canManageContacts
-    ? await supabase.from("member_contacts").select("member_id, phone_number")
-    : await supabase.rpc("get_masked_member_contacts");
+    ? await supabase
+        .from("member_contacts")
+        .select("member_id, phone_number")
+        .in("member_id", memberIds)
+    : await supabase.rpc("get_masked_member_contacts", {
+        member_ids: memberIds,
+      });
 
   if (result.error) {
     throw new Error("회원 연락처를 불러오지 못했습니다.");
@@ -164,7 +190,7 @@ export async function loadMemberDirectory(input: {
   let request = supabase
     .from("members")
     .select(
-      `id, member_code, group_id, ${groupRelation}, name, status, joined_date, withdrawn_date, memo`,
+      `id, member_code, ${groupRelation}, name, status, joined_date, withdrawn_date, memo`,
     )
     .order("name", { ascending: true });
 
@@ -181,19 +207,26 @@ export async function loadMemberDirectory(input: {
     request = request.or(buildMemberSearchFilter(query));
   }
 
-  const [{ data, error }, contactDisplays] = await Promise.all([
-    request,
-    loadContactDisplays(supabase, canManageContacts),
-  ]);
+  const { data, error } = await request;
 
   if (error) {
     throw new Error("회원 목록을 불러오지 못했습니다.");
   }
 
-  return ((data ?? []) as unknown as MemberDatabaseRow[]).map((row) => {
-    const member = mapMemberRecord(row);
-    return toMemberListRow(member, contactDisplays.get(member.id) ?? null);
-  });
+  const rows = (data ?? []) as unknown as MemberDatabaseRow[];
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const contactDisplays = await loadContactDisplays(
+    supabase,
+    canManageContacts,
+    rows.map((row) => row.id),
+  );
+
+  return rows.map((row) =>
+    mapMemberListRow(row, contactDisplays.get(row.id) ?? null),
+  );
 }
 
 export async function loadMemberForEdit(
@@ -234,11 +267,11 @@ export async function loadMemberForEdit(
     phoneNumber = contact?.phone_number ?? null;
     phoneDisplay = formatPhoneNumber(phoneNumber);
   } else {
-    const displays = await loadContactDisplays(supabase, false);
+    const displays = await loadContactDisplays(supabase, false, [id]);
     phoneDisplay = displays.get(id) ?? null;
   }
 
-  const member = mapMemberRecord(data as unknown as MemberDatabaseRow);
+  const member = mapMemberRecord(data as unknown as MemberEditDatabaseRow);
   return {
     ...toMemberListRow(member, phoneDisplay),
     phoneNumber,

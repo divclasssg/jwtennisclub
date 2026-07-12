@@ -42,4 +42,14 @@ describe("member roster preparation migration", () => {
     expect(validationPosition).toBeLessThan(deletePosition);
     expect(migrationSql).toContain("matched_member_id");
   });
+
+  it("returns masked contacts only for requested member IDs after checking view permission", () => {
+    expect(migrationSql).toContain(
+      "get_masked_member_contacts(member_ids uuid[])",
+    );
+    expect(migrationSql).toContain("public.has_permission('members.view')");
+    expect(migrationSql).toContain(
+      "member_contacts.member_id = any(member_ids)",
+    );
+  });
 });

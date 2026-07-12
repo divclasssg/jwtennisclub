@@ -86,7 +86,7 @@ $$;
 
 revoke execute on function public.mask_phone_number(text) from public, anon;
 
-create or replace function public.get_masked_member_contacts()
+create or replace function public.get_masked_member_contacts(member_ids uuid[])
 returns table(member_id uuid, phone_masked text)
 language sql
 security definer
@@ -96,11 +96,12 @@ as $$
   select member_contacts.member_id,
          public.mask_phone_number(member_contacts.phone_number)
   from public.member_contacts
-  where public.has_permission('members.view');
+  where public.has_permission('members.view')
+    and member_contacts.member_id = any(member_ids);
 $$;
 
-revoke execute on function public.get_masked_member_contacts() from public, anon;
-grant execute on function public.get_masked_member_contacts() to authenticated;
+revoke execute on function public.get_masked_member_contacts(uuid[]) from public, anon;
+grant execute on function public.get_masked_member_contacts(uuid[]) to authenticated;
 
 create or replace function public.search_members_by_phone(phone_query text)
 returns table(member_id uuid)
