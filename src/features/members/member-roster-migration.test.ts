@@ -42,6 +42,12 @@ describe("member roster preparation migration", () => {
     expect(migrationSql).toContain("phone_last_four = case when contact_update_requested");
   });
 
+  it("distinguishes an omitted group from an explicit group removal", () => {
+    expect(migrationSql).toContain("when member_data ? 'group_id'");
+    expect(migrationSql).toContain("then (member_data->>'group_id')::uuid");
+    expect(migrationSql).toContain("else group_id");
+  });
+
   it("rejects every ambiguous or inconsistent operator reconnect before deletion", () => {
     const validationPosition = migrationSql.indexOf("operator profile member UUID/name mismatch");
     const deletePosition = migrationSql.indexOf("delete from public.fee_payments");

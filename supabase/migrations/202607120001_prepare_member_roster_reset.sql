@@ -313,7 +313,10 @@ begin
       withdrawn_date = (member_data->>'withdrawn_date')::date,
       withdrawal_reason = nullif(btrim(member_data->>'withdrawal_reason'), ''),
       memo = nullif(btrim(member_data->>'memo'), ''),
-      group_id = coalesce((member_data->>'group_id')::uuid, group_id),
+      group_id = case
+        when member_data ? 'group_id' then (member_data->>'group_id')::uuid
+        else group_id
+      end,
       updated_by = auth.uid(), updated_at = now()
     where id = saved_member_id;
 
