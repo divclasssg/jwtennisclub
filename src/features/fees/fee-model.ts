@@ -4,7 +4,7 @@ export type FeePaymentRecord = {
   id: string;
   memberId: string;
   memberName: string;
-  memberPhoneLastFour: string | null;
+  memberCode: string;
   periodMonth: string;
   amount: number;
   paidDate: string;

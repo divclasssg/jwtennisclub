@@ -17,7 +17,7 @@ const payments = [
     updated_at: "2026-07-03T00:00:00Z",
     members: {
       name: "김민수",
-      phone_last_four: "1234",
+      member_code: "M0001",
     },
   },
 ];
@@ -25,8 +25,8 @@ const payments = [
 const members = [
   {
     id: "member-1",
+    member_code: "M0001",
     name: "김민수",
-    phone_last_four: "1234",
     operator_profile_id: "profile-treasurer",
     status: "active",
     joined_date: "2026-07-01",
@@ -36,8 +36,8 @@ const members = [
   },
   {
     id: "member-2",
+    member_code: "M0002",
     name: "이영희",
-    phone_last_four: "9876",
     operator_profile_id: "profile-president",
     status: "active",
     joined_date: "2026-07-01",
@@ -179,7 +179,8 @@ describe("FeesPage", () => {
     const table = within(list).getByRole("table");
 
     expect(within(list).getByText("2026.07 · 총 1명")).toBeInTheDocument();
-    expect(within(table).getByRole("cell", { name: "1234" })).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "M0001" })).toBeInTheDocument();
+    expect(within(table).queryByText("1234")).not.toBeInTheDocument();
     const memberKindCell = within(table).getByRole("cell", { name: "운영진" });
     const paymentStatusCell = within(table).getByRole("cell", { name: "납부완료" });
 
@@ -217,7 +218,7 @@ describe("FeesPage", () => {
 
     expect(items).toHaveLength(2);
     expect(within(items[0]).getByRole("heading", { name: "이영희" })).toBeInTheDocument();
-    expect(within(items[0]).getByText("연락처 9876")).toBeInTheDocument();
+    expect(within(items[0]).getByText("회원번호 M0002")).toBeInTheDocument();
     expect(within(items[0]).getByText("미납")).toBeInTheDocument();
     expect(within(items[0]).getByText("기준 금액 30,000원")).toBeInTheDocument();
     expect(within(items[0]).getByRole("button", { name: "납부 처리" })).toBeInTheDocument();

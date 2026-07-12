@@ -9,8 +9,8 @@ const membersQuery = {
     data: [
       {
         id: "member-1",
+        member_code: "M0001",
         name: "김민수",
-        phone_last_four: "1234",
         status: "active",
         joined_date: "2026-07-01",
         withdrawn_date: null,

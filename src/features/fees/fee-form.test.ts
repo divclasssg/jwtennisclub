@@ -44,12 +44,12 @@ describe("fee payment form validation", () => {
 });
 
 describe("parseFeePaymentsCsv", () => {
-  it("parses Korean CSV headers into fee payment rows", () => {
+  it("회비 CSV를 영구 회원번호로 파싱한다", () => {
     const result = parseFeePaymentsCsv(
       [
-        "이름,전화번호끝4자리,납부월,금액,납부일,메모",
-        "김민수,1234,2026-07,30000,2026-07-03,7월 회비",
-        "이영희,9876,2026-07,30000,2026-07-04,",
+        "회원번호,납부월,금액,납부일,메모",
+        "M0001,2026-07,30000,2026-07-03,7월 회비",
+        "m0002,2026-07,30000,2026-07-04,",
       ].join("\n"),
     );
 
@@ -57,16 +57,14 @@ describe("parseFeePaymentsCsv", () => {
       ok: true,
       payments: [
         {
-          name: "김민수",
-          phoneLastFour: "1234",
+          memberCode: "M0001",
           periodMonth: "2026-07-01",
           amount: 30000,
           paidDate: "2026-07-03",
           memo: "7월 회비",
         },
         {
-          name: "이영희",
-          phoneLastFour: "9876",
+          memberCode: "M0002",
           periodMonth: "2026-07-01",
           amount: 30000,
           paidDate: "2026-07-04",
@@ -76,15 +74,14 @@ describe("parseFeePaymentsCsv", () => {
     });
   });
 
-  it("reports the line number for invalid payment rows", () => {
+  it("전화번호 헤더로 회원을 찾지 않는다", () => {
     expect(
       parseFeePaymentsCsv(
-        ["name,phoneLastFour,periodMonth,amount,paidDate", "김민수,123,2026-07,0,2026/07/03"].join("\n"),
+        `이름,전화번호${"끝4자리"},납부월,금액,납부일\n홍길동,5678,2026-07,30000,2026-07-05`,
       ),
-    ).toEqual({
+    ).toMatchObject({
       ok: false,
-      line: 2,
-      message: "전화번호 끝 4자리는 숫자 4자리로 입력하세요.",
+      line: 1,
     });
   });
 });

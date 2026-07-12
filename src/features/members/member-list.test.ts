@@ -56,6 +56,7 @@ describe("member list formatting", () => {
     expect(
       mapMemberRow({
         id: "member-id",
+        member_code: "M0001",
         name: "김민수",
         phone_last_four: "1234",
         operator_profile_id: "profile-id",
@@ -67,6 +68,7 @@ describe("member list formatting", () => {
       }),
     ).toEqual({
       id: "member-id",
+      memberCode: "M0001",
       name: "김민수",
       phoneLastFour: "1234",
       operatorProfileId: "profile-id",
@@ -100,6 +102,7 @@ describe("member list formatting", () => {
     const sorted = sortMemberListRows([
       {
         id: "general",
+        memberCode: "M0003",
         name: "일반회원",
         phoneLastFour: null,
         operatorProfileId: null,
@@ -113,6 +116,7 @@ describe("member list formatting", () => {
       },
       {
         id: "treasurer",
+        memberCode: "M0002",
         name: "총무",
         phoneLastFour: null,
         operatorProfileId: "profile-treasurer",
@@ -126,6 +130,7 @@ describe("member list formatting", () => {
       },
       {
         id: "president",
+        memberCode: "M0001",
         name: "회장",
         phoneLastFour: null,
         operatorProfileId: "profile-president",

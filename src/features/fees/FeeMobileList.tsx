@@ -73,7 +73,7 @@ export function FeeMobileList({
 
             <div className={styles["fee-mobile-detail-list"]}>
               <p className={styles["fee-mobile-detail"]}>
-                연락처 {row.memberPhoneLastFour ?? "-"}
+                회원번호 {row.memberCode}
               </p>
               <p className={styles["fee-mobile-detail"]}>
                 기준 금액 {formatCurrency(amount)}원

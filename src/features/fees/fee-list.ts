@@ -42,11 +42,11 @@ type FeePaymentDatabaseRow = {
   members:
     | {
         name: string;
-        phone_last_four: string | null;
+        member_code: string;
       }
     | {
         name: string;
-        phone_last_four: string | null;
+        member_code: string;
       }[]
     | null;
 };
@@ -62,9 +62,23 @@ export type FeeListSummary = {
 export type FeeBoardMemberRow = {
   memberId: string;
   memberName: string;
-  memberPhoneLastFour: string | null;
+  memberCode: string;
   operatorProfileId: string | null;
   payment: FeePaymentRecord | null;
+};
+
+type FeeBoardSourceMember = {
+  id: string;
+  memberCode: string;
+  name: string;
+  operatorProfileId: string | null;
+  operatorPositionName?: string | null;
+  operatorPositionSortOrder?: number | null;
+  status?: string;
+  joinedDate?: string;
+  withdrawnDate?: string | null;
+  withdrawalReason?: string | null;
+  memo?: string | null;
 };
 
 export function normalizeFeeListFilters(
@@ -100,7 +114,7 @@ export function mapFeePaymentRow(
     id: row.id,
     memberId: row.member_id,
     memberName: member?.name ?? "알 수 없는 회원",
-    memberPhoneLastFour: member?.phone_last_four ?? null,
+    memberCode: member?.member_code ?? "",
     periodMonth: row.period_month,
     amount: row.amount,
     paidDate: row.paid_date,
@@ -134,11 +148,7 @@ export function buildFeeListSummary(input: {
 }
 
 export function buildFeeBoardRows(input: {
-  members: {
-    id: string;
-    name: string;
-    phoneLastFour: string | null;
-  }[] | MemberListRow[];
+  members: FeeBoardSourceMember[];
   payments: FeePaymentRecord[];
   query?: string;
   status?: FeePaymentStatusFilter;
@@ -153,7 +163,7 @@ export function buildFeeBoardRows(input: {
     .map((member) => ({
       memberId: member.id,
       memberName: member.name,
-      memberPhoneLastFour: member.phoneLastFour,
+      memberCode: member.memberCode,
       operatorProfileId: member.operatorProfileId,
       payment: paymentsByMemberId.get(member.id) ?? null,
     }))
@@ -164,7 +174,7 @@ export function buildFeeBoardRows(input: {
 
       return (
         row.memberName.toLowerCase().includes(query) ||
-        (row.memberPhoneLastFour?.includes(query) ?? false)
+        row.memberCode.toLowerCase().includes(query)
       );
     })
     .filter((row) => {

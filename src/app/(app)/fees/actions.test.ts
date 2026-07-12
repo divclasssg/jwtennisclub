@@ -14,8 +14,7 @@ const mocks = vi.hoisted(() => {
       data: [
         {
           id: "member-1",
-          name: "김민수",
-          phone_last_four: "1234",
+          member_code: "M0001",
         },
       ],
       error: null,
@@ -104,8 +103,8 @@ describe("fee payment actions", () => {
       new File(
         [
           [
-            "name,phoneLastFour,periodMonth,amount,paidDate,memo",
-            "김민수,1234,2026-07,30000,2026-07-03,7월 회비",
+            "memberCode,periodMonth,amount,paidDate,memo",
+            "m0001,2026-07,30000,2026-07-03,7월 회비",
           ].join("\n"),
         ],
         "fees.csv",
@@ -118,6 +117,7 @@ describe("fee payment actions", () => {
     );
 
     expect(mocks.supabase.from).toHaveBeenCalledWith("members");
+    expect(mocks.membersQuery.select).toHaveBeenCalledWith("id, member_code");
     expect(mocks.membersQuery.eq).toHaveBeenCalledWith("status", "active");
     expect(mocks.feePaymentsTable.insert).toHaveBeenCalledWith([
       {

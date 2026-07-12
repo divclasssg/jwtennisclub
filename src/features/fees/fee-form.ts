@@ -21,8 +21,7 @@ export type FeePaymentDatabaseInput = {
 };
 
 export type FeePaymentCsvInput = Omit<FeePaymentFormInput, "memberId"> & {
-  name: string;
-  phoneLastFour: string;
+  memberCode: string;
 };
 
 export type FeePaymentCsvParseResult =
@@ -37,8 +36,7 @@ export type FeePaymentCsvParseResult =
     };
 
 const csvHeaderAliases: Readonly<Record<keyof FeePaymentCsvInput, string[]>> = {
-  name: ["name", "이름"],
-  phoneLastFour: ["phone_last_four", "phoneLastFour", "전화번호끝4자리"],
+  memberCode: ["member_code", "memberCode", "회원번호"],
   periodMonth: ["period_month", "periodMonth", "납부월"],
   amount: ["amount", "금액"],
   paidDate: ["paid_date", "paidDate", "납부일"],
@@ -88,6 +86,16 @@ export function parseFeePaymentsCsv(source: string): FeePaymentCsvParseResult {
   }
 
   const headers = rows[0].map((header) => header.trim());
+  const requiredFields: (keyof FeePaymentCsvInput)[] = [
+    "memberCode",
+    "periodMonth",
+    "amount",
+    "paidDate",
+  ];
+
+  if (requiredFields.some((field) => !hasCsvHeader(headers, field))) {
+    return { ok: false, line: 1, message: "CSV 필수 헤더를 확인하세요." };
+  }
   const payments: FeePaymentCsvInput[] = [];
 
   for (let index = 1; index < rows.length; index += 1) {
@@ -98,8 +106,7 @@ export function parseFeePaymentsCsv(source: string): FeePaymentCsvParseResult {
     }
 
     const payment = normalizeFeePaymentCsvInput({
-      name: readCsvValue(headers, row, "name"),
-      phoneLastFour: readCsvValue(headers, row, "phoneLastFour"),
+      memberCode: readCsvValue(headers, row, "memberCode"),
       periodMonth: readCsvValue(headers, row, "periodMonth"),
       amount: readCsvValue(headers, row, "amount"),
       paidDate: readCsvValue(headers, row, "paidDate"),
@@ -164,8 +171,7 @@ export function toFeePaymentDatabaseInput(
 }
 
 function normalizeFeePaymentCsvInput(input: {
-  name?: string | null;
-  phoneLastFour?: string | null;
+  memberCode?: string | null;
   periodMonth?: string | null;
   amount?: string | number | null;
   paidDate?: string | null;
@@ -180,8 +186,7 @@ function normalizeFeePaymentCsvInput(input: {
   });
 
   return {
-    name: normalizeRequiredText(input.name),
-    phoneLastFour: normalizeRequiredText(input.phoneLastFour),
+    memberCode: normalizeRequiredText(input.memberCode).toUpperCase(),
     periodMonth: payment.periodMonth,
     amount: payment.amount,
     paidDate: payment.paidDate,
@@ -192,12 +197,8 @@ function normalizeFeePaymentCsvInput(input: {
 function validateFeePaymentCsvInput(input: FeePaymentCsvInput) {
   const errors: string[] = [];
 
-  if (!input.name) {
-    errors.push("이름을 입력하세요.");
-  }
-
-  if (!/^[0-9]{4}$/.test(input.phoneLastFour)) {
-    errors.push("전화번호 끝 4자리는 숫자 4자리로 입력하세요.");
+  if (!input.memberCode) {
+    errors.push("회원번호를 입력하세요.");
   }
 
   errors.push(
@@ -274,6 +275,10 @@ function readCsvValue(
   }
 
   return row[index] ?? null;
+}
+
+function hasCsvHeader(headers: string[], field: keyof FeePaymentCsvInput) {
+  return headers.some((header) => csvHeaderAliases[field].includes(header));
 }
 
 function readFormString(formData: FormData, name: string) {

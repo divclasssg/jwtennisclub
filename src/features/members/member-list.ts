@@ -13,6 +13,7 @@ const MEMBER_STATUS_TAB_LABELS: Readonly<Record<MemberStatus, string>> =
 
 export type MemberListRow = {
   id: string;
+  memberCode: string;
   name: string;
   phoneLastFour: string | null;
   operatorProfileId: string | null;
@@ -48,8 +49,9 @@ export function buildMemberSearchFilter(query: string) {
 
 type MemberDatabaseRow = {
   id: string;
+  member_code: string;
   name: string;
-  phone_last_four: string | null;
+  phone_last_four?: string | null;
   operator_profile_id?: string | null;
   status: MemberStatus;
   joined_date: string;
@@ -84,8 +86,9 @@ export function isMemberStatus(value: unknown): value is MemberStatus {
 export function mapMemberRow(row: MemberDatabaseRow): MemberListRow {
   return {
     id: row.id,
+    memberCode: row.member_code,
     name: row.name,
-    phoneLastFour: row.phone_last_four,
+    phoneLastFour: row.phone_last_four ?? null,
     operatorProfileId: row.operator_profile_id ?? null,
     operatorPositionName: null,
     operatorPositionSortOrder: null,

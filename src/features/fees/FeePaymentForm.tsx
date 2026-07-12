@@ -6,7 +6,7 @@ import styles from "./FeePaymentForm.module.scss";
 type FeePaymentMemberOption = {
   id: string;
   name: string;
-  phoneLastFour: string | null;
+  memberCode: string;
 };
 
 type FeePaymentFormProps = {
@@ -31,7 +31,7 @@ export function FeePaymentForm({
             {members.map((member) => (
               <option key={member.id} value={member.id}>
                 {member.name}
-                {member.phoneLastFour ? ` (${member.phoneLastFour})` : ""}
+                {` (${member.memberCode})`}
               </option>
             ))}
           </select>

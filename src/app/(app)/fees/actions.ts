@@ -20,8 +20,7 @@ const maximumCsvRows = 200;
 
 type FeeImportMemberRow = {
   id: string;
-  name: string;
-  phone_last_four: string | null;
+  member_code: string;
 };
 
 function buildRedirect(path: string, params: Record<string, string | number>) {
@@ -146,7 +145,7 @@ export async function importFeePaymentsCsv(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedUserId();
   const { data: members, error: membersError } = await supabase
     .from("members")
-    .select("id, name, phone_last_four")
+    .select("id, member_code")
     .eq("status", "active");
 
   if (membersError) {
@@ -155,7 +154,7 @@ export async function importFeePaymentsCsv(formData: FormData) {
 
   const memberMap = buildMemberImportMap(members ?? []);
   const payments = parsed.payments.map((payment, index) => {
-    const memberId = memberMap.get(buildMemberImportKey(payment));
+    const memberId = memberMap.get(payment.memberCode);
 
     if (!memberId) {
       redirect(
@@ -195,16 +194,6 @@ export async function importFeePaymentsCsv(formData: FormData) {
 
 function buildMemberImportMap(members: FeeImportMemberRow[]) {
   return new Map(
-    members.map((member) => [
-      buildMemberImportKey({
-        name: member.name,
-        phoneLastFour: member.phone_last_four ?? "",
-      }),
-      member.id,
-    ]),
+    members.map((member) => [member.member_code.trim().toUpperCase(), member.id]),
   );
-}
-
-function buildMemberImportKey(input: { name: string; phoneLastFour: string }) {
-  return `${input.name.trim()}|${input.phoneLastFour.trim()}`;
 }

@@ -78,7 +78,7 @@ async function getFeePayments(periodMonth: string) {
   const { data, error } = await supabase
     .from("fee_payments")
     .select(
-      "id, member_id, period_month, amount, paid_date, memo, created_by, updated_by, created_at, updated_at, members(name, phone_last_four)",
+      "id, member_id, period_month, amount, paid_date, memo, created_by, updated_by, created_at, updated_at, members(name, member_code)",
     )
     .eq("period_month", periodMonth)
     .order("paid_date", { ascending: false });
@@ -95,7 +95,7 @@ async function getFeeTargetMembers(periodMonth: string, query: string) {
   let request = supabase
     .from("members")
     .select(
-      "id, name, phone_last_four, operator_profile_id, status, joined_date, withdrawn_date, withdrawal_reason, memo",
+      "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, withdrawal_reason, memo",
     )
     .eq("status", "active")
     .lte("joined_date", getPeriodMonthEnd(periodMonth))
@@ -103,7 +103,7 @@ async function getFeeTargetMembers(periodMonth: string, query: string) {
 
   if (query) {
     const pattern = buildSearchPattern(query);
-    request = request.or(`name.ilike.${pattern},phone_last_four.ilike.${pattern}`);
+    request = request.or(`name.ilike.${pattern},member_code.ilike.${pattern}`);
   }
 
   const { data, error } = await request;
@@ -205,7 +205,7 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
             <TextInput
               defaultValue={filters.query}
               name="q"
-              placeholder="이름 또는 뒤 4자리"
+              placeholder="이름 또는 회원번호"
               shape="pill"
               type="search"
             />
@@ -253,7 +253,7 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                   <thead>
                     <tr>
                       <th scope="col">회원</th>
-                      <th scope="col">연락처</th>
+                      <th scope="col">회원번호</th>
                       <th scope="col">구분</th>
                       <th scope="col">상태</th>
                       <th scope="col">기준 금액</th>
@@ -266,7 +266,7 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                     {boardRows.map((row) => (
                       <tr key={row.memberId}>
                         <th scope="row">{row.memberName}</th>
-                        <td>{row.memberPhoneLastFour ?? "-"}</td>
+                        <td>{row.memberCode}</td>
                         <td>{formatMemberKind(row)}</td>
                         <td>{formatPaymentStatus(row)}</td>
                         <td>

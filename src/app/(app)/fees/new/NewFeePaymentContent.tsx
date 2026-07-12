@@ -30,7 +30,7 @@ function getImportErrorMessage(error: string | undefined, line: string | undefin
   }
 
   if (error === "member-not-found") {
-    return `${prefix}활동 회원 목록에서 이름과 전화번호 끝 4자리가 일치하는 회원을 찾지 못했습니다.`;
+    return `${prefix}활동 회원 목록에서 회원번호가 일치하는 회원을 찾지 못했습니다.`;
   }
 
   if (error === "save-failed") {
@@ -56,7 +56,7 @@ export function NewFeePaymentContent({
     <FormPanel
       description={
         <>
-          name, phoneLastFour, periodMonth, amount, paidDate, memo 순서로 여러
+          memberCode, periodMonth, amount, paidDate, memo 순서로 여러
           납부 기록을 한 번에 등록합니다.
         </>
       }

@@ -57,14 +57,14 @@ describe("fee payment list helpers", () => {
         updated_at: "2026-07-03T00:00:00Z",
         members: {
           name: "김민수",
-          phone_last_four: "1234",
+          member_code: "M0001",
         },
       }),
     ).toEqual({
       id: "payment-id",
       memberId: "member-id",
       memberName: "김민수",
-      memberPhoneLastFour: "1234",
+      memberCode: "M0001",
       periodMonth: "2026-07-01",
       amount: 50000,
       paidDate: "2026-07-03",
@@ -97,8 +97,8 @@ describe("fee payment list helpers", () => {
       members: [
         {
           id: "general",
+          memberCode: "M0003",
           name: "일반회원",
-          phoneLastFour: null,
           operatorProfileId: null,
           operatorPositionName: null,
           operatorPositionSortOrder: null,
@@ -110,8 +110,8 @@ describe("fee payment list helpers", () => {
         },
         {
           id: "treasurer",
+          memberCode: "M0002",
           name: "총무",
-          phoneLastFour: null,
           operatorProfileId: "profile-treasurer",
           operatorPositionName: "treasurer",
           operatorPositionSortOrder: 30,
@@ -123,8 +123,8 @@ describe("fee payment list helpers", () => {
         },
         {
           id: "president",
+          memberCode: "M0001",
           name: "회장",
-          phoneLastFour: null,
           operatorProfileId: "profile-president",
           operatorPositionName: "president",
           operatorPositionSortOrder: 10,
