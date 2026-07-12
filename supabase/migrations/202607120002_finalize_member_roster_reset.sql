@@ -1,3 +1,13 @@
+-- Global transaction lock order shared with profile-trigger and roster-reset writes.
+-- SHARE locks block authorization-changing writes until this migration commits.
+lock table public.profiles in share mode;
+lock table public.member_code_allocator in share mode;
+lock table public.members in share mode;
+lock table public.fee_payments in share mode;
+lock table public.expenses in share mode;
+lock table public.events in share mode;
+lock table public.audit_logs in share mode;
+
 do $$
 begin
   if not exists (select 1 from public.member_roster_reset_state where singleton)

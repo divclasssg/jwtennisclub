@@ -253,6 +253,27 @@ describe("member roster preparation migration", () => {
 });
 
 describe("member roster finalization migration", () => {
+  it("locks every authorization table in the global order before checking the marker", () => {
+    const firstGuardPosition = finalizeMigrationSql.indexOf("do $$");
+    const orderedLocks = [
+      "lock table public.profiles in share mode",
+      "lock table public.member_code_allocator in share mode",
+      "lock table public.members in share mode",
+      "lock table public.fee_payments in share mode",
+      "lock table public.expenses in share mode",
+      "lock table public.events in share mode",
+      "lock table public.audit_logs in share mode",
+    ];
+
+    let previousPosition = -1;
+    for (const lock of orderedLocks) {
+      const lockPosition = finalizeMigrationSql.indexOf(lock);
+      expect(lockPosition, lock).toBeGreaterThan(previousPosition);
+      expect(lockPosition, lock).toBeLessThan(firstGuardPosition);
+      previousPosition = lockPosition;
+    }
+  });
+
   it("bootstraps only a genuinely pristine database and blocks an emptied production database", () => {
     const guardPosition = finalizeMigrationSql.indexOf(
       "member roster reset has not been completed",
