@@ -42,6 +42,10 @@ describe("member roster preparation migration", () => {
     expect(migrationSql).not.toContain("next_member_code(requested_group_id uuid)");
     expect(migrationSql).toContain("left(row.member_code, 1)");
     expect(migrationSql).toContain("max(right(row.member_code, 4)::integer) + 1");
+    expect(migrationSql).toContain("prefix ~ '^[^0-9[:space:]]$'");
+    expect(migrationSql).toContain(
+      "member_code ~ '^[^0-9[:space:]][0-9]{4}$'",
+    );
   });
 
   it("preserves an explicitly unassigned group in reset and normal saves", () => {
@@ -299,6 +303,9 @@ describe("member roster finalization migration", () => {
     expect(finalizeMigrationSql).toContain("members_member_code_unique");
     expect(finalizeMigrationSql).toContain("members_prevent_member_code_change");
     expect(finalizeMigrationSql).toContain("public.prevent_member_code_change()");
+    expect(finalizeMigrationSql).toContain(
+      "member_code !~ '^[^0-9[:space:]][0-9]{4}$'",
+    );
   });
 
   it("requires the reset marker count to equal the exact current roster count", () => {

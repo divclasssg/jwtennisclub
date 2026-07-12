@@ -61,7 +61,7 @@ begin
 
   if exists (
     select 1 from public.members
-    where member_code !~ '^[A-Z][0-9]{4}$'
+    where member_code !~ '^[^0-9[:space:]][0-9]{4}$'
   ) then
     raise exception 'members.member_code contains invalid values';
   end if;
@@ -73,7 +73,7 @@ begin
       and conname = 'members_member_code_format'
       and contype = 'c'
       and convalidated
-      and pg_get_constraintdef(oid) like '%^[A-Z][0-9]{4}$%'
+      and pg_get_constraintdef(oid) like '%^[^0-9[:space:]][0-9]{4}$%'
   ) then
     raise exception 'members_member_code_format must be present and validated';
   end if;

@@ -126,7 +126,7 @@ export function parseRosterCsv(source) {
     if (record.length !== headers.length) fail("열 개수가 헤더와 다릅니다.", rowNumber);
     const values = Object.fromEntries(headers.map((header, column) => [header, record[column]?.trim() ?? ""]));
     const memberCode = values.ID;
-    const codeMatch = memberCode.match(/^([A-Z])[0-9]{4}$/);
+    const codeMatch = memberCode.match(/^([^0-9\s])[0-9]{4}$/u);
     if (!codeMatch) fail("ID 형식이 올바르지 않습니다.", rowNumber);
     if (memberCodePrefix && memberCodePrefix !== codeMatch[1]) fail("ID 접두사가 일관되지 않습니다.", rowNumber);
     memberCodePrefix ??= codeMatch[1];

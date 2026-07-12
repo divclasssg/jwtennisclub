@@ -37,7 +37,7 @@ where members.id = numbered_members.id;
 
 create table public.member_code_allocator (
   singleton boolean primary key default true check (singleton),
-  prefix text not null check (prefix ~ '^[A-Z]$'),
+  prefix text not null check (prefix ~ '^[^0-9[:space:]]$'),
   next_suffix integer not null check (next_suffix between 1 and 10000)
 );
 
@@ -50,7 +50,7 @@ set prefix = excluded.prefix, next_suffix = excluded.next_suffix;
 alter table public.members
   alter column member_code set not null,
   add constraint members_member_code_format
-    check (member_code ~ '^[A-Z][0-9]{4}$');
+    check (member_code ~ '^[^0-9[:space:]][0-9]{4}$');
 
 create unique index members_member_code_unique
 on public.members(member_code) where member_code is not null;
@@ -189,7 +189,7 @@ as $$
 begin
   if auth.role() = 'service_role'
      and current_setting('app.member_roster_reset_import', true) = 'on' then
-    if new.member_code is null or new.member_code !~ '^[A-Z][0-9]{4}$' then
+    if new.member_code is null or new.member_code !~ '^[^0-9[:space:]][0-9]{4}$' then
       raise exception 'invalid imported member code';
     end if;
   else
@@ -455,7 +455,7 @@ begin
 
   if exists (
     select 1 from roster_import_rows row
-    where row.member_code !~ '^[A-Z][0-9]{4}$'
+    where row.member_code !~ '^[^0-9[:space:]][0-9]{4}$'
   ) then
     raise exception 'invalid imported member code';
   end if;

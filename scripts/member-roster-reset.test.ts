@@ -30,6 +30,12 @@ describe("parseRosterCsv", () => {
     ]);
   });
 
+  it("숫자와 공백이 아닌 문장부호 접두사를 영구 회원번호로 허용한다", () => {
+    const csv = validCsv.replace("M0001", "#0001");
+
+    expect(parseRosterCsv(csv)[0]?.memberCode).toBe("#0001");
+  });
+
   it("따옴표 안의 쉼표와 줄바꿈을 보존한다", () => {
     const csv = [
       "ID,이름,전화번호,Group,상태,가입일",
