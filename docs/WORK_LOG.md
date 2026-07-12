@@ -476,3 +476,26 @@
 - Do not select or serialize full phone numbers in `/fees`, default member lists, or fee CSV matching.
 - Keep sensitive full-phone lookup values out of GET query strings and login redirect parameters.
 - Keep real member source files outside tracked repository paths; `/members/` is reserved for ignored local data only.
+
+## 2026-07-12
+
+### 완료
+- 회원 명부 초기화 구현을 통합 검증했다. 회원번호 고정, A/B/그룹 없음 분류, 연락처 분리 저장, 중복 확인, 회비의 회원번호 기반 연동, 레거시 필드 제거가 자동 테스트 범위에 포함된다.
+- 실제 회원 CSV 원문은 열거나 출력하지 않았다.
+- 루트 작업 공간과 기능 작업 트리에서 `members/members.csv`가 `.gitignore`의 `/members/` 규칙에 의해 제외되는 것을 확인했다.
+- Git이 추적하는 `members` 경로 파일이 없음을 확인했다.
+- 테스트 파일을 제외한 `src` 런타임에서 `phone_last_four`, `withdrawal_reason`, `phoneLastFour`, `withdrawalReason` 참조가 없음을 확인했다.
+- 회비 화면과 회비 기능에서 연락처 필드 참조가 없고, 런타임 URL 검색 파라미터에 연락처를 사용하는 참조가 없음을 확인했다.
+
+### 검증 근거
+- `npm test`: 56개 파일, 260개 테스트 통과, 종료 코드 0.
+- `npm run lint`: 통과, 종료 코드 0.
+- `npx tsc --noEmit`: 통과, 종료 코드 0.
+- `git diff --check`: 통과, 종료 코드 0.
+- `npm run build`: 120초 제한 안에 완료되지 않았다. 오류 출력 없이 `Creating an optimized production build ...` 단계에서 제한시간 종료 코드 124로 중단되었으므로 빌드 통과로 처리하지 않았다.
+- 개발 서버는 3012 포트에서 167ms에 준비되었으나, 작업 트리에 유효한 Supabase 공개 환경 변수가 없어 보호 라우트 요청이 프록시 단계에서 500으로 종료되었다. 기본 기동만 확인했으며 비인증 리다이렉트와 화면 컴파일은 검증하지 못했다.
+
+### 보류 검증
+- Supabase 준비 마이그레이션, 실제 CSV dry-run, 초기화 실행, 완료 집계 확인, 최종 마이그레이션은 실행하지 않았다.
+- 인증된 관리자/일반 운영자 권한 차이, 연락처 마스킹/수정, 이름·회원번호 검색, 그룹 필터, 중복 확인 흐름은 브라우저에서 검증하지 않았다.
+- 375px 모바일과 1440px 데스크톱 레이아웃, 브라우저 콘솔, 네트워크 및 RSC payload의 개인정보 노출 여부는 인증 환경에서 추가 검증해야 한다.

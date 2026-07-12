@@ -54,6 +54,9 @@
 - [x] Schedule selected-date detail panel top-aligned and sized to its content
 - [x] Schedule week view changed to a reference-style time-grid calendar
 - [x] Local member source-data directory excluded from Git after full-phone security review
+- [x] 변경 불가 회원번호, 비공개 연락처, A/B/그룹 없음 분류를 포함한 회원 명부 초기화 구현
+- [x] 회원 및 회비 런타임 경로에서 레거시 연락처·탈퇴 사유 필드 제거
+- [x] 회원 명부 초기화 자동 테스트, lint, typecheck, 개인정보 정적 검사 통과
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management
@@ -77,6 +80,11 @@
 - [ ] Verify member and fee operator/general kind columns after real operator/member data exists
 - [ ] Verify operator-first sorting after real club positions are assigned
 - [x] Verify fee inline payment processing after real monthly payment data exists
+- [ ] Supabase에 회원 명부 준비·초기화·최종 마이그레이션 적용
+- [ ] 실제 회원 CSV dry-run 후 개인정보 원문 없이 집계 확인
+- [ ] dry-run 결과 검토 후 파괴적 회원 명부 초기화 실행
+- [ ] 인증 브라우저에서 회원·회비 권한, 중복 확인, 반응형 UI, 콘솔, 네트워크 payload 검증
+- [ ] Next.js 컴파일이 검증 제한시간 안에 완료되는 환경에서 프로덕션 빌드 재실행
 
 ## Confirmed Product Decisions
 - [x] Target users are tennis club operators, not general members
