@@ -20,32 +20,28 @@ on conflict (code) do nothing;
 
 alter table public.members
   add column member_code text,
-  add column group_id uuid references public.member_groups(id) on delete set null,
+  add column group_id uuid references public.member_groups(id) on delete set null;
+
+update public.members
+set group_id = (select id from public.member_groups where code = 'A')
+where group_id is null;
+
+with numbered_members as (
+  select id, row_number() over (order by created_at, id) as member_number
+  from public.members
+)
+update public.members
+set member_code = 'A' || lpad(numbered_members.member_number::text, 4, '0')
+from numbered_members
+where members.id = numbered_members.id;
+
+alter table public.members
+  alter column member_code set not null,
   add constraint members_member_code_format
-    check (member_code is null or member_code ~ '^[A-Z][0-9]{4}$');
+    check (member_code ~ '^[A-Z][0-9]{4}$');
 
 create unique index members_member_code_unique
 on public.members(member_code) where member_code is not null;
-
-create or replace function public.prevent_member_code_change()
-returns trigger
-language plpgsql
-set search_path = public
-as $$
-begin
-  if old.member_code is distinct from new.member_code and old.member_code is not null then
-    raise exception 'member_code cannot be changed';
-  end if;
-  return new;
-end;
-$$;
-
-revoke execute on function public.prevent_member_code_change() from public, anon, authenticated;
-
-create trigger members_prevent_member_code_change
-before update of member_code on public.members
-for each row
-execute function public.prevent_member_code_change();
 
 create table public.member_contacts (
   member_id uuid primary key references public.members(id) on delete cascade,
@@ -170,6 +166,49 @@ $$;
 
 revoke execute on function public.next_member_code(uuid) from public, anon, authenticated;
 
+create or replace function public.assign_member_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.group_id is null then
+    select id into new.group_id from public.member_groups where code = 'A' and is_active;
+  end if;
+
+  new.member_code := public.next_member_code(new.group_id);
+  return new;
+end;
+$$;
+
+revoke execute on function public.assign_member_code() from public, anon, authenticated;
+
+create trigger members_assign_member_code
+before insert on public.members
+for each row
+execute function public.assign_member_code();
+
+create or replace function public.prevent_member_code_change()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if old.member_code is distinct from new.member_code then
+    raise exception 'member_code cannot be changed';
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.prevent_member_code_change() from public, anon, authenticated;
+
+create trigger members_prevent_member_code_change
+before update of member_code on public.members
+for each row
+execute function public.prevent_member_code_change();
+
 create or replace function public.save_member_with_contact(
   member_id uuid,
   member_data jsonb,
@@ -208,6 +247,13 @@ begin
     raise exception 'invalid phone number';
   end if;
 
+  perform pg_advisory_xact_lock(
+    hashtextextended('member-contact-phone:' || coalesce(normalized_phone, '<none>'), 0)
+  );
+  perform pg_advisory_xact_lock(
+    hashtextextended('member-contact-name:' || lower(requested_name), 0)
+  );
+
   select contacts.member_id into duplicate_id
   from public.member_contacts contacts
   join public.members duplicate_member on duplicate_member.id = contacts.member_id
@@ -239,10 +285,9 @@ begin
   end if;
 
   if saved_member_id is null then
-    assigned_code := public.next_member_code((member_data->>'group_id')::uuid);
     insert into public.members (
       name, phone_last_four, status, joined_date, withdrawn_date,
-      withdrawal_reason, memo, created_by, updated_by, member_code, group_id
+      withdrawal_reason, memo, created_by, updated_by, group_id
     ) values (
       requested_name, right(normalized_phone, 4),
       coalesce((member_data->>'status')::public.member_status, 'active'),
@@ -250,7 +295,7 @@ begin
       (member_data->>'withdrawn_date')::date,
       nullif(btrim(member_data->>'withdrawal_reason'), ''),
       nullif(btrim(member_data->>'memo'), ''), auth.uid(), auth.uid(),
-      assigned_code, (member_data->>'group_id')::uuid
+      (member_data->>'group_id')::uuid
     ) returning id into saved_member_id;
   else
     update public.members set
@@ -305,6 +350,8 @@ set search_path = public
 as $$
 declare
   imported_count integer;
+  preserved_profile_count integer;
+  reconnected_profile_count integer;
 begin
   if auth.role() is distinct from 'service_role' then
     raise exception 'service_role required';
@@ -320,7 +367,8 @@ begin
 
   create temporary table roster_profile_links on commit drop as
   select id as old_member_id, operator_profile_id,
-         lower(btrim(name)) as normalized_name
+         lower(btrim(name)) as normalized_name,
+         null::uuid as matched_member_id
   from public.members
   where operator_profile_id is not null;
 
@@ -336,21 +384,55 @@ begin
     phone_number text
   );
 
+  if exists (
+    select 1
+    from roster_profile_links links
+    join roster_import_rows imported on imported.id = links.old_member_id
+    where lower(btrim(imported.name)) is distinct from links.normalized_name
+  ) then
+    raise exception 'operator profile member UUID/name mismatch';
+  end if;
+
+  if exists (
+    select 1
+    from roster_profile_links links
+    where (
+      select count(*)
+      from roster_import_rows imported
+      where lower(btrim(imported.name)) = links.normalized_name
+    ) <> 1
+    or 1 <> (
+      select count(*)
+      from roster_profile_links same_name_link
+      where same_name_link.normalized_name = links.normalized_name
+    )
+  ) then
+    raise exception 'operator profile must match exactly one imported member';
+  end if;
+
+  update roster_profile_links links
+  set matched_member_id = imported.id
+  from roster_import_rows imported
+  where lower(btrim(imported.name)) = links.normalized_name;
+
   delete from public.fee_payments;
   delete from public.members;
 
   insert into public.members (
     id, name, status, joined_date, withdrawn_date, withdrawal_reason, memo,
-    member_code, group_id, created_at, updated_at
+    group_id, created_at, updated_at
   )
   select
     row.id, btrim(row.name),
     coalesce(row.status, 'active')::public.member_status,
     coalesce(row.joined_date, current_date), row.withdrawn_date,
     nullif(btrim(row.withdrawal_reason), ''), nullif(btrim(row.memo), ''),
-    row.member_code, groups.id, now(), now()
+    coalesce(groups.id, default_group.id), now(), now()
   from roster_import_rows row
-  left join public.member_groups groups on groups.code = row.group_code;
+  left join public.member_groups groups on groups.code = row.group_code
+  cross join lateral (
+    select id from public.member_groups where code = 'A' and is_active
+  ) default_group;
 
   insert into public.member_contacts (member_id, phone_number, phone_normalized)
   select members.id, row.phone_number,
@@ -362,20 +444,15 @@ begin
   update public.members
   set operator_profile_id = links.operator_profile_id
   from roster_profile_links links
-  where members.id = links.old_member_id
-     or (
-       lower(btrim(members.name)) = links.normalized_name
-       and not exists (
-         select 1 from public.members preserved
-         where preserved.id = links.old_member_id
-       )
-       and 1 = (
-         select count(*) from public.members same_name
-         where lower(btrim(same_name.name)) = links.normalized_name
-       )
-     );
+  where members.id = links.matched_member_id;
 
-  get diagnostics imported_count = row_count;
+  get diagnostics reconnected_profile_count = row_count;
+  select count(*) into preserved_profile_count from roster_profile_links;
+
+  if reconnected_profile_count <> preserved_profile_count then
+    raise exception 'operator profile reconnect count mismatch';
+  end if;
+
   select count(*) into imported_count from public.members;
 
   return jsonb_build_object('status', 'RESET_COMPLETE', 'imported_count', imported_count);
