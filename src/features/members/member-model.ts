@@ -11,12 +11,13 @@ export const MEMBER_STATUS_LABELS: Readonly<Record<MemberStatus, string>> =
 
 export type MemberRecord = {
   id: string;
+  memberCode: string;
+  groupId: string | null;
+  groupCode: string | null;
   name: string;
-  phoneLastFour: string | null;
   status: MemberStatus;
   joinedDate: string;
   withdrawnDate: string | null;
-  withdrawalReason: string | null;
   memo: string | null;
   createdBy: string | null;
   updatedBy: string | null;
@@ -26,7 +27,7 @@ export type MemberRecord = {
 
 export type MemberLifecycleInput = Pick<
   MemberRecord,
-  "status" | "joinedDate" | "withdrawnDate" | "withdrawalReason"
+  "status" | "joinedDate" | "withdrawnDate"
 >;
 
 export function isFeeChargeTarget(status: MemberStatus): boolean {
@@ -44,10 +45,6 @@ export function validateMemberLifecycle(
 
   if (member.status !== "withdrawn" && member.withdrawnDate) {
     errors.push("활동중 또는 휴회 회원은 탈퇴일을 비워야 합니다.");
-  }
-
-  if (member.status !== "withdrawn" && member.withdrawalReason) {
-    errors.push("활동중 또는 휴회 회원은 탈퇴 사유를 비워야 합니다.");
   }
 
   if (

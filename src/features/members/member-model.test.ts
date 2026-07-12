@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   isFeeChargeTarget,
   MEMBER_STATUSES,
+  type MemberRecord,
   validateMemberLifecycle,
 } from "./member-model";
 
@@ -20,6 +21,28 @@ const operatorMemberMigrationSql = readFileSync(
 );
 
 describe("member model", () => {
+  it("models roster and group identifiers without protected contact fields", () => {
+    const member: MemberRecord = {
+      id: "member-id",
+      memberCode: "JW-001",
+      groupId: "group-id",
+      groupCode: "A",
+      name: "홍길동",
+      status: "active",
+      joinedDate: "2026-01-01",
+      withdrawnDate: null,
+      memo: null,
+      createdBy: null,
+      updatedBy: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    };
+
+    expect(member.memberCode).toBe("JW-001");
+    expect(member.groupId).toBe("group-id");
+    expect(member.groupCode).toBe("A");
+  });
+
   it("defines the supported member statuses", () => {
     expect(MEMBER_STATUSES).toEqual(["active", "paused", "withdrawn"]);
   });
@@ -36,7 +59,6 @@ describe("member model", () => {
         status: "withdrawn",
         joinedDate: "2026-07-01",
         withdrawnDate: null,
-        withdrawalReason: null,
       }),
     ).toContain("탈퇴 회원은 탈퇴일이 필요합니다.");
   });
@@ -47,20 +69,18 @@ describe("member model", () => {
         status: "paused",
         joinedDate: "2026-07-01",
         withdrawnDate: "2026-07-02",
-        withdrawalReason: null,
       }),
     ).toContain("활동중 또는 휴회 회원은 탈퇴일을 비워야 합니다.");
   });
 
-  it("keeps withdrawal reasons only on withdrawn members", () => {
+  it("validates withdrawn status and date without a withdrawal reason", () => {
     expect(
       validateMemberLifecycle({
-        status: "active",
-        joinedDate: "2026-07-01",
-        withdrawnDate: null,
-        withdrawalReason: "개인 사정",
+        status: "withdrawn",
+        joinedDate: "2026-01-01",
+        withdrawnDate: "2026-07-01",
       }),
-    ).toContain("활동중 또는 휴회 회원은 탈퇴 사유를 비워야 합니다.");
+    ).toEqual([]);
   });
 
   it("prevents withdrawal dates before the joined date", () => {
@@ -69,7 +89,6 @@ describe("member model", () => {
         status: "withdrawn",
         joinedDate: "2026-07-02",
         withdrawnDate: "2026-07-01",
-        withdrawalReason: null,
       }),
     ).toContain("탈퇴일은 가입일보다 빠를 수 없습니다.");
   });
