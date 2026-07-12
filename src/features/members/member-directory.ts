@@ -7,6 +7,7 @@ import {
   validatePhoneNumber,
 } from "./member-contact";
 import { buildMemberSearchFilter } from "./member-list";
+import type { Permission } from "@/features/admin/permissions";
 import type { MemberRecord, MemberStatus } from "./member-model";
 
 export { buildMemberSearchFilter } from "./member-list";
@@ -132,7 +133,8 @@ export function toMemberListRow(
   };
 }
 
-export async function canManageMemberContacts(
+export async function hasCurrentUserPermission(
+  requiredPermission: Permission,
   suppliedClient?: Awaited<ReturnType<typeof createClient>>,
 ) {
   const supabase = suppliedClient ?? await createClient();
@@ -159,14 +161,20 @@ export async function canManageMemberContacts(
     .from("role_permissions")
     .select("permission")
     .eq("role_id", profile.role_id)
-    .eq("permission", "members.contacts.manage")
+    .eq("permission", requiredPermission)
     .maybeSingle();
 
   if (permissionError) {
-    throw new Error("회원 연락처 권한을 확인하지 못했습니다.");
+    throw new Error("회원 관리 권한을 확인하지 못했습니다.");
   }
 
-  return permission?.permission === "members.contacts.manage";
+  return permission?.permission === requiredPermission;
+}
+
+export async function canManageMemberContacts(
+  suppliedClient?: Awaited<ReturnType<typeof createClient>>,
+) {
+  return hasCurrentUserPermission("members.contacts.manage", suppliedClient);
 }
 
 async function loadContactDisplays(

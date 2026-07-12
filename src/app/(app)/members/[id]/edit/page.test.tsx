@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import EditMemberPage from "./page";
 
 const loadMemberForEdit = vi.fn();
+const hasCurrentUserPermission = vi.fn();
 
 vi.mock("@/features/members/member-directory", () => ({
+  hasCurrentUserPermission: (...args: unknown[]) => hasCurrentUserPermission(...args),
   loadMemberForEdit: (...args: unknown[]) => loadMemberForEdit(...args),
   loadMemberGroups: vi.fn(async () => [
     { id: "group-a", code: "A" },
@@ -33,7 +35,10 @@ const member = {
 };
 
 describe("EditMemberPage", () => {
-  beforeEach(() => loadMemberForEdit.mockResolvedValue(member));
+  beforeEach(() => {
+    loadMemberForEdit.mockResolvedValue(member);
+    hasCurrentUserPermission.mockResolvedValue(true);
+  });
 
   it("renders member code and raw contact for a contact manager", async () => {
     render(await EditMemberPage({
@@ -69,6 +74,16 @@ describe("EditMemberPage", () => {
     loadMemberForEdit.mockResolvedValue(null);
     await expect(EditMemberPage({
       params: Promise.resolve({ id: "missing" }),
+      searchParams: Promise.resolve({}),
+    })).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(notFound).toHaveBeenCalled();
+  });
+
+  it("uses notFound without member update permission", async () => {
+    hasCurrentUserPermission.mockResolvedValue(false);
+
+    await expect(EditMemberPage({
+      params: Promise.resolve({ id: "member-1" }),
       searchParams: Promise.resolve({}),
     })).rejects.toThrow("NEXT_NOT_FOUND");
     expect(notFound).toHaveBeenCalled();

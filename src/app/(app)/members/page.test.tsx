@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import MembersPage from "./page";
 
 const loadMemberDirectory = vi.fn();
+const hasCurrentUserPermission = vi.fn();
 
 vi.mock("@/features/members/member-directory", () => ({
+  hasCurrentUserPermission: (...args: unknown[]) => hasCurrentUserPermission(...args),
   loadMemberDirectory: (...args: unknown[]) => loadMemberDirectory(...args),
 }));
 
@@ -21,7 +23,10 @@ const member = {
 };
 
 describe("MembersPage", () => {
-  beforeEach(() => loadMemberDirectory.mockResolvedValue([member]));
+  beforeEach(() => {
+    loadMemberDirectory.mockResolvedValue([member]);
+    hasCurrentUserPermission.mockResolvedValue(true);
+  });
 
   it("renders permanent member data and directory filters", async () => {
     render(
@@ -66,5 +71,17 @@ describe("MembersPage", () => {
     expect(within(mobileList).getByText("회원번호 JW-000001")).toBeInTheDocument();
     expect(within(mobileList).getByText("연락처 010-****-5678")).toBeInTheDocument();
     expect(within(mobileList).getByText("그룹 A")).toBeInTheDocument();
+  });
+
+  it("hides member management links without create and update permissions", async () => {
+    hasCurrentUserPermission.mockImplementation(async (permission: string) =>
+      permission !== "members.create" && permission !== "members.update"
+    );
+
+    render(await MembersPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.queryByRole("link", { name: "회원 등록" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "수정" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "김민수 수정" })).not.toBeInTheDocument();
   });
 });

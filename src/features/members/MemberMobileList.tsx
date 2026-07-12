@@ -9,6 +9,7 @@ import type { MemberStatus } from "./member-model";
 import styles from "./MemberMobileList.module.scss";
 
 type MemberMobileListProps = {
+  canUpdate?: boolean;
   members: MemberListRow[];
 };
 
@@ -24,7 +25,7 @@ function getMemberStatusTone(status: MemberStatus) {
   return "muted";
 }
 
-export function MemberMobileList({ members }: MemberMobileListProps) {
+export function MemberMobileList({ canUpdate = true, members }: MemberMobileListProps) {
   return (
     <ul aria-label="모바일 회원 목록" className={styles["member-mobile-list"]}>
       {members.map((member) => (
@@ -38,13 +39,13 @@ export function MemberMobileList({ members }: MemberMobileListProps) {
                 </Badge>
               </div>
             </div>
-            <Link
+            {canUpdate ? <Link
               aria-label={`${member.name} 수정`}
               className={styles["member-mobile-edit-link"]}
               href={`/members/${member.id}/edit`}
             >
               수정
-            </Link>
+            </Link> : null}
           </div>
 
           <div className={styles["member-mobile-detail-list"]}>

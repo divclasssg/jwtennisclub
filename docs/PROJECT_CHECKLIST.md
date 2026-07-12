@@ -84,8 +84,8 @@
 - [x] 실제 회원 CSV 로컬 dry-run 후 개인정보 원문 없이 구조·집계 확인
 - [x] service role 환경에서 A/B 그룹·활성 운영자 재연결을 포함한 DB 연동 dry-run 실행
 - [x] dry-run 결과 검토 후 파괴적 회원 명부 초기화 실행
-- [ ] 인증 브라우저에서 회원·회비 권한, 중복 확인, 반응형 UI, 콘솔, 네트워크 payload 검증
-- [ ] Next.js 컴파일이 검증 제한시간 안에 완료되는 환경에서 프로덕션 빌드 재실행
+- [x] 인증 브라우저에서 회원·회비 권한, 개인정보 마스킹, 반응형 UI, 직접 경로와 콘솔 검증
+- [x] 자원을 고갈시키던 별도 Next.js 개발 서버 종료 후 프로덕션 빌드 재실행
 
 ## Confirmed Product Decisions
 - [x] Target users are tennis club operators, not general members

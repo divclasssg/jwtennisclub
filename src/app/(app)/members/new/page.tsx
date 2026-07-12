@@ -2,8 +2,9 @@ import {
   NewMemberContent,
   type NewMemberSearchParams,
 } from "./NewMemberContent";
+import { notFound } from "next/navigation";
 import { FormPageTemplate } from "@/components/templates";
-import { canManageMemberContacts, loadMemberGroups } from "@/features/members/member-directory";
+import { canManageMemberContacts, hasCurrentUserPermission, loadMemberGroups } from "@/features/members/member-directory";
 
 type NewMemberPageProps = {
   searchParams: Promise<NewMemberSearchParams>;
@@ -12,6 +13,8 @@ type NewMemberPageProps = {
 export default async function NewMemberPage({
   searchParams,
 }: NewMemberPageProps) {
+  if (!await hasCurrentUserPermission("members.create")) notFound();
+
   const params = await searchParams;
   const [groups, canManageContacts] = await Promise.all([
     loadMemberGroups(), canManageMemberContacts(),

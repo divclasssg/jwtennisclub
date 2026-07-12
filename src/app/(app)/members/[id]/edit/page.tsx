@@ -4,7 +4,7 @@ import { FormMessage } from "@/components/molecules";
 import { FormPanel } from "@/components/organisms";
 import { FormPageTemplate } from "@/components/templates";
 import { MemberForm } from "@/features/members/MemberForm";
-import { loadMemberForEdit, loadMemberGroups } from "@/features/members/member-directory";
+import { hasCurrentUserPermission, loadMemberForEdit, loadMemberGroups } from "@/features/members/member-directory";
 import type { DuplicateConfirmation } from "@/features/members/member-form";
 import { firstSearchParam } from "@/features/members/member-list";
 
@@ -28,6 +28,8 @@ export default async function EditMemberPage({ params, searchParams }: {
   params: Promise<{ id: string }>;
   searchParams: Promise<Query>;
 }) {
+  if (!await hasCurrentUserPermission("members.update")) notFound();
+
   const { id } = await params;
   const [member, groups, query] = await Promise.all([
     loadMemberForEdit(id),

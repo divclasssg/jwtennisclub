@@ -1,5 +1,24 @@
 # JW Tennis Club SaaS Work Log
 
+## 2026-07-12
+
+### Completed
+- Supabase CLI 호환 `supabase_migrations.schema_migrations` 이력을 로컬 마이그레이션 11개와 동기화했다.
+- gstack 인증 브라우저 QA에서 관리자에게만 전체 연락처가 표시되고 운영자에게는 19개 연락처가 모두 마스킹되는 것을 확인했다.
+- 운영자에게 잘못 노출되던 회원 등록·수정 링크를 권한에 따라 숨기고, 등록·수정 직접 경로도 권한이 없으면 404로 차단했다.
+- 1440x900 및 375x812 화면에서 회원 목록의 가로 넘침이 없고 콘솔 오류가 없음을 확인했다.
+- QA용 임시 Supabase Auth 사용자 2명과 로컬 자격증명 파일을 삭제하고 회원 수가 20명으로 유지됨을 확인했다.
+- 2일 이상 실행되며 CPU 127%와 메모리 22%를 점유하던 별도 `darksite` Next.js 개발 서버가 프로덕션 빌드 정지의 원인임을 확인하고 종료했다.
+
+### Verification Evidence
+- 회원 권한 집중 테스트: 4개 파일, 20개 테스트 통과.
+- gstack 운영자 QA: 등록 링크 0개, 수정 링크 0개, 전체 연락처 0개, 마스킹 연락처 19개, 직접 등록·수정 경로 404.
+- 반응형 QA: 1440px와 375px 모두 문서 가로 overflow 없음.
+- `npm run build`: Next.js 16.2.10 Turbopack 컴파일 3.2초, 전체 빌드 6.5초 완료.
+
+### Issues And Lessons
+- 동시에 실행 중인 다른 Next.js 개발 서버가 CPU와 메모리를 과도하게 점유하면 현재 프로젝트 빌드가 `Creating an optimized production build ...`에서 멈춘 것처럼 보일 수 있다. 빌드 재시도 전에 프로젝트 외부의 장기 실행 Next 프로세스 자원 사용량을 확인한다.
+
 ## 2026-07-02
 
 ### Completed
