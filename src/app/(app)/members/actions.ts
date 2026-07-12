@@ -8,7 +8,6 @@ import {
   type MemberSaveResult,
   parseMemberFormData,
   parseMemberSaveResult,
-  parseMembersCsv,
   toDatabaseDuplicateConfirmation,
   toMemberDatabaseInput,
   validateMemberForm,
@@ -16,7 +15,6 @@ import {
 
 const membersPath = "/members";
 const memberCreatePath = "/members/new";
-const maximumCsvRows = 200;
 
 function buildRedirect(path: string, params: Record<string, string | number>) {
   const searchParams = new URLSearchParams();
@@ -117,50 +115,8 @@ export async function updateMember(formData: FormData) {
 }
 
 export async function importMembersCsv(formData: FormData) {
-  const file = formData.get("csvFile");
-
-  if (!(file instanceof File) || file.size === 0) {
-    redirect(buildRedirect(memberCreatePath, { importError: "missing-file" }));
-  }
-
-  const parsed = parseMembersCsv(await file.text());
-
-  if (!parsed.ok) {
-    redirect(
-      buildRedirect(memberCreatePath, {
-        importError: "invalid-csv",
-        line: parsed.line,
-      }),
-    );
-  }
-
-  if (parsed.members.length > maximumCsvRows) {
-    redirect(buildRedirect(memberCreatePath, { importError: "too-many-rows" }));
-  }
-
-  const { supabase } = await getAuthenticatedUserId();
-  for (let index = 0; index < parsed.members.length; index += 1) {
-    const result = await saveMember(supabase, null, parsed.members[index]);
-    if (!result || result.status !== "saved") {
-      redirect(
-        buildRedirect(memberCreatePath, {
-          importError:
-            result?.status === "confirmation-required"
-              ? result.reason
-              : "save-failed",
-          line: index + 2,
-        }),
-      );
-    }
-  }
-
-  revalidatePath(membersPath);
-  redirect(
-    buildRedirect(membersPath, {
-      status: "imported",
-      count: parsed.members.length,
-    }),
-  );
+  void formData;
+  redirect(buildRedirect(memberCreatePath, { importError: "import-disabled" }));
 }
 
 type MemberRpcClient = {

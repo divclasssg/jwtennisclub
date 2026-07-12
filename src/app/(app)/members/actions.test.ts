@@ -20,7 +20,7 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
-import { createMember } from "./actions";
+import { createMember, importMembersCsv, updateMember } from "./actions";
 
 function memberFormData(confirmation?: "phone-reuse" | "name-without-phone") {
   const formData = new FormData();
@@ -87,6 +87,60 @@ describe("member actions", () => {
       expect.objectContaining({ duplicate_confirmation: "CONFIRM_PHONE_REUSE" }),
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/members");
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it("disables general member CSV imports without calling the database", async () => {
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(["name,phoneNumber\n홍길동,010-1234-5678"], "members.csv", {
+        type: "text/csv",
+      }),
+    );
+
+    await expect(importMembersCsv(formData)).rejects.toThrow(
+      "redirect:/members/new?importError=import-disabled",
+    );
+
+    expect(mocks.getUser).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.from).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("redirects an update to the name-only confirmation state", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { status: "NAME_ONLY_CONFIRMATION_REQUIRED" },
+      error: null,
+    });
+    const formData = memberFormData();
+    formData.set("id", "member-id");
+
+    await expect(updateMember(formData)).rejects.toThrow(
+      "redirect:/members/member-id/edit?duplicate=name-without-phone",
+    );
+
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "save_member_with_contact",
+      expect.objectContaining({ member_id: "member-id" }),
+    );
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("redirects a blocked update without revalidating", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { status: "DUPLICATE_BLOCKED" },
+      error: null,
+    });
+    const formData = memberFormData();
+    formData.set("id", "member-id");
+
+    await expect(updateMember(formData)).rejects.toThrow(
+      "redirect:/members/member-id/edit?error=duplicate-member",
+    );
+
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
     expect(mocks.from).not.toHaveBeenCalled();
   });
 });
