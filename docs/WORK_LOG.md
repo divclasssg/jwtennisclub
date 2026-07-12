@@ -492,6 +492,9 @@
 - `npm run lint`: 통과, 종료 코드 0.
 - `npx tsc --noEmit`: 통과, 종료 코드 0.
 - `git diff --check`: 통과, 종료 코드 0.
+- `rg -n 'phoneLastFour|phone_last_four|withdrawalReason|withdrawal_reason|탈퇴 사유' src --glob '!**/*.test.*' --glob '!**/*.spec.*'`: 런타임 코드 출력 없음, 종료 코드 1.
+- `rg -n 'phone_number|phone_normalized|phoneNumber|phoneDisplay' 'src/app/(app)/fees' src/features/fees --glob '!**/*.test.*' --glob '!**/*.spec.*'`: 회비 런타임 코드 출력 없음, 종료 코드 1.
+- `rg -n 'searchParams.*phone|phone.*searchParams' src --glob '!**/*.test.*' --glob '!**/*.spec.*'`: 런타임 코드 출력 없음, 종료 코드 1. 테스트를 포함한 원래 broad 명령은 연락처 원문이 아닌 `invalid-phone`, `phone-reuse` searchParams fixture 2건을 출력했다.
 - `npm run build`: 120초 제한 안에 완료되지 않았다. 오류 출력 없이 `Creating an optimized production build ...` 단계에서 제한시간 종료 코드 124로 중단되었으므로 빌드 통과로 처리하지 않았다.
 - 개발 서버는 3012 포트에서 167ms에 준비되었으나, 작업 트리에 유효한 Supabase 공개 환경 변수가 없어 보호 라우트 요청이 프록시 단계에서 500으로 종료되었다. 기본 기동만 확인했으며 비인증 리다이렉트와 화면 컴파일은 검증하지 못했다.
 

@@ -56,7 +56,7 @@
 - [x] Local member source-data directory excluded from Git after full-phone security review
 - [x] 변경 불가 회원번호, 비공개 연락처, A/B/그룹 없음 분류를 포함한 회원 명부 초기화 구현
 - [x] 회원 및 회비 런타임 경로에서 레거시 연락처·탈퇴 사유 필드 제거
-- [x] 회원 명부 초기화 자동 테스트, lint, typecheck, 개인정보 정적 검사 통과
+- [x] 회원 명부 초기화 자동 테스트, lint, typecheck, 테스트 제외 런타임 개인정보 정적 검사 통과
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management
