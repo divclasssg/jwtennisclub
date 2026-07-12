@@ -1,8 +1,13 @@
+import { createHash } from "node:crypto";
+import { lstat, mkdtemp, mkdir, realpath, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   buildResetPreview,
   parseRosterCsv,
+  resolveRosterPath,
   runRosterReset,
 } from "./member-roster-reset.mjs";
 
@@ -32,6 +37,29 @@ describe("parseRosterCsv", () => {
     ].join("\n");
 
     expect(parseRosterCsv(csv)[0]?.name).toBe("홍,\n길동");
+  });
+
+  it.each([
+    ['M0001,홍"길동,01012345678,A,활동중,2026-07-01', "unquoted quote"],
+    ['M0001,"홍길동"x,01012345678,A,활동중,2026-07-01', "junk after quote"],
+    ['M0001,"홍길동,01012345678,A,활동중,2026-07-01', "unterminated quote"],
+  ])("잘못된 CSV 따옴표를 차단한다: %s", (dataRow) => {
+    const csv = ["ID,이름,전화번호,Group,상태,가입일", dataRow].join("\n");
+    expect(() => parseRosterCsv(csv)).toThrow(/CSV/);
+  });
+
+  it("전화번호 허용 문자 밖의 문자를 정규화 전에 차단한다", () => {
+    expect(() => parseRosterCsv(validCsv.replace("010-1234-5678", "010-call-5678"))).toThrow(/전화번호/);
+  });
+
+  it("CRLF, 빈 줄, 멀티라인 필드 뒤 오류의 실제 시작 행을 보고한다", () => {
+    const csv = [
+      "ID,이름,전화번호,Group,상태,가입일",
+      "",
+      'M0001,"합성\r\n이름",01012345678,A,활동중,2026-07-01',
+      "M0002,다른합성,01099998888,C,활동중,2026-07-02",
+    ].join("\r\n");
+    expect(() => parseRosterCsv(csv)).toThrow(/CSV 5행/);
   });
 
   it.each([
@@ -100,6 +128,14 @@ describe("runRosterReset", () => {
     expect(JSON.stringify(result)).not.toContain("01012345678");
   });
 
+  it("SHA-256은 디코딩된 문자열이 아니라 원본 바이트를 기준으로 한다", async () => {
+    const sourceBytes = Buffer.from(validCsv, "utf16le");
+    const utf8Bytes = Buffer.from(validCsv, "utf8");
+    const result = await runRosterReset({ ...file, sourceBytes, source: validCsv, profiles, rpc: vi.fn() });
+    expect(result.sha256).toBe(createHash("sha256").update(sourceBytes).digest("hex"));
+    expect(result.sha256).not.toBe(createHash("sha256").update(utf8Bytes).digest("hex"));
+  });
+
   it("정확한 입력 경로만 허용한다", async () => {
     await expect(runRosterReset({ ...file, path: "./members/members.csv", profiles, rpc: vi.fn() })).rejects.toThrow(/경로/);
   });
@@ -119,5 +155,30 @@ describe("runRosterReset", () => {
 
     const badRpc = vi.fn().mockResolvedValue({ imported_count: 0, reconnected_profile_count: 1 });
     await expect(runRosterReset({ ...file, profiles, execute: true, confirmation: "RESET_MEMBERS_AND_FEES", expectedSha256: dryRun.sha256, serviceRoleKey: "secret", rpc: badRpc })).rejects.toThrow(/결과/);
+  });
+});
+
+describe("resolveRosterPath", () => {
+  it("저장소 루트 기준 상대 경로와 같은 절대 경로만 허용한다", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "roster-repo-"));
+    await mkdir(join(repoRoot, "members"));
+    const intendedPath = join(repoRoot, "members", "members.csv");
+    await writeFile(intendedPath, "synthetic");
+    const fs = { lstat, realpath };
+
+    await expect(resolveRosterPath("members/members.csv", { repoRoot, fs })).resolves.toBe(intendedPath);
+    await expect(resolveRosterPath(intendedPath, { repoRoot, fs })).resolves.toBe(intendedPath);
+    await expect(resolveRosterPath(join(repoRoot, "members", "other.csv"), { repoRoot, fs })).rejects.toThrow(/경로/);
+  });
+
+  it("의도한 파일과 입력 경로의 심볼릭 링크를 모두 차단한다", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "roster-repo-"));
+    await mkdir(join(repoRoot, "members"));
+    const target = join(repoRoot, "target.csv");
+    const intendedPath = join(repoRoot, "members", "members.csv");
+    await writeFile(target, "synthetic");
+    await symlink(target, intendedPath);
+
+    await expect(resolveRosterPath(intendedPath, { repoRoot, fs: { lstat, realpath } })).rejects.toThrow(/심볼릭 링크/);
   });
 });

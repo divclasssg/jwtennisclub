@@ -386,7 +386,7 @@ begin
 
   create temporary table roster_profile_links on commit drop as
   select id as old_member_id, operator_profile_id,
-         lower(btrim(name)) as normalized_name,
+         lower(btrim(normalize(name, NFKC))) as normalized_name,
          null::uuid as matched_member_id
   from public.members
   where operator_profile_id is not null;
@@ -396,7 +396,9 @@ begin
     coalesce(row.id, gen_random_uuid()) as id,
     row.name, row.status, row.joined_date, row.withdrawn_date,
     row.withdrawal_reason, row.memo, row.member_code, row.group_code,
-    row.phone_number
+    row.phone_number,
+    lower(btrim(normalize(row.name, NFKC))) as normalized_name,
+    nullif(regexp_replace(coalesce(row.phone_number, ''), '[^0-9]', '', 'g'), '') as normalized_phone
   from jsonb_to_recordset(import_rows) as row(
     id uuid, name text, status text, joined_date date, withdrawn_date date,
     withdrawal_reason text, memo text, member_code text, group_code text,
@@ -405,9 +407,72 @@ begin
 
   if exists (
     select 1
+    from roster_import_rows row
+    left join public.member_groups groups
+      on groups.code = row.group_code and groups.is_active
+    where row.group_code is not null and groups.id is null
+  ) or not exists (
+    select 1 from public.member_groups groups
+    where groups.code = 'A' and groups.is_active
+      and exists (select 1 from roster_import_rows row where row.group_code is null)
+  ) and exists (
+    select 1 from roster_import_rows row where row.group_code is null
+  ) then
+    raise exception 'invalid imported group';
+  end if;
+
+  if exists (
+    select 1 from roster_import_rows row
+    where nullif(btrim(row.name), '') is null
+      or row.member_code is null
+      or row.status is null
+      or row.joined_date is null
+  ) then
+    raise exception 'imported member fields are required';
+  end if;
+
+  if exists (
+    select 1 from roster_import_rows row
+    where row.member_code !~ '^[A-Z][0-9]{4}$'
+  ) then
+    raise exception 'invalid imported member code';
+  end if;
+
+  if (select count(distinct left(row.member_code, 1)) from roster_import_rows row) <> 1 then
+    raise exception 'imported member code prefixes must match';
+  end if;
+
+  if exists (
+    select row.member_code from roster_import_rows row
+    group by row.member_code having count(*) > 1
+  ) then
+    raise exception 'duplicate imported member code';
+  end if;
+
+  if exists (
+    select 1 from roster_import_rows row
+    where row.status not in ('active', 'paused', 'withdrawn')
+      or (row.phone_number is not null and btrim(row.phone_number) !~ '^[0-9 ()-]+$')
+      or (row.normalized_phone is not null and row.normalized_phone !~ '^01[016789][0-9]{7,8}$')
+  ) then
+    raise exception 'invalid imported member values';
+  end if;
+
+  if exists (
+    select row.normalized_name, row.normalized_phone
+    from roster_import_rows row
+    where row.normalized_phone is not null
+    group by row.normalized_name, row.normalized_phone
+    having count(*) > 1
+  ) then
+    raise exception 'duplicate imported name and phone';
+  end if;
+
+  if exists (
+    select 1
     from roster_profile_links links
     join roster_import_rows imported on imported.id = links.old_member_id
-    where lower(btrim(imported.name)) is distinct from links.normalized_name
+    where imported.normalized_name is distinct from links.normalized_name
   ) then
     raise exception 'operator profile member UUID/name mismatch';
   end if;
@@ -418,7 +483,7 @@ begin
     where (
       select count(*)
       from roster_import_rows imported
-      where lower(btrim(imported.name)) = links.normalized_name
+      where imported.normalized_name = links.normalized_name
     ) <> 1
     or 1 <> (
       select count(*)
@@ -432,7 +497,7 @@ begin
   update roster_profile_links links
   set matched_member_id = imported.id
   from roster_import_rows imported
-  where lower(btrim(imported.name)) = links.normalized_name;
+  where imported.normalized_name = links.normalized_name;
 
   perform pg_advisory_xact_lock(hashtext('public.members.member_code'));
   delete from public.fee_payments;

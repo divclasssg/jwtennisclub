@@ -87,6 +87,29 @@ describe("member roster preparation migration", () => {
     expect(migrationSql).toContain("matched_member_id");
   });
 
+  it("validates the complete reset payload before deleting existing data", () => {
+    const deletePosition = migrationSql.indexOf("delete from public.fee_payments");
+    const requiredContracts = [
+      "invalid imported group",
+      "invalid imported member code",
+      "imported member code prefixes must match",
+      "duplicate imported member code",
+      "imported member fields are required",
+      "duplicate imported name and phone",
+      "operator profile must match exactly one imported member",
+    ];
+
+    expect(deletePosition).toBeGreaterThan(-1);
+    for (const contract of requiredContracts) {
+      const validationPosition = migrationSql.indexOf(contract);
+      expect(validationPosition, contract).toBeGreaterThan(-1);
+      expect(validationPosition, contract).toBeLessThan(deletePosition);
+    }
+    expect(migrationSql).toContain("row.group_code is not null");
+    expect(migrationSql).toContain("groups.is_active");
+    expect(migrationSql).toContain("row.group_code is null");
+  });
+
   it("returns masked contacts only for requested member IDs after checking view permission", () => {
     expect(migrationSql).toContain(
       "get_masked_member_contacts(member_ids uuid[])",

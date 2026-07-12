@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
+import { lstat, readFile, realpath } from "node:fs/promises";
+import { dirname, isAbsolute, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REQUIRED_HEADERS = ["ID", "이름", "전화번호", "Group", "상태", "가입일"];
 const STATUS_MAP = new Map([
@@ -21,38 +22,71 @@ function parseCsvRecords(source) {
   const records = [];
   let record = [];
   let field = "";
-  let quoted = false;
+  let state = "unquoted";
+  let physicalLine = 1;
+  let recordStartLine = 1;
+
+  const finishRecord = () => {
+    record.push(field);
+    if (record.some((value) => value !== "")) {
+      records.push({ fields: record, sourceLine: recordStartLine });
+    }
+    record = [];
+    field = "";
+    state = "unquoted";
+  };
 
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index];
-    if (quoted) {
+    const isNewline = character === "\n" || character === "\r";
+
+    if (state === "quoted") {
       if (character === '"' && source[index + 1] === '"') {
         field += '"';
         index += 1;
       } else if (character === '"') {
-        quoted = false;
+        state = "after-quote";
       } else {
         field += character;
+        if (isNewline) {
+          if (character === "\r" && source[index + 1] === "\n") {
+            field += "\n";
+            index += 1;
+          }
+          physicalLine += 1;
+        }
       }
-    } else if (character === '"' && field === "") {
-      quoted = true;
+    } else if (state === "after-quote") {
+      if (character === ",") {
+        record.push(field);
+        field = "";
+        state = "unquoted";
+      } else if (isNewline) {
+        finishRecord();
+        if (character === "\r" && source[index + 1] === "\n") index += 1;
+        physicalLine += 1;
+        recordStartLine = physicalLine;
+      } else {
+        fail("닫는 따옴표 뒤에 허용되지 않은 문자가 있습니다.", recordStartLine);
+      }
+    } else if (character === '"') {
+      if (field !== "") fail("따옴표는 필드 시작에서만 사용할 수 있습니다.", recordStartLine);
+      state = "quoted";
     } else if (character === ",") {
       record.push(field);
       field = "";
-    } else if (character === "\n" || character === "\r") {
+    } else if (isNewline) {
+      finishRecord();
       if (character === "\r" && source[index + 1] === "\n") index += 1;
-      record.push(field);
-      if (record.some((value) => value !== "")) records.push(record);
-      record = [];
-      field = "";
+      physicalLine += 1;
+      recordStartLine = physicalLine;
     } else {
       field += character;
     }
   }
 
-  if (quoted) fail("닫히지 않은 따옴표가 있습니다.");
-  record.push(field);
-  if (record.some((value) => value !== "")) records.push(record);
+  if (state === "quoted") fail("닫히지 않은 따옴표가 있습니다.", recordStartLine);
+  finishRecord();
   return records;
 }
 
@@ -77,7 +111,7 @@ export function parseRosterCsv(source) {
   const records = parseCsvRecords(source.replace(/^\uFEFF/, ""));
   if (records.length < 2) fail("헤더와 한 개 이상의 데이터 행이 필요합니다.");
 
-  const headers = records[0].map((header) => header.trim());
+  const headers = records[0].fields.map((header) => header.trim());
   if (new Set(headers).size !== headers.length) fail("중복 헤더가 있습니다.");
   for (const required of REQUIRED_HEADERS) {
     if (!headers.includes(required)) fail(`필수 헤더가 없습니다: ${required}`);
@@ -89,8 +123,7 @@ export function parseRosterCsv(source) {
   let memberCodePrefix;
 
   for (let index = 1; index < records.length; index += 1) {
-    const record = records[index];
-    const rowNumber = index + 1;
+    const { fields: record, sourceLine: rowNumber } = records[index];
     if (record.length !== headers.length) fail("열 개수가 헤더와 다릅니다.", rowNumber);
     const values = Object.fromEntries(headers.map((header, column) => [header, record[column]?.trim() ?? ""]));
     const memberCode = values.ID;
@@ -104,6 +137,7 @@ export function parseRosterCsv(source) {
     const name = values["이름"];
     if (!name) fail("이름이 비어 있습니다.", rowNumber);
     const rawPhone = values["전화번호"];
+    if (rawPhone && !/^[0-9 ()-]+$/.test(rawPhone)) fail("전화번호에 허용되지 않은 문자가 있습니다.", rowNumber);
     const phoneNumber = rawPhone ? rawPhone.replace(/[^0-9]/g, "") : null;
     if (phoneNumber && !/^01[016789][0-9]{7,8}$/.test(phoneNumber)) fail("전화번호 형식이 올바르지 않습니다.", rowNumber);
     if (phoneNumber) {
@@ -152,7 +186,7 @@ export function buildResetPreview(rows, linkedProfiles) {
 
 export async function runRosterReset(options) {
   if (options.path !== "members/members.csv") fail("입력 경로는 정확히 members/members.csv여야 합니다.");
-  const sha256 = createHash("sha256").update(options.source).digest("hex");
+  const sha256 = createHash("sha256").update(options.sourceBytes ?? Buffer.from(options.source, "utf8")).digest("hex");
   const rows = parseRosterCsv(options.source);
   const preview = buildResetPreview(rows, options.profiles);
 
@@ -176,6 +210,28 @@ export async function runRosterReset(options) {
   return { executed: true, sha256, ...preview };
 }
 
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+export async function resolveRosterPath(inputPath, options = {}) {
+  const repoRoot = options.repoRoot ?? REPO_ROOT;
+  const fs = options.fs ?? { lstat, realpath };
+  const intendedPath = resolve(repoRoot, "members", "members.csv");
+  const candidatePath = isAbsolute(inputPath) ? resolve(inputPath) : resolve(repoRoot, inputPath);
+  if (candidatePath !== intendedPath) fail("입력 경로는 저장소의 members/members.csv여야 합니다.");
+
+  const candidateStat = await fs.lstat(candidatePath);
+  if (candidateStat.isSymbolicLink()) fail("입력 CSV는 심볼릭 링크일 수 없습니다.");
+  if (!candidateStat.isFile()) fail("입력 CSV는 일반 파일이어야 합니다.");
+  const [candidateRealPath, intendedRealPath] = await Promise.all([
+    fs.realpath(candidatePath),
+    fs.realpath(intendedPath),
+  ]);
+  if (candidateRealPath !== intendedRealPath) {
+    fail("입력 CSV가 허용된 파일을 가리키지 않습니다.");
+  }
+  return intendedPath;
+}
+
 async function loadDatabaseContext(url, serviceRoleKey) {
   const { createClient } = await import("@supabase/supabase-js");
   const supabase = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -197,17 +253,17 @@ async function loadDatabaseContext(url, serviceRoleKey) {
 }
 
 export async function main(argv = process.argv.slice(2), env = process.env) {
-  const path = argv.find((argument) => !argument.startsWith("--"));
-  if (!path) fail("CSV 경로가 필요합니다.");
-  if (path !== "members/members.csv") fail("입력 경로는 정확히 members/members.csv여야 합니다.");
+  const inputPath = argv.find((argument) => !argument.startsWith("--"));
+  if (!inputPath) fail("CSV 경로가 필요합니다.");
+  const path = await resolveRosterPath(inputPath);
   const execute = argv.includes("--execute");
   const confirmation = argv.find((value) => value.startsWith("--confirm="))?.slice("--confirm=".length);
   const expectedSha256 = argv.find((value) => value.startsWith("--expected-sha256="))?.slice("--expected-sha256=".length);
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl || !serviceRoleKey) fail("Supabase URL과 service role key가 필요합니다.");
-  const [source, database] = await Promise.all([readFile(path, "utf8"), loadDatabaseContext(supabaseUrl, serviceRoleKey)]);
-  const result = await runRosterReset({ path, source, ...database, execute, confirmation, expectedSha256, serviceRoleKey });
+  const [sourceBytes, database] = await Promise.all([readFile(path), loadDatabaseContext(supabaseUrl, serviceRoleKey)]);
+  const result = await runRosterReset({ path: "members/members.csv", source: sourceBytes.toString("utf8"), sourceBytes, ...database, execute, confirmation, expectedSha256, serviceRoleKey });
   console.log(JSON.stringify(result, null, 2));
 }
 
