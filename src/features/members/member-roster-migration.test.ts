@@ -100,6 +100,22 @@ describe("member roster preparation migration", () => {
     expect(migrationSql).not.toContain("(member_id is null or contact_update_requested)");
   });
 
+  it("requires name-only confirmation for contactless creates but not omitted-contact updates", () => {
+    expect(migrationSql).toContain("member_id is null and normalized_phone is null and name_exists");
+    expect(migrationSql).not.toContain("if contact_update_requested and normalized_phone is null and name_exists");
+  });
+
+  it("uses one NFKC normalized name for manual save locks and comparisons", () => {
+    const saveFunction = migrationSql.slice(
+      migrationSql.indexOf("create or replace function public.save_member_with_contact"),
+      migrationSql.indexOf("revoke execute on function public.save_member_with_contact"),
+    );
+    expect(saveFunction).toContain("normalized_name text := lower(btrim(normalize(member_data->>'name', NFKC)))");
+    expect(saveFunction).toContain("'member-contact-name:' || normalized_name");
+    expect(saveFunction).toContain("lower(btrim(normalize(duplicate_member.name, NFKC))) = normalized_name");
+    expect(saveFunction).toContain("lower(btrim(normalize(name, NFKC))) = normalized_name");
+  });
+
   it("distinguishes an omitted group from an explicit group removal", () => {
     expect(migrationSql).toContain("when member_data ? 'group_id'");
     expect(migrationSql).toContain("then (member_data->>'group_id')::uuid");
@@ -122,6 +138,15 @@ describe("member roster preparation migration", () => {
     expect(migrationSql).toContain("where status = 'active'");
     expect(migrationSql).toContain("normalize(display_name, NFKC)");
     expect(migrationSql).not.toContain("where operator_profile_id is not null");
+  });
+
+  it("rejects a changed active-profile UUID snapshot before destructive reset", () => {
+    const validationPosition = migrationSql.indexOf("active profile set changed since preview");
+    const deletePosition = migrationSql.indexOf("delete from public.fee_payments");
+    expect(migrationSql).toContain("expected_active_profile_ids uuid[]");
+    expect(migrationSql).toContain("array_agg(id order by id)");
+    expect(validationPosition).toBeGreaterThan(-1);
+    expect(validationPosition).toBeLessThan(deletePosition);
   });
 
   it("stores canonical contact digits consistently", () => {
@@ -197,7 +222,7 @@ describe("member roster preparation migration", () => {
 });
 
 describe("member roster finalization migration", () => {
-  it("requires an explicit reset or bootstrap marker even for empty databases", () => {
+  it("bootstraps only a genuinely pristine database and blocks an emptied production database", () => {
     const guardPosition = finalizeMigrationSql.indexOf(
       "member roster reset has not been completed",
     );
@@ -205,8 +230,13 @@ describe("member roster finalization migration", () => {
 
     expect(guardPosition).toBeGreaterThan(-1);
     expect(guardPosition).toBeLessThan(dropPosition);
-    expect(finalizeMigrationSql).not.toContain("if exists (select 1 from public.members)");
-    expect(finalizeMigrationSql).toContain("if not exists (");
+    expect(finalizeMigrationSql).toContain("'bootstrap_empty'");
+    expect(finalizeMigrationSql).toContain("not exists (select 1 from public.members)");
+    expect(finalizeMigrationSql).toContain("not exists (select 1 from public.profiles)");
+    expect(finalizeMigrationSql).toContain("not exists (select 1 from public.fee_payments)");
+    expect(finalizeMigrationSql).toContain("not exists (select 1 from public.expenses)");
+    expect(finalizeMigrationSql).toContain("not exists (select 1 from public.events)");
+    expect(finalizeMigrationSql).toContain("not exists (select 1 from public.audit_logs)");
     expect(finalizeMigrationSql).toContain("from public.member_roster_reset_state");
     expect(finalizeMigrationSql).toContain("marker_kind in ('reset_complete', 'bootstrap_empty')");
   });
@@ -240,10 +270,10 @@ describe("member roster finalization migration", () => {
     expect(finalizeMigrationSql).toContain("drop column if exists phone_last_four");
     expect(finalizeMigrationSql).toContain("drop column if exists withdrawal_reason");
     expect(finalizeMigrationSql).toContain(
-      "revoke execute on function public.admin_reset_member_roster(jsonb, text)",
+      "revoke execute on function public.admin_reset_member_roster(jsonb, text, uuid[])",
     );
     expect(finalizeMigrationSql).toContain(
-      "drop function public.admin_reset_member_roster(jsonb, text)",
+      "drop function public.admin_reset_member_roster(jsonb, text, uuid[])",
     );
   });
 
@@ -260,5 +290,7 @@ describe("member roster finalization migration", () => {
     expect(saveFunction).not.toContain("phone_last_four");
     expect(saveFunction).not.toContain("withdrawal_reason");
     expect(saveFunction).toContain("member_data ? 'phone_number'");
+    expect(saveFunction).toContain("member_id is null and normalized_phone is null and name_exists");
+    expect(saveFunction).toContain("normalized_name text := lower(btrim(normalize(member_data->>'name', NFKC)))");
   });
 });

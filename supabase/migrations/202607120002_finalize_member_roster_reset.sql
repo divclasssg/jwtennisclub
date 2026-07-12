@@ -1,8 +1,16 @@
--- Rollout note: apply this migration only after the one-time roster reset has
--- succeeded and its imported/member-profile counts have been verified. A
--- every database requires an explicit reset or empty-bootstrap marker.
 do $$
 begin
+  if not exists (select 1 from public.member_roster_reset_state where singleton)
+     and not exists (select 1 from public.members)
+     and not exists (select 1 from public.profiles)
+     and not exists (select 1 from public.fee_payments)
+     and not exists (select 1 from public.expenses)
+     and not exists (select 1 from public.events)
+     and not exists (select 1 from public.audit_logs) then
+    insert into public.member_roster_reset_state (singleton, marker_kind, member_count, marked_at)
+    values (true, 'bootstrap_empty', 0, now());
+  end if;
+
   if not exists (
        select 1
        from public.member_roster_reset_state
@@ -112,6 +120,7 @@ as $$
 declare
   saved_member_id uuid := member_id;
   requested_name text := btrim(member_data->>'name');
+  normalized_name text := lower(btrim(normalize(member_data->>'name', NFKC)));
   requested_phone text := nullif(btrim(member_data->>'phone_number'), '');
   normalized_phone text;
   duplicate_id uuid;
@@ -145,7 +154,7 @@ begin
     );
   end if;
   perform pg_advisory_xact_lock(
-    hashtextextended('member-contact-name:' || lower(requested_name), 0)
+    hashtextextended('member-contact-name:' || normalized_name, 0)
   );
 
   if contact_update_requested then
@@ -154,14 +163,14 @@ begin
     join public.members duplicate_member on duplicate_member.id = contacts.member_id
     where contacts.phone_normalized = normalized_phone
       and contacts.member_id is distinct from member_id
-    order by (lower(btrim(duplicate_member.name)) = lower(requested_name)) desc
+    order by (lower(btrim(normalize(duplicate_member.name, NFKC))) = normalized_name) desc
     limit 1;
   end if;
 
   if duplicate_id is not null then
     if exists (
       select 1 from public.members
-      where id = duplicate_id and lower(btrim(name)) = lower(requested_name)
+      where id = duplicate_id and lower(btrim(normalize(name, NFKC))) = normalized_name
     ) then
       return jsonb_build_object('status', 'DUPLICATE_BLOCKED', 'member_id', duplicate_id);
     elsif duplicate_confirmation is distinct from 'CONFIRM_PHONE_REUSE' then
@@ -172,10 +181,10 @@ begin
   select exists (
     select 1 from public.members
     where id is distinct from member_id
-      and lower(btrim(name)) = lower(requested_name)
+      and lower(btrim(normalize(name, NFKC))) = normalized_name
   ) into name_exists;
 
-  if contact_update_requested and normalized_phone is null and name_exists
+  if member_id is null and normalized_phone is null and name_exists
      and duplicate_confirmation is distinct from 'CONFIRM_NAME_ONLY' then
     return jsonb_build_object('status', 'NAME_ONLY_CONFIRMATION_REQUIRED');
   end if;
@@ -244,12 +253,8 @@ alter table public.members
   drop column if exists phone_last_four,
   drop column if exists withdrawal_reason;
 
-revoke execute on function public.admin_reset_member_roster(jsonb, text)
+revoke execute on function public.admin_reset_member_roster(jsonb, text, uuid[])
 from public, anon, authenticated, service_role;
-drop function public.admin_reset_member_roster(jsonb, text);
-
-revoke execute on function public.admin_mark_empty_roster_bootstrap(text)
-from public, anon, authenticated, service_role;
-drop function public.admin_mark_empty_roster_bootstrap(text);
+drop function public.admin_reset_member_roster(jsonb, text, uuid[]);
 
 drop table public.member_roster_reset_state;

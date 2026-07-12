@@ -239,6 +239,7 @@ as $$
 declare
   saved_member_id uuid := member_id;
   requested_name text := btrim(member_data->>'name');
+  normalized_name text := lower(btrim(normalize(member_data->>'name', NFKC)));
   requested_phone text := nullif(btrim(member_data->>'phone_number'), '');
   normalized_phone text;
   duplicate_id uuid;
@@ -272,7 +273,7 @@ begin
     );
   end if;
   perform pg_advisory_xact_lock(
-    hashtextextended('member-contact-name:' || lower(requested_name), 0)
+    hashtextextended('member-contact-name:' || normalized_name, 0)
   );
 
   if contact_update_requested then
@@ -281,14 +282,14 @@ begin
     join public.members duplicate_member on duplicate_member.id = contacts.member_id
     where contacts.phone_normalized = normalized_phone
       and contacts.member_id is distinct from member_id
-    order by (lower(btrim(duplicate_member.name)) = lower(requested_name)) desc
+    order by (lower(btrim(normalize(duplicate_member.name, NFKC))) = normalized_name) desc
     limit 1;
   end if;
 
   if duplicate_id is not null then
     if exists (
       select 1 from public.members
-      where id = duplicate_id and lower(btrim(name)) = lower(requested_name)
+      where id = duplicate_id and lower(btrim(normalize(name, NFKC))) = normalized_name
     ) then
       return jsonb_build_object('status', 'DUPLICATE_BLOCKED', 'member_id', duplicate_id);
     elsif duplicate_confirmation is distinct from 'CONFIRM_PHONE_REUSE' then
@@ -299,10 +300,10 @@ begin
   select exists (
     select 1 from public.members
     where id is distinct from member_id
-      and lower(btrim(name)) = lower(requested_name)
+      and lower(btrim(normalize(name, NFKC))) = normalized_name
   ) into name_exists;
 
-  if contact_update_requested and normalized_phone is null and name_exists
+  if member_id is null and normalized_phone is null and name_exists
      and duplicate_confirmation is distinct from 'CONFIRM_NAME_ONLY' then
     return jsonb_build_object('status', 'NAME_ONLY_CONFIRMATION_REQUIRED');
   end if;
@@ -369,7 +370,8 @@ grant execute on function public.save_member_with_contact(uuid, jsonb, text) to 
 
 create or replace function public.admin_reset_member_roster(
   import_rows jsonb,
-  confirmation text
+  confirmation text,
+  expected_active_profile_ids uuid[]
 )
 returns jsonb
 language plpgsql
@@ -391,6 +393,14 @@ begin
 
   if jsonb_typeof(import_rows) is distinct from 'array' then
     raise exception 'import_rows must be a JSON array';
+  end if;
+
+  if coalesce(expected_active_profile_ids, array[]::uuid[]) is distinct from (
+    select coalesce(array_agg(id order by id), array[]::uuid[])
+    from public.profiles
+    where status = 'active'
+  ) then
+    raise exception 'active profile set changed since preview';
   end if;
 
   create temporary table roster_profile_links on commit drop as
@@ -560,28 +570,6 @@ begin
 end;
 $$;
 
-revoke execute on function public.admin_reset_member_roster(jsonb, text)
+revoke execute on function public.admin_reset_member_roster(jsonb, text, uuid[])
 from public, anon, authenticated;
-grant execute on function public.admin_reset_member_roster(jsonb, text) to service_role;
-
-create or replace function public.admin_mark_empty_roster_bootstrap(confirmation text)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if auth.role() is distinct from 'service_role' then raise exception 'service_role required'; end if;
-  if confirmation is distinct from 'BOOTSTRAP_EMPTY_MEMBER_ROSTER' then raise exception 'invalid bootstrap confirmation'; end if;
-  if exists (select 1 from public.members) or exists (select 1 from public.fee_payments) then
-    raise exception 'bootstrap marker requires empty members and fee payments';
-  end if;
-  insert into public.member_roster_reset_state (singleton, marker_kind, member_count, marked_at)
-  values (true, 'bootstrap_empty', 0, now())
-  on conflict (singleton) do update
-  set marker_kind = excluded.marker_kind, member_count = excluded.member_count, marked_at = excluded.marked_at;
-end;
-$$;
-
-revoke execute on function public.admin_mark_empty_roster_bootstrap(text) from public, anon, authenticated;
-grant execute on function public.admin_mark_empty_roster_bootstrap(text) to service_role;
+grant execute on function public.admin_reset_member_roster(jsonb, text, uuid[]) to service_role;

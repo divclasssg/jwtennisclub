@@ -188,6 +188,7 @@ export async function runRosterReset(options) {
   const sha256 = createHash("sha256").update(options.sourceBytes ?? Buffer.from(options.source, "utf8")).digest("hex");
   const rows = parseRosterCsv(options.source);
   const preview = buildResetPreview(rows, options.profiles);
+  const activeProfileIds = options.profiles.map((profile) => profile.id).sort();
 
   if (!options.execute) return { executed: false, sha256, ...preview };
   if (options.confirmation !== "RESET_MEMBERS_AND_FEES" || options.expectedSha256 !== sha256) {
@@ -202,7 +203,7 @@ export async function runRosterReset(options) {
     group_code: row.groupCode,
     status: row.status,
     joined_date: row.joinedDate,
-  })), options.confirmation);
+  })), options.confirmation, activeProfileIds);
   if (result.imported_count !== preview.rowCount || result.reconnected_profile_count !== preview.reconnectedProfileCount) {
     fail("초기화 결과 카운트가 미리보기와 일치하지 않습니다.");
   }
@@ -264,8 +265,12 @@ async function loadDatabaseContext(url, serviceRoleKey) {
   if (codes.size !== 2 || !codes.has("A") || !codes.has("B")) fail("활성 A/B 그룹을 확인할 수 없습니다.");
   return {
     profiles: (profiles ?? []).map((profile) => ({ id: profile.id, name: profile.display_name })),
-    rpc: async (rows, confirmation) => {
-      const { data, error } = await supabase.rpc("admin_reset_member_roster", { import_rows: rows, confirmation });
+    rpc: async (rows, confirmation, expectedActiveProfileIds) => {
+      const { data, error } = await supabase.rpc("admin_reset_member_roster", {
+        import_rows: rows,
+        confirmation,
+        expected_active_profile_ids: expectedActiveProfileIds,
+      });
       if (error) fail("회원 명부 초기화 RPC가 실패했습니다.");
       return data;
     },

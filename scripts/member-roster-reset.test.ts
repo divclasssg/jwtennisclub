@@ -161,10 +161,30 @@ describe("runRosterReset", () => {
     const rpc = vi.fn().mockResolvedValue({ imported_count: 1, reconnected_profile_count: 1 });
     const result = await runRosterReset({ ...file, profiles, execute: true, confirmation: "RESET_MEMBERS_AND_FEES", expectedSha256: dryRun.sha256, serviceRoleKey: "secret", rpc });
     expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith(expect.any(Array), "RESET_MEMBERS_AND_FEES", ["profile-1"]);
     expect(result.executed).toBe(true);
 
     const badRpc = vi.fn().mockResolvedValue({ imported_count: 0, reconnected_profile_count: 1 });
     await expect(runRosterReset({ ...file, profiles, execute: true, confirmation: "RESET_MEMBERS_AND_FEES", expectedSha256: dryRun.sha256, serviceRoleKey: "secret", rpc: badRpc })).rejects.toThrow(/결과/);
+  });
+
+  it("RPC에 정렬된 active profile UUID snapshot을 전달한다", async () => {
+    const snapshotProfiles = [
+      { id: "00000000-0000-0000-0000-000000000002", name: "Synthetic Two" },
+      { id: "00000000-0000-0000-0000-000000000001", name: "Synthetic One" },
+    ];
+    const source = [
+      "ID,이름,전화번호,Group,상태,가입일",
+      "M0001,Synthetic One,,A,활동중,2026-07-01",
+      "M0002,Synthetic Two,,B,활동중,2026-07-01",
+    ].join("\n");
+    const dryRun = await runRosterReset({ path: file.path, source, profiles: snapshotProfiles, rpc: vi.fn() });
+    const rpc = vi.fn().mockResolvedValue({ imported_count: 2, reconnected_profile_count: 2 });
+    await runRosterReset({ path: file.path, source, profiles: snapshotProfiles, execute: true, confirmation: "RESET_MEMBERS_AND_FEES", expectedSha256: dryRun.sha256, serviceRoleKey: "secret", rpc });
+    expect(rpc).toHaveBeenCalledWith(expect.any(Array), "RESET_MEMBERS_AND_FEES", [
+      "00000000-0000-0000-0000-000000000001",
+      "00000000-0000-0000-0000-000000000002",
+    ]);
   });
 });
 
