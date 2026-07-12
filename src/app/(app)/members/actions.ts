@@ -73,7 +73,7 @@ export async function createMember(
   }
 
   const { supabase } = await getAuthenticatedUserId();
-  const result = await saveMember(supabase, null, member, true);
+  const result = await saveMember(supabase, null, member, formData.has("phoneNumber"));
 
   if (!result) {
     redirect(buildRedirect(memberCreatePath, { error: "save-failed" }));

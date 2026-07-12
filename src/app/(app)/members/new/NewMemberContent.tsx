@@ -25,15 +25,16 @@ function duplicateValue(value?: string): DuplicateConfirmation {
   return value === "phone-reuse" || value === "name-without-phone" ? value : null;
 }
 
-export function NewMemberContent({ searchParams, groups }: {
+export function NewMemberContent({ searchParams, groups, canManageContacts }: {
   searchParams: NewMemberSearchParams;
   groups: MemberGroupOption[];
+  canManageContacts: boolean;
 }) {
   const message = errorMessage(firstSearchParam(searchParams.error));
   const duplicate = duplicateValue(firstSearchParam(searchParams.duplicate));
 
   return <FormPanel description="이름, 전체 연락처, 그룹과 가입일을 입력합니다." title="회원 정보">
-    <MemberForm action={createMember} duplicateConfirmation={duplicate} groups={groups} mode="create" />
+    <MemberForm action={createMember} canManageContacts={canManageContacts} duplicateConfirmation={duplicate} groups={groups} mode="create" />
     {message ? <FormMessage>{message}</FormMessage> : null}
   </FormPanel>;
 }

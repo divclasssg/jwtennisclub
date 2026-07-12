@@ -177,4 +177,14 @@ describe("member actions", () => {
       }),
     );
   });
+
+  it("omits contact data when the create form has no contact control", async () => {
+    mocks.rpc.mockResolvedValue({ data: { status: "SAVED", member_code: "M0002" }, error: null });
+    const formData = memberFormData();
+    formData.delete("phoneNumber");
+    await expect(createMember(initialState, formData)).rejects.toThrow("redirect:/members?status=created&memberCode=M0002");
+    expect(mocks.rpc).toHaveBeenCalledWith("save_member_with_contact", expect.objectContaining({
+      member_data: expect.not.objectContaining({ phone_number: expect.anything() }),
+    }));
+  });
 });

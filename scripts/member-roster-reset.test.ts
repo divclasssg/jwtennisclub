@@ -104,6 +104,12 @@ describe("buildResetPreview", () => {
     expect(JSON.stringify(preview)).not.toContain("01012345678");
   });
 
+  it("matches active profile names with trim and case normalization", () => {
+    const csv = validCsv.replace("홍길동", "Synthetic Operator");
+    expect(buildResetPreview(parseRosterCsv(csv), [{ id: "profile-1", name: " synthetic operator " }]))
+      .toMatchObject({ reconnectedProfileCount: 1 });
+  });
+
   it("운영자 이름의 누락과 복수 일치를 차단한다", () => {
     const rows = parseRosterCsv(validCsv);
     expect(() => buildResetPreview(rows, [{ id: "profile-1", name: "없는이름" }])).toThrow(/프로필/);

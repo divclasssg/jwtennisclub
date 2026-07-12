@@ -1,8 +1,4 @@
-import {
-  MEMBER_STATUS_LABELS,
-  type MemberStatus,
-  validateMemberLifecycle,
-} from "./member-model";
+import { type MemberStatus, validateMemberLifecycle } from "./member-model";
 import { normalizePhoneNumber, validatePhoneNumber } from "./member-contact";
 import { isMemberStatus } from "./member-list";
 
@@ -50,21 +46,6 @@ export type MemberSaveResult =
     }
   | { status: "blocked" };
 
-export type CsvParseResult =
-  | { ok: true; members: MemberFormInput[] }
-  | { ok: false; line: number; message: string };
-
-const csvHeaderAliases: Readonly<
-  Record<Exclude<keyof MemberFormInput, "duplicateConfirmation">, string[]>
-> = {
-  name: ["name", "이름"],
-  phoneNumber: ["phone_number", "phoneNumber", "전화번호", "연락처"],
-  groupId: ["group_id", "groupId", "그룹ID"],
-  status: ["status", "상태"],
-  joinedDate: ["joined_date", "joinedDate", "가입일"],
-  withdrawnDate: ["withdrawn_date", "withdrawnDate", "탈퇴일"],
-  memo: ["memo", "메모"],
-};
 
 export function parseMemberFormData(formData: FormData): MemberFormInput {
   return normalizeMemberInput({
@@ -168,94 +149,10 @@ export function parseMemberSaveResult(value: unknown): MemberSaveResult {
   throw new Error("Invalid member save result");
 }
 
-export function parseMembersCsv(source: string): CsvParseResult {
-  const rows = parseCsvRows(source);
-  if (rows.length < 2) {
-    return { ok: false, line: 1, message: "CSV에 회원 데이터가 없습니다." };
-  }
-
-  const headers = rows[0].map((header) => header.trim());
-  const members: MemberFormInput[] = [];
-  for (let index = 1; index < rows.length; index += 1) {
-    const row = rows[index];
-    if (row.every((cell) => !cell.trim())) continue;
-
-    const member = normalizeMemberInput({
-      name: readCsvValue(headers, row, "name"),
-      phoneNumber: readCsvValue(headers, row, "phoneNumber"),
-      groupId: readCsvValue(headers, row, "groupId"),
-      status: normalizeCsvStatus(readCsvValue(headers, row, "status")),
-      joinedDate: readCsvValue(headers, row, "joinedDate"),
-      withdrawnDate: readCsvValue(headers, row, "withdrawnDate"),
-      memo: readCsvValue(headers, row, "memo"),
-    });
-    const errors = validateMemberForm(member);
-    if (errors.length > 0) {
-      return { ok: false, line: index + 1, message: errors[0] };
-    }
-    members.push(member);
-  }
-
-  return members.length > 0
-    ? { ok: true, members }
-    : { ok: false, line: 1, message: "CSV에 회원 데이터가 없습니다." };
-}
-
 function isDuplicateConfirmation(
   value: unknown,
 ): value is Exclude<DuplicateConfirmation, null> {
   return value === "phone-reuse" || value === "name-without-phone";
-}
-
-function normalizeCsvStatus(value: string | null) {
-  if (!value) return value;
-  return (
-    Object.entries(MEMBER_STATUS_LABELS).find(
-      ([key, label]) => key === value || label === value,
-    )?.[0] ?? value
-  );
-}
-
-function parseCsvRows(source: string) {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let inQuotes = false;
-  for (let index = 0; index < source.length; index += 1) {
-    const character = source[index];
-    const nextCharacter = source[index + 1];
-    if (character === '"' && inQuotes && nextCharacter === '"') {
-      cell += '"';
-      index += 1;
-    } else if (character === '"') {
-      inQuotes = !inQuotes;
-    } else if (character === "," && !inQuotes) {
-      row.push(cell);
-      cell = "";
-    } else if ((character === "\n" || character === "\r") && !inQuotes) {
-      if (character === "\r" && nextCharacter === "\n") index += 1;
-      row.push(cell);
-      rows.push(row);
-      row = [];
-      cell = "";
-    } else {
-      cell += character;
-    }
-  }
-  row.push(cell);
-  rows.push(row);
-  return rows;
-}
-
-function readCsvValue(
-  headers: string[],
-  row: string[],
-  field: Exclude<keyof MemberFormInput, "duplicateConfirmation">,
-) {
-  const index = headers.findIndex((header) =>
-    csvHeaderAliases[field].includes(header),
-  );
-  return index < 0 ? null : (row[index] ?? null);
 }
 
 function readFormString(formData: FormData, name: string) {

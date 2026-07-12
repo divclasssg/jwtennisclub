@@ -26,7 +26,7 @@ describe("MemberForm duplicate confirmation", () => {
       }
       return { status: "idle" as const };
     });
-    render(<MemberForm action={action} groups={[{ id: "group-a", code: "A" }]} mode="create" />);
+    render(<MemberForm action={action} canManageContacts groups={[{ id: "group-a", code: "A" }]} mode="create" />);
     fireEvent.change(screen.getByLabelText("이름"), { target: { value: "후보 회원" } });
     fireEvent.change(screen.getByLabelText("연락처"), { target: { value: "010-2345-6789" } });
     fireEvent.change(screen.getByLabelText("그룹"), { target: { value: "group-a" } });

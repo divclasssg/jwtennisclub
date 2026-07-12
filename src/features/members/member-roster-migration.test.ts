@@ -29,9 +29,25 @@ describe("member roster preparation migration", () => {
     expect(notNullPosition).toBeGreaterThan(backfillPosition);
     expect(migrationSql).toContain("before insert on public.members");
     expect(migrationSql).toContain(
-      "new.member_code := public.next_member_code(new.group_id)",
+      "new.member_code := public.next_member_code()",
     );
     expect(migrationSql).toContain("if old.member_code is distinct from new.member_code");
+  });
+
+  it("stores one prefix and counter and allocates independently of group", () => {
+    expect(migrationSql).toContain("create table public.member_code_allocator");
+    expect(migrationSql).toContain("prefix text not null");
+    expect(migrationSql).toContain("next_suffix integer not null");
+    expect(migrationSql).toContain("create or replace function public.next_member_code()")
+    expect(migrationSql).not.toContain("next_member_code(requested_group_id uuid)");
+    expect(migrationSql).toContain("left(row.member_code, 1)");
+    expect(migrationSql).toContain("max(right(row.member_code, 4)::integer) + 1");
+  });
+
+  it("preserves an explicitly unassigned group in reset and normal saves", () => {
+    expect(migrationSql).not.toContain("select id into new.group_id from public.member_groups where code = 'A'");
+    expect(migrationSql).toContain("groups.id, now(), now()")
+    expect(migrationSql).not.toContain("coalesce(groups.id, default_group.id)");
   });
 
   it("preserves imported codes only inside the service-role reset transaction", () => {
@@ -49,7 +65,7 @@ describe("member roster preparation migration", () => {
 
   it("allocates the next code from the global maximum imported suffix", () => {
     expect(migrationSql).toContain(
-      "coalesce(max(right(members.member_code, 4)::integer), 0) + 1",
+      "max(right(row.member_code, 4)::integer) + 1",
     );
     expect(migrationSql).not.toContain(
       "where members.member_code like group_code || '%'",
@@ -65,17 +81,23 @@ describe("member roster preparation migration", () => {
   it("serializes phone and name duplicate decisions", () => {
     expect(migrationSql).toContain("member-contact-phone:");
     expect(migrationSql).toContain("member-contact-name:");
-    expect(migrationSql.match(/pg_advisory_xact_lock/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(migrationSql.match(/pg_advisory_xact_lock/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(migrationSql).toContain("from public.member_code_allocator where singleton for update");
   });
 
   it("preserves contacts for non-contact updates and rejects unauthorized contact changes", () => {
     expect(migrationSql).toContain("contact_update_requested boolean := member_data ? 'phone_number'");
     expect(migrationSql).toContain(
-      "(member_id is null or contact_update_requested)",
+      "contact_update_requested",
     );
     expect(migrationSql).toContain("not public.has_permission('members.contacts.manage')");
     expect(migrationSql).toContain("if contact_update_requested then");
     expect(migrationSql).toContain("phone_last_four = case when contact_update_requested");
+  });
+
+  it("requires contact permission only for an actual contact key", () => {
+    expect(migrationSql).toContain("if contact_update_requested")
+    expect(migrationSql).not.toContain("(member_id is null or contact_update_requested)");
   });
 
   it("distinguishes an omitted group from an explicit group removal", () => {
@@ -85,7 +107,7 @@ describe("member roster preparation migration", () => {
   });
 
   it("rejects every ambiguous or inconsistent operator reconnect before deletion", () => {
-    const validationPosition = migrationSql.indexOf("operator profile member UUID/name mismatch");
+    const validationPosition = migrationSql.indexOf("operator profile must match exactly one imported member");
     const deletePosition = migrationSql.indexOf("delete from public.fee_payments");
 
     expect(validationPosition).toBeGreaterThan(-1);
@@ -93,6 +115,18 @@ describe("member roster preparation migration", () => {
     expect(migrationSql).toContain("operator profile reconnect count mismatch");
     expect(validationPosition).toBeLessThan(deletePosition);
     expect(migrationSql).toContain("matched_member_id");
+  });
+
+  it("uses every active profile display name as the authoritative reconnect set", () => {
+    expect(migrationSql).toContain("from public.profiles")
+    expect(migrationSql).toContain("where status = 'active'");
+    expect(migrationSql).toContain("normalize(display_name, NFKC)");
+    expect(migrationSql).not.toContain("where operator_profile_id is not null");
+  });
+
+  it("stores canonical contact digits consistently", () => {
+    expect(migrationSql).toContain("phone_number = phone_normalized");
+    expect(migrationSql).toContain("saved_member_id, normalized_phone, normalized_phone");
   });
 
   it("validates the complete reset payload before deleting existing data", () => {
@@ -158,12 +192,12 @@ describe("member roster preparation migration", () => {
     expect(migrationSql).toContain("create table public.member_roster_reset_state");
     expect(markerPosition).toBeGreaterThan(deletePosition);
     expect(markerPosition).toBeLessThan(resultPosition);
-    expect(migrationSql).toContain("reset_completed_at = excluded.reset_completed_at");
+    expect(migrationSql).toContain("marker_kind = excluded.marker_kind");
   });
 });
 
 describe("member roster finalization migration", () => {
-  it("blocks populated databases until the destructive reset completed", () => {
+  it("requires an explicit reset or bootstrap marker even for empty databases", () => {
     const guardPosition = finalizeMigrationSql.indexOf(
       "member roster reset has not been completed",
     );
@@ -171,9 +205,10 @@ describe("member roster finalization migration", () => {
 
     expect(guardPosition).toBeGreaterThan(-1);
     expect(guardPosition).toBeLessThan(dropPosition);
-    expect(finalizeMigrationSql).toContain("if exists (select 1 from public.members)");
-    expect(finalizeMigrationSql).toContain("and not exists (");
+    expect(finalizeMigrationSql).not.toContain("if exists (select 1 from public.members)");
+    expect(finalizeMigrationSql).toContain("if not exists (");
     expect(finalizeMigrationSql).toContain("from public.member_roster_reset_state");
+    expect(finalizeMigrationSql).toContain("marker_kind in ('reset_complete', 'bootstrap_empty')");
   });
 
   it("asserts the permanent member-code contract before destructive cleanup", () => {

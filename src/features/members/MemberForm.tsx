@@ -26,6 +26,7 @@ type MemberFormProps = {
   member?: MemberEditRecord;
   groups: MemberGroupOption[];
   duplicateConfirmation?: DuplicateConfirmation;
+  canManageContacts?: boolean;
 };
 
 export function MemberForm({
@@ -34,6 +35,7 @@ export function MemberForm({
   member,
   groups,
   duplicateConfirmation = null,
+  canManageContacts = member?.canManageContacts ?? false,
 }: MemberFormProps) {
   const [actionState, formAction] = useActionState(action, initialMemberActionState);
   const activeConfirmation = actionState.status === "confirmation-required"
@@ -73,7 +75,7 @@ export function MemberForm({
             type="text"
           />
         </FormField>
-        {mode === "create" || member?.canManageContacts ? (
+        {canManageContacts ? (
           <FormField label="연락처">
             <TextInput
               autoComplete="tel"
@@ -85,12 +87,12 @@ export function MemberForm({
               type="tel"
             />
           </FormField>
-        ) : (
+        ) : mode === "edit" ? (
           <div className={styles["protected-contact"]}>
             <span>연락처</span>
             <strong>{member?.phoneDisplay}</strong>
           </div>
-        )}
+        ) : null}
         <FormField label="그룹">
           <SelectInput defaultValue={candidate?.groupId ?? member?.groupId ?? ""} name="groupId">
             <option value="">그룹 없음</option>

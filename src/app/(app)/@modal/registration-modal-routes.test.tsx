@@ -23,6 +23,7 @@ vi.mock("@/app/(app)/members/actions", () => ({
 }));
 
 vi.mock("@/features/members/member-directory", () => ({
+  canManageMemberContacts: vi.fn(async () => false),
   loadMemberGroups: vi.fn(async () => [{ id: "group-a", code: "A" }]),
 }));
 
@@ -36,6 +37,7 @@ describe("registration modal routes", () => {
 
     expect(screen.getByRole("dialog", { name: "회원 등록" })).toBeInTheDocument();
     expect(screen.getByLabelText("이름")).toBeInTheDocument();
+    expect(screen.queryByLabelText("연락처")).not.toBeInTheDocument();
     expect(
       screen.getByText("연락처 형식을 확인하세요."),
     ).toBeInTheDocument();

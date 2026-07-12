@@ -35,6 +35,18 @@ set member_code = 'A' || lpad(numbered_members.member_number::text, 4, '0')
 from numbered_members
 where members.id = numbered_members.id;
 
+create table public.member_code_allocator (
+  singleton boolean primary key default true check (singleton),
+  prefix text not null check (prefix ~ '^[A-Z]$'),
+  next_suffix integer not null check (next_suffix between 1 and 10000)
+);
+
+insert into public.member_code_allocator (singleton, prefix, next_suffix)
+select true, 'A', coalesce(max(right(member_code, 4)::integer), 0) + 1
+from public.members
+on conflict (singleton) do update
+set prefix = excluded.prefix, next_suffix = excluded.next_suffix;
+
 alter table public.members
   alter column member_code set not null,
   add constraint members_member_code_format
@@ -51,7 +63,8 @@ create table public.member_contacts (
   updated_at timestamptz not null default now(),
   constraint member_contacts_phone_pair check (
     (phone_number is null and phone_normalized is null)
-    or (phone_number is not null and phone_normalized ~ '^01[016789][0-9]{7,8}$')
+    or (phone_number is not null and phone_normalized ~ '^01[016789][0-9]{7,8}$'
+      and phone_number = phone_normalized)
   )
 );
 
@@ -59,7 +72,9 @@ create table public.member_contacts (
 -- migration. It is written only by a successful reset transaction.
 create table public.member_roster_reset_state (
   singleton boolean primary key default true check (singleton),
-  reset_completed_at timestamptz not null
+  marker_kind text not null check (marker_kind in ('reset_complete', 'bootstrap_empty')),
+  member_count integer not null check (member_count >= 0),
+  marked_at timestamptz not null
 );
 
 revoke all on table public.member_roster_reset_state from public, anon, authenticated;
@@ -140,41 +155,30 @@ $$;
 revoke execute on function public.search_members_by_phone(text) from public, anon;
 grant execute on function public.search_members_by_phone(text) to authenticated;
 
-create or replace function public.next_member_code(requested_group_id uuid)
+create or replace function public.next_member_code()
 returns text
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  group_code text;
+  stored_prefix text;
   next_number integer;
 begin
-  perform pg_advisory_xact_lock(hashtext('public.members.member_code'));
-
-  select member_groups.code into group_code
-  from public.member_groups
-  where member_groups.id = requested_group_id
-    and member_groups.is_active;
-
-  if group_code is null or group_code !~ '^[A-Z]$' then
-    raise exception 'an active single-letter member group is required';
-  end if;
-
-  select coalesce(max(right(members.member_code, 4)::integer), 0) + 1
-  into next_number
-  from public.members
-  where members.member_code is not null;
+  select prefix, next_suffix into stored_prefix, next_number
+  from public.member_code_allocator where singleton for update;
+  if not found then raise exception 'member code allocator is not configured'; end if;
 
   if next_number > 9999 then
     raise exception 'member code sequence exhausted';
   end if;
 
-  return group_code || lpad(next_number::text, 4, '0');
+  update public.member_code_allocator set next_suffix = next_suffix + 1 where singleton;
+  return stored_prefix || lpad(next_number::text, 4, '0');
 end;
 $$;
 
-revoke execute on function public.next_member_code(uuid) from public, anon, authenticated;
+revoke execute on function public.next_member_code() from public, anon, authenticated;
 
 create or replace function public.assign_member_code()
 returns trigger
@@ -183,17 +187,13 @@ security definer
 set search_path = public
 as $$
 begin
-  if new.group_id is null then
-    select id into new.group_id from public.member_groups where code = 'A' and is_active;
-  end if;
-
   if auth.role() = 'service_role'
      and current_setting('app.member_roster_reset_import', true) = 'on' then
     if new.member_code is null or new.member_code !~ '^[A-Z][0-9]{4}$' then
       raise exception 'invalid imported member code';
     end if;
   else
-    new.member_code := public.next_member_code(new.group_id);
+    new.member_code := public.next_member_code();
   end if;
   return new;
 end;
@@ -252,7 +252,7 @@ begin
     raise exception 'members.update permission required';
   end if;
 
-  if (member_id is null or contact_update_requested)
+  if contact_update_requested
      and not public.has_permission('members.contacts.manage') then
     raise exception 'members.contacts.manage permission required';
   end if;
@@ -346,7 +346,7 @@ begin
       insert into public.member_contacts (
         member_id, phone_number, phone_normalized, updated_by, updated_at
       ) values (
-        saved_member_id, requested_phone, normalized_phone, auth.uid(), now()
+        saved_member_id, normalized_phone, normalized_phone, auth.uid(), now()
       ) on conflict (member_id) do update set
         phone_number = excluded.phone_number,
         phone_normalized = excluded.phone_normalized,
@@ -394,11 +394,11 @@ begin
   end if;
 
   create temporary table roster_profile_links on commit drop as
-  select id as old_member_id, operator_profile_id,
-         lower(btrim(normalize(name, NFKC))) as normalized_name,
+  select null::uuid as old_member_id, id as operator_profile_id,
+         lower(btrim(normalize(display_name, NFKC))) as normalized_name,
          null::uuid as matched_member_id
-  from public.members
-  where operator_profile_id is not null;
+  from public.profiles
+  where status = 'active';
 
   create temporary table roster_import_rows on commit drop as
   select
@@ -479,15 +479,6 @@ begin
   if exists (
     select 1
     from roster_profile_links links
-    join roster_import_rows imported on imported.id = links.old_member_id
-    where imported.normalized_name is distinct from links.normalized_name
-  ) then
-    raise exception 'operator profile member UUID/name mismatch';
-  end if;
-
-  if exists (
-    select 1
-    from roster_profile_links links
     where (
       select count(*)
       from roster_import_rows imported
@@ -507,7 +498,11 @@ begin
   from roster_import_rows imported
   where imported.normalized_name = links.normalized_name;
 
-  perform pg_advisory_xact_lock(hashtext('public.members.member_code'));
+  if exists (select 1 from roster_profile_links where matched_member_id is null) then
+    raise exception 'operator profile reconnect count mismatch';
+  end if;
+
+  perform 1 from public.member_code_allocator where singleton for update;
   delete from public.fee_payments;
   delete from public.members;
   perform set_config('app.member_roster_reset_import', 'on', true);
@@ -521,16 +516,12 @@ begin
     coalesce(row.status, 'active')::public.member_status,
     coalesce(row.joined_date, current_date), row.withdrawn_date,
     nullif(btrim(row.withdrawal_reason), ''), nullif(btrim(row.memo), ''),
-    coalesce(groups.id, default_group.id), now(), now()
+    groups.id, now(), now()
   from roster_import_rows row
-  left join public.member_groups groups on groups.code = row.group_code
-  cross join lateral (
-    select id from public.member_groups where code = 'A' and is_active
-  ) default_group;
+  left join public.member_groups groups on groups.code = row.group_code;
 
   insert into public.member_contacts (member_id, phone_number, phone_normalized)
-  select members.id, row.phone_number,
-         regexp_replace(row.phone_number, '[^0-9]', '', 'g')
+  select members.id, row.normalized_phone, row.normalized_phone
   from roster_import_rows row
   join public.members members on members.id = row.id
   where nullif(btrim(row.phone_number), '') is not null;
@@ -549,10 +540,17 @@ begin
 
   select count(*) into imported_count from public.members;
 
-  insert into public.member_roster_reset_state (singleton, reset_completed_at)
-  values (true, now())
+  insert into public.member_code_allocator (singleton, prefix, next_suffix)
+  select true, left(row.member_code, 1), max(right(row.member_code, 4)::integer) + 1
+  from roster_import_rows row
+  group by left(row.member_code, 1)
   on conflict (singleton) do update
-  set reset_completed_at = excluded.reset_completed_at;
+  set prefix = excluded.prefix, next_suffix = excluded.next_suffix;
+
+  insert into public.member_roster_reset_state (singleton, marker_kind, member_count, marked_at)
+  values (true, 'reset_complete', imported_count, now())
+  on conflict (singleton) do update
+  set marker_kind = excluded.marker_kind, member_count = excluded.member_count, marked_at = excluded.marked_at;
 
   return jsonb_build_object(
     'status', 'RESET_COMPLETE',
@@ -565,3 +563,25 @@ $$;
 revoke execute on function public.admin_reset_member_roster(jsonb, text)
 from public, anon, authenticated;
 grant execute on function public.admin_reset_member_roster(jsonb, text) to service_role;
+
+create or replace function public.admin_mark_empty_roster_bootstrap(confirmation text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() is distinct from 'service_role' then raise exception 'service_role required'; end if;
+  if confirmation is distinct from 'BOOTSTRAP_EMPTY_MEMBER_ROSTER' then raise exception 'invalid bootstrap confirmation'; end if;
+  if exists (select 1 from public.members) or exists (select 1 from public.fee_payments) then
+    raise exception 'bootstrap marker requires empty members and fee payments';
+  end if;
+  insert into public.member_roster_reset_state (singleton, marker_kind, member_count, marked_at)
+  values (true, 'bootstrap_empty', 0, now())
+  on conflict (singleton) do update
+  set marker_kind = excluded.marker_kind, member_count = excluded.member_count, marked_at = excluded.marked_at;
+end;
+$$;
+
+revoke execute on function public.admin_mark_empty_roster_bootstrap(text) from public, anon, authenticated;
+grant execute on function public.admin_mark_empty_roster_bootstrap(text) to service_role;

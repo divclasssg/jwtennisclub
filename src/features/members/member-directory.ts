@@ -132,7 +132,10 @@ export function toMemberListRow(
   };
 }
 
-async function canManageMemberContacts(supabase: Awaited<ReturnType<typeof createClient>>) {
+export async function canManageMemberContacts(
+  suppliedClient?: Awaited<ReturnType<typeof createClient>>,
+) {
+  const supabase = suppliedClient ?? await createClient();
   const {
     data: { user },
     error: userError,

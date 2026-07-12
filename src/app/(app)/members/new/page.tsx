@@ -3,7 +3,7 @@ import {
   type NewMemberSearchParams,
 } from "./NewMemberContent";
 import { FormPageTemplate } from "@/components/templates";
-import { loadMemberGroups } from "@/features/members/member-directory";
+import { canManageMemberContacts, loadMemberGroups } from "@/features/members/member-directory";
 
 type NewMemberPageProps = {
   searchParams: Promise<NewMemberSearchParams>;
@@ -13,7 +13,9 @@ export default async function NewMemberPage({
   searchParams,
 }: NewMemberPageProps) {
   const params = await searchParams;
-  const groups = await loadMemberGroups();
+  const [groups, canManageContacts] = await Promise.all([
+    loadMemberGroups(), canManageMemberContacts(),
+  ]);
 
   return (
     <FormPageTemplate
@@ -21,7 +23,7 @@ export default async function NewMemberPage({
       kicker="새 회원 추가"
       title="회원 등록"
     >
-      <NewMemberContent groups={groups} searchParams={params} />
+      <NewMemberContent canManageContacts={canManageContacts} groups={groups} searchParams={params} />
     </FormPageTemplate>
   );
 }

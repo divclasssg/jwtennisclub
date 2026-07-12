@@ -1,13 +1,17 @@
 -- Rollout note: apply this migration only after the one-time roster reset has
 -- succeeded and its imported/member-profile counts have been verified. A
--- populated database without that durable success marker fails before cleanup.
+-- every database requires an explicit reset or empty-bootstrap marker.
 do $$
 begin
-  if exists (select 1 from public.members)
-     and not exists (
+  if not exists (
        select 1
        from public.member_roster_reset_state
-       where singleton and reset_completed_at is not null
+       where singleton
+         and marker_kind in ('reset_complete', 'bootstrap_empty')
+         and (
+           (marker_kind = 'reset_complete' and member_count > 0 and exists (select 1 from public.members))
+           or (marker_kind = 'bootstrap_empty' and member_count = 0 and not exists (select 1 from public.members))
+         )
      ) then
     raise exception 'member roster reset has not been completed; do not finalize the roster migration';
   end if;
@@ -121,7 +125,7 @@ begin
     raise exception 'members.update permission required';
   end if;
 
-  if (member_id is null or contact_update_requested)
+  if contact_update_requested
      and not public.has_permission('members.contacts.manage') then
     raise exception 'members.contacts.manage permission required';
   end if;
@@ -212,7 +216,7 @@ begin
       insert into public.member_contacts (
         member_id, phone_number, phone_normalized, updated_by, updated_at
       ) values (
-        saved_member_id, requested_phone, normalized_phone, auth.uid(), now()
+        saved_member_id, normalized_phone, normalized_phone, auth.uid(), now()
       ) on conflict (member_id) do update set
         phone_number = excluded.phone_number,
         phone_normalized = excluded.phone_normalized,
@@ -243,5 +247,9 @@ alter table public.members
 revoke execute on function public.admin_reset_member_roster(jsonb, text)
 from public, anon, authenticated, service_role;
 drop function public.admin_reset_member_roster(jsonb, text);
+
+revoke execute on function public.admin_mark_empty_roster_bootstrap(text)
+from public, anon, authenticated, service_role;
+drop function public.admin_mark_empty_roster_bootstrap(text);
 
 drop table public.member_roster_reset_state;

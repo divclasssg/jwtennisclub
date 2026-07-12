@@ -257,13 +257,13 @@ async function loadDatabaseContext(url, serviceRoleKey) {
   const supabase = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const [{ data: groups, error: groupError }, { data: profiles, error: profileError }] = await Promise.all([
     supabase.from("member_groups").select("code").in("code", ["A", "B"]).eq("is_active", true),
-    supabase.from("members").select("operator_profile_id, name").not("operator_profile_id", "is", null),
+    supabase.from("profiles").select("id, display_name").eq("status", "active"),
   ]);
   if (groupError || profileError) fail("초기화 사전검증 데이터를 불러오지 못했습니다.");
   const codes = new Set((groups ?? []).map((group) => group.code));
   if (codes.size !== 2 || !codes.has("A") || !codes.has("B")) fail("활성 A/B 그룹을 확인할 수 없습니다.");
   return {
-    profiles: (profiles ?? []).map((profile) => ({ id: profile.operator_profile_id, name: profile.name })),
+    profiles: (profiles ?? []).map((profile) => ({ id: profile.id, name: profile.display_name })),
     rpc: async (rows, confirmation) => {
       const { data, error } = await supabase.rpc("admin_reset_member_roster", { import_rows: rows, confirmation });
       if (error) fail("회원 명부 초기화 RPC가 실패했습니다.");

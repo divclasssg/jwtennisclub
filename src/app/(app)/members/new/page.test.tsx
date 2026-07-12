@@ -4,6 +4,7 @@ import NewMemberPage from "./page";
 
 vi.mock("../actions", () => ({ createMember: vi.fn() }));
 vi.mock("@/features/members/member-directory", () => ({
+  canManageMemberContacts: vi.fn(async () => false),
   loadMemberGroups: vi.fn(async () => [
     { id: "group-a", code: "A" },
     { id: "group-b", code: "B" },
@@ -16,8 +17,7 @@ describe("NewMemberPage", () => {
 
     expect(screen.getByText("회원번호는 등록 시 자동 발급됩니다.")).toBeInTheDocument();
     expect(screen.queryByLabelText("회원번호")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("연락처")).toHaveAttribute("autocomplete", "tel");
-    expect(screen.getByLabelText("연락처")).toHaveAttribute("type", "tel");
+    expect(screen.queryByLabelText("연락처")).not.toBeInTheDocument();
     expect(screen.getByLabelText("그룹")).toBeInTheDocument();
     expect(screen.queryByText("탈퇴 사유")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("CSV 파일")).not.toBeInTheDocument();
