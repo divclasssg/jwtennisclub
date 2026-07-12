@@ -178,7 +178,14 @@ begin
     select id into new.group_id from public.member_groups where code = 'A' and is_active;
   end if;
 
-  new.member_code := public.next_member_code(new.group_id);
+  if auth.role() = 'service_role'
+     and current_setting('app.member_roster_reset_import', true) = 'on' then
+    if new.member_code is null or new.member_code !~ '^[A-Z][0-9]{4}$' then
+      raise exception 'invalid imported member code';
+    end if;
+  else
+    new.member_code := public.next_member_code(new.group_id);
+  end if;
   return new;
 end;
 $$;
@@ -427,15 +434,17 @@ begin
   from roster_import_rows imported
   where lower(btrim(imported.name)) = links.normalized_name;
 
+  perform pg_advisory_xact_lock(hashtext('public.members.member_code'));
   delete from public.fee_payments;
   delete from public.members;
+  perform set_config('app.member_roster_reset_import', 'on', true);
 
   insert into public.members (
-    id, name, status, joined_date, withdrawn_date, withdrawal_reason, memo,
+    id, name, member_code, status, joined_date, withdrawn_date, withdrawal_reason, memo,
     group_id, created_at, updated_at
   )
   select
-    row.id, btrim(row.name),
+    row.id, btrim(row.name), row.member_code,
     coalesce(row.status, 'active')::public.member_status,
     coalesce(row.joined_date, current_date), row.withdrawn_date,
     nullif(btrim(row.withdrawal_reason), ''), nullif(btrim(row.memo), ''),
@@ -467,7 +476,11 @@ begin
 
   select count(*) into imported_count from public.members;
 
-  return jsonb_build_object('status', 'RESET_COMPLETE', 'imported_count', imported_count);
+  return jsonb_build_object(
+    'status', 'RESET_COMPLETE',
+    'imported_count', imported_count,
+    'reconnected_profile_count', reconnected_profile_count
+  );
 end;
 $$;
 

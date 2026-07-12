@@ -26,6 +26,34 @@ describe("member roster preparation migration", () => {
     expect(migrationSql).toContain("if old.member_code is distinct from new.member_code");
   });
 
+  it("preserves imported codes only inside the service-role reset transaction", () => {
+    expect(migrationSql).toContain("auth.role() = 'service_role'");
+    expect(migrationSql).toContain(
+      "current_setting('app.member_roster_reset_import', true) = 'on'",
+    );
+    expect(migrationSql).toContain(
+      "perform set_config('app.member_roster_reset_import', 'on', true)",
+    );
+    expect(migrationSql).toContain(
+      "row.id, btrim(row.name), row.member_code",
+    );
+  });
+
+  it("allocates the next code from the global maximum imported suffix", () => {
+    expect(migrationSql).toContain(
+      "coalesce(max(right(members.member_code, 4)::integer), 0) + 1",
+    );
+    expect(migrationSql).not.toContain(
+      "where members.member_code like group_code || '%'",
+    );
+  });
+
+  it("returns both imported and reconnected profile counts", () => {
+    expect(migrationSql).toContain(
+      "'reconnected_profile_count', reconnected_profile_count",
+    );
+  });
+
   it("serializes phone and name duplicate decisions", () => {
     expect(migrationSql).toContain("member-contact-phone:");
     expect(migrationSql).toContain("member-contact-name:");
