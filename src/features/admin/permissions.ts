@@ -3,6 +3,7 @@ export const PERMISSIONS = [
   "members.create",
   "members.update",
   "members.delete",
+  "members.contacts.manage",
   "fees.payments.create",
   "fees.payments.update",
   "expenses.view",

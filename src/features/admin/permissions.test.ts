@@ -37,6 +37,11 @@ describe("hasPermission", () => {
     expect(hasPermission("admin", "roles.manage")).toBe(true);
   });
 
+  it("연락처 관리 권한은 관리자에게만 기본 부여한다", () => {
+    expect(hasPermission("admin", "members.contacts.manage")).toBe(true);
+    expect(hasPermission("operator", "members.contacts.manage")).toBe(false);
+  });
+
   it("allows default operators to create payments and expenses", () => {
     expect(hasPermission("operator", "fees.payments.create")).toBe(true);
     expect(hasPermission("operator", "expenses.create")).toBe(true);
