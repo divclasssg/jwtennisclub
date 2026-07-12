@@ -132,4 +132,28 @@ describe("fee payment actions", () => {
     ]);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
   });
+
+  it("redirects a missing member with the original CSV line after blank rows", async () => {
+    mocks.membersQuery.eq.mockResolvedValueOnce({ data: [], error: null });
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(
+        [
+          [
+            "memberCode,periodMonth,amount,paidDate,memo",
+            "",
+            "m0001,2026-07,30000,2026-07-03,7월 회비",
+          ].join("\r\n"),
+        ],
+        "fees.csv",
+        { type: "text/csv" },
+      ),
+    );
+
+    await expect(importFeePaymentsCsv(formData)).rejects.toThrow(
+      "redirect:/fees/new?importError=member-not-found&line=3",
+    );
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
 });

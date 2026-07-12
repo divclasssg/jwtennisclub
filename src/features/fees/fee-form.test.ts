@@ -55,6 +55,7 @@ describe("parseFeePaymentsCsv", () => {
 
     expect(result).toEqual({
       ok: true,
+      sourceLines: [2, 3],
       payments: [
         {
           memberCode: "M0001",
@@ -71,6 +72,40 @@ describe("parseFeePaymentsCsv", () => {
           memo: null,
         },
       ],
+    });
+  });
+
+  it("빈 행을 건너뛰고 원본 CSV 행 번호를 보존한다", () => {
+    const result = parseFeePaymentsCsv(
+      [
+        "회원번호,납부월,금액,납부일",
+        "",
+        "M0001,2026-07,30000,2026-07-03",
+        "   , , , ",
+        "M0002,2026-07,30000,2026-07-04",
+      ].join("\n"),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      sourceLines: [3, 5],
+      payments: [{ memberCode: "M0001" }, { memberCode: "M0002" }],
+    });
+  });
+
+  it("CRLF CSV에서도 빈 행 뒤의 원본 행 번호를 보존한다", () => {
+    const result = parseFeePaymentsCsv(
+      [
+        "회원번호,납부월,금액,납부일",
+        "",
+        "M0001,2026-07,30000,2026-07-03",
+      ].join("\r\n"),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      sourceLines: [3],
+      payments: [{ memberCode: "M0001" }],
     });
   });
 

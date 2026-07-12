@@ -28,6 +28,7 @@ export type FeePaymentCsvParseResult =
   | {
       ok: true;
       payments: FeePaymentCsvInput[];
+      sourceLines: number[];
     }
   | {
       ok: false;
@@ -97,6 +98,7 @@ export function parseFeePaymentsCsv(source: string): FeePaymentCsvParseResult {
     return { ok: false, line: 1, message: "CSV 필수 헤더를 확인하세요." };
   }
   const payments: FeePaymentCsvInput[] = [];
+  const sourceLines: number[] = [];
 
   for (let index = 1; index < rows.length; index += 1) {
     const row = rows[index];
@@ -123,13 +125,14 @@ export function parseFeePaymentsCsv(source: string): FeePaymentCsvParseResult {
     }
 
     payments.push(payment);
+    sourceLines.push(index + 1);
   }
 
   if (payments.length === 0) {
     return { ok: false, line: 1, message: "CSV에 회비 납부 데이터가 없습니다." };
   }
 
-  return { ok: true, payments };
+  return { ok: true, payments, sourceLines };
 }
 
 export function validateFeePaymentForm(input: FeePaymentFormInput): string[] {

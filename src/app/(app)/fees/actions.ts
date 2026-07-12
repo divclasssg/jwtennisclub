@@ -160,7 +160,7 @@ export async function importFeePaymentsCsv(formData: FormData) {
       redirect(
         buildRedirect(feeCreatePath, {
           importError: "member-not-found",
-          line: index + 2,
+          line: parsed.sourceLines[index],
         }),
       );
     }
