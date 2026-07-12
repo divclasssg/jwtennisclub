@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, realpath } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -10,8 +11,6 @@ const STATUS_MAP = new Map([
   ["active", "active"],
   ["휴회", "paused"],
   ["paused", "paused"],
-  ["탈퇴", "withdrawn"],
-  ["withdrawn", "withdrawn"],
 ]);
 
 function fail(message, rowNumber) {
@@ -215,21 +214,42 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export async function resolveRosterPath(inputPath, options = {}) {
   const repoRoot = options.repoRoot ?? REPO_ROOT;
   const fs = options.fs ?? { lstat, realpath };
-  const intendedPath = resolve(repoRoot, "members", "members.csv");
+  const membersPath = resolve(repoRoot, "members");
+  const intendedPath = resolve(membersPath, "members.csv");
   const candidatePath = isAbsolute(inputPath) ? resolve(inputPath) : resolve(repoRoot, inputPath);
   if (candidatePath !== intendedPath) fail("입력 경로는 저장소의 members/members.csv여야 합니다.");
 
+  const repoStat = await fs.lstat(repoRoot);
+  if (repoStat.isSymbolicLink() || !repoStat.isDirectory()) fail("저장소 루트는 심볼릭 링크가 아닌 디렉터리여야 합니다.");
+  const membersStat = await fs.lstat(membersPath);
+  if (membersStat.isSymbolicLink() || !membersStat.isDirectory()) fail("members 경로는 심볼릭 링크가 아닌 디렉터리여야 합니다.");
   const candidateStat = await fs.lstat(candidatePath);
   if (candidateStat.isSymbolicLink()) fail("입력 CSV는 심볼릭 링크일 수 없습니다.");
   if (!candidateStat.isFile()) fail("입력 CSV는 일반 파일이어야 합니다.");
-  const [candidateRealPath, intendedRealPath] = await Promise.all([
+  const [realRepoRoot, realMembersPath, candidateRealPath, intendedRealPath] = await Promise.all([
+    fs.realpath(repoRoot),
+    fs.realpath(membersPath),
     fs.realpath(candidatePath),
     fs.realpath(intendedPath),
   ]);
+  if (realMembersPath !== resolve(realRepoRoot, "members")) {
+    fail("members 디렉터리가 저장소 루트 밖을 가리킬 수 없습니다.");
+  }
   if (candidateRealPath !== intendedRealPath) {
     fail("입력 CSV가 허용된 파일을 가리키지 않습니다.");
   }
   return intendedPath;
+}
+
+async function readRosterBytes(path) {
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile()) fail("입력 CSV는 일반 파일이어야 합니다.");
+    return await handle.readFile();
+  } finally {
+    await handle.close();
+  }
 }
 
 async function loadDatabaseContext(url, serviceRoleKey) {
@@ -262,7 +282,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl || !serviceRoleKey) fail("Supabase URL과 service role key가 필요합니다.");
-  const [sourceBytes, database] = await Promise.all([readFile(path), loadDatabaseContext(supabaseUrl, serviceRoleKey)]);
+  const [sourceBytes, database] = await Promise.all([readRosterBytes(path), loadDatabaseContext(supabaseUrl, serviceRoleKey)]);
   const result = await runRosterReset({ path: "members/members.csv", source: sourceBytes.toString("utf8"), sourceBytes, ...database, execute, confirmation, expectedSha256, serviceRoleKey });
   console.log(JSON.stringify(result, null, 2));
 }

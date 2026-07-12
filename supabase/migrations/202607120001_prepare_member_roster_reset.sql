@@ -410,13 +410,12 @@ begin
     from roster_import_rows row
     left join public.member_groups groups
       on groups.code = row.group_code and groups.is_active
-    where row.group_code is not null and groups.id is null
-  ) or not exists (
-    select 1 from public.member_groups groups
-    where groups.code = 'A' and groups.is_active
-      and exists (select 1 from roster_import_rows row where row.group_code is null)
-  ) and exists (
-    select 1 from roster_import_rows row where row.group_code is null
+    where row.group_code is not null
+      and (row.group_code not in ('A', 'B') or groups.id is null)
+  ) or not (
+    select count(*) = 2
+    from public.member_groups groups
+    where groups.code in ('A', 'B') and groups.is_active
   ) then
     raise exception 'invalid imported group';
   end if;
@@ -451,7 +450,7 @@ begin
 
   if exists (
     select 1 from roster_import_rows row
-    where row.status not in ('active', 'paused', 'withdrawn')
+    where row.status not in ('active', 'paused')
       or (row.phone_number is not null and btrim(row.phone_number) !~ '^[0-9 ()-]+$')
       or (row.normalized_phone is not null and row.normalized_phone !~ '^01[016789][0-9]{7,8}$')
   ) then

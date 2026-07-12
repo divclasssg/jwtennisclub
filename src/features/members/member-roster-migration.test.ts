@@ -107,7 +107,21 @@ describe("member roster preparation migration", () => {
     }
     expect(migrationSql).toContain("row.group_code is not null");
     expect(migrationSql).toContain("groups.is_active");
-    expect(migrationSql).toContain("row.group_code is null");
+    expect(migrationSql).toContain("groups.code in ('A', 'B')");
+  });
+
+  it("rejects non-A/B groups and withdrawn rows before deleting existing data", () => {
+    const deletePosition = migrationSql.indexOf("delete from public.fee_payments");
+    const strictGroupPosition = migrationSql.indexOf("row.group_code not in ('A', 'B')");
+    const activeGroupsPosition = migrationSql.indexOf("count(*) = 2");
+    const statusPosition = migrationSql.indexOf("row.status not in ('active', 'paused')");
+
+    expect(strictGroupPosition).toBeGreaterThan(-1);
+    expect(activeGroupsPosition).toBeGreaterThan(-1);
+    expect(statusPosition).toBeGreaterThan(-1);
+    expect(strictGroupPosition).toBeLessThan(deletePosition);
+    expect(activeGroupsPosition).toBeLessThan(deletePosition);
+    expect(statusPosition).toBeLessThan(deletePosition);
   });
 
   it("returns masked contacts only for requested member IDs after checking view permission", () => {

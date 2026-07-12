@@ -90,6 +90,10 @@ describe("parseRosterCsv", () => {
     expect(() => parseRosterCsv("ID,이름,전화번호,Group,상태\nM0001,홍길동,,A,활동중")).toThrow();
     expect(() => parseRosterCsv("ID,이름,이름,전화번호,Group,상태,가입일\nM0001,홍길동,홍길동,,A,활동중,2026-01-01")).toThrow();
   });
+
+  it.each(["탈퇴", "withdrawn"])("탈퇴 상태는 withdrawn_date가 없는 reset CSV에서 차단한다: %s", (status) => {
+    expect(() => parseRosterCsv(validCsv.replace("활동중", status))).toThrow(/상태/);
+  });
 });
 
 describe("buildResetPreview", () => {
@@ -180,5 +184,14 @@ describe("resolveRosterPath", () => {
     await symlink(target, intendedPath);
 
     await expect(resolveRosterPath(intendedPath, { repoRoot, fs: { lstat, realpath } })).rejects.toThrow(/심볼릭 링크/);
+  });
+
+  it("members parent 디렉터리의 심볼릭 링크 탈출을 차단한다", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "roster-repo-"));
+    const outsideRoot = await mkdtemp(join(tmpdir(), "roster-outside-"));
+    await writeFile(join(outsideRoot, "members.csv"), "synthetic");
+    await symlink(outsideRoot, join(repoRoot, "members"));
+
+    await expect(resolveRosterPath("members/members.csv", { repoRoot, fs: { lstat, realpath } })).rejects.toThrow(/심볼릭 링크|디렉터리/);
   });
 });
