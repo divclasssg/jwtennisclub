@@ -1,99 +1,39 @@
-import { createMember, importMembersCsv } from "../actions";
-import styles from "./page.module.scss";
-import { Button } from "@/components/atoms";
-import { CsvUploadField, FormMessage } from "@/components/molecules";
+import { createMember } from "../actions";
+import { FormMessage } from "@/components/molecules";
 import { FormPanel } from "@/components/organisms";
 import { MemberForm } from "@/features/members/MemberForm";
+import type { MemberGroupOption } from "@/features/members/member-directory";
+import type { DuplicateConfirmation } from "@/features/members/member-form";
 import { firstSearchParam } from "@/features/members/member-list";
 
 export type NewMemberSearchParams = {
   error?: string | string[];
-  importError?: string | string[];
-  line?: string | string[];
+  duplicate?: string | string[];
 };
 
-function getErrorMessage(error: string | undefined) {
-  if (error === "invalid-name") {
-    return "이름을 입력하세요.";
-  }
-
-  if (error === "invalid-phone") {
-    return "전화번호는 끝 4자리 숫자만 입력하세요.";
-  }
-
-  if (error === "invalid-joined-date") {
-    return "가입일을 확인하세요.";
-  }
-
-  if (error === "invalid-withdrawn-date") {
-    return "탈퇴 상태와 탈퇴일을 확인하세요.";
-  }
-
-  if (error === "save-failed") {
-    return "회원을 저장하지 못했습니다. 권한 또는 입력값을 확인하세요.";
-  }
-
+function errorMessage(error?: string) {
+  if (error === "invalid-name") return "이름을 입력하세요.";
+  if (error === "invalid-phone") return "연락처 형식을 확인하세요.";
+  if (error === "invalid-joined-date") return "가입일을 확인하세요.";
+  if (error === "invalid-withdrawn-date") return "탈퇴 상태와 탈퇴일을 확인하세요.";
+  if (error === "duplicate-member") return "이미 등록된 회원입니다.";
+  if (error === "save-failed") return "회원을 저장하지 못했습니다. 권한 또는 입력값을 확인하세요.";
   return null;
 }
 
-function getImportErrorMessage(error: string | undefined, line?: string) {
-  if (error === "missing-file") {
-    return "CSV 파일을 선택하세요.";
-  }
-
-  if (error === "invalid-csv") {
-    return `${line ?? "-"}번째 줄을 확인하세요. CSV 형식 또는 입력값이 올바르지 않습니다.`;
-  }
-
-  if (error === "too-many-rows") {
-    return "CSV는 한 번에 최대 200명까지 등록할 수 있습니다.";
-  }
-
-  if (error === "save-failed") {
-    return "CSV 회원을 저장하지 못했습니다. 권한 또는 입력값을 확인하세요.";
-  }
-
-  return null;
+function duplicateValue(value?: string): DuplicateConfirmation {
+  return value === "phone-reuse" || value === "name-without-phone" ? value : null;
 }
 
-type NewMemberContentProps = {
+export function NewMemberContent({ searchParams, groups }: {
   searchParams: NewMemberSearchParams;
-};
+  groups: MemberGroupOption[];
+}) {
+  const message = errorMessage(firstSearchParam(searchParams.error));
+  const duplicate = duplicateValue(firstSearchParam(searchParams.duplicate));
 
-export function NewMemberContent({ searchParams }: NewMemberContentProps) {
-  const errorMessage = getErrorMessage(firstSearchParam(searchParams.error));
-  const importErrorMessage = getImportErrorMessage(
-    firstSearchParam(searchParams.importError),
-    firstSearchParam(searchParams.line),
-  );
-
-  return (
-    <>
-      <FormPanel
-        description="이름, 전화번호 끝 4자리, 가입일을 기준으로 회원을 추가합니다."
-        title="단건 등록"
-      >
-        <MemberForm action={createMember} mode="create" />
-        {errorMessage ? <FormMessage>{errorMessage}</FormMessage> : null}
-      </FormPanel>
-
-      <FormPanel
-        description={
-          <>
-            헤더는 이름, 전화번호끝4자리, 가입일, 상태, 탈퇴일, 탈퇴사유,
-            메모를 사용할 수 있습니다.
-          </>
-        }
-        title="CSV 등록"
-      >
-        <form action={importMembersCsv} className={styles["member-csv-form"]}>
-          <CsvUploadField />
-          <Button type="submit">CSV 등록</Button>
-        </form>
-        {importErrorMessage ? (
-          <FormMessage>{importErrorMessage}</FormMessage>
-        ) : null}
-      </FormPanel>
-    </>
-  );
+  return <FormPanel description="이름, 전체 연락처, 그룹과 가입일을 입력합니다." title="회원 정보">
+    <MemberForm action={createMember} duplicateConfirmation={duplicate} groups={groups} mode="create" />
+    {message ? <FormMessage>{message}</FormMessage> : null}
+  </FormPanel>;
 }

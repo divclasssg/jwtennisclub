@@ -2,3 +2,28 @@
   display: grid;
   gap: var(--spacing-lg);
 }
+
+.member-code-note,
+.protected-contact,
+.duplicate-warning {
+  margin: 0;
+  color: var(--ink-muted-48);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.protected-contact {
+  display: grid;
+  gap: var(--spacing-xs);
+}
+
+.protected-contact strong {
+  color: var(--ink);
+}
+
+.duplicate-warning {
+  padding: var(--spacing-md);
+  border: var(--hairline-width) solid var(--color-error-border-soft);
+  border-radius: var(--rounded-sm);
+  color: var(--error-text);
+}

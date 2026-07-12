@@ -26,7 +26,22 @@ export type MemberListRow = {
 export type MemberEditRecord = MemberListRow & {
   phoneNumber: string | null;
   groupId: string | null;
+  canManageContacts: boolean;
 };
+
+export type MemberGroupOption = { id: string; code: string };
+
+export async function loadMemberGroups(): Promise<MemberGroupOption[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("member_groups")
+    .select("id, code")
+    .eq("is_active", true)
+    .order("code", { ascending: true });
+
+  if (error) throw new Error("회원 그룹을 불러오지 못했습니다.");
+  return (data ?? []) as MemberGroupOption[];
+}
 
 type MemberDatabaseRow = {
   id: string;
@@ -186,7 +201,7 @@ export async function loadMemberDirectory(input: {
 }): Promise<MemberListRow[]> {
   const supabase = await createClient();
   const canManageContacts = await canManageMemberContacts(supabase);
-  const groupRelation = input.group ? "member_groups!inner(code)" : "member_groups(code)";
+  const groupRelation = input.group && input.group !== "none" ? "member_groups!inner(code)" : "member_groups(code)";
   let request = supabase
     .from("members")
     .select(
@@ -198,7 +213,9 @@ export async function loadMemberDirectory(input: {
     request = request.eq("status", input.status);
   }
 
-  if (input.group) {
+  if (input.group === "none") {
+    request = request.is("group_id", null);
+  } else if (input.group) {
     request = request.eq("member_groups.code", input.group);
   }
 
@@ -276,6 +293,7 @@ export async function loadMemberForEdit(
     ...toMemberListRow(member, phoneDisplay),
     phoneNumber,
     groupId: member.groupId,
+    canManageContacts,
   };
 }
 

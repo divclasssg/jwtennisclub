@@ -20,7 +20,10 @@ vi.mock("@/app/(app)/fees/actions", () => ({
 
 vi.mock("@/app/(app)/members/actions", () => ({
   createMember: vi.fn(),
-  importMembersCsv: vi.fn(),
+}));
+
+vi.mock("@/features/members/member-directory", () => ({
+  loadMemberGroups: vi.fn(async () => [{ id: "group-a", code: "A" }]),
 }));
 
 describe("registration modal routes", () => {
@@ -34,8 +37,9 @@ describe("registration modal routes", () => {
     expect(screen.getByRole("dialog", { name: "회원 등록" })).toBeInTheDocument();
     expect(screen.getByLabelText("이름")).toBeInTheDocument();
     expect(
-      screen.getByText("전화번호는 끝 4자리 숫자만 입력하세요."),
+      screen.getByText("연락처 형식을 확인하세요."),
     ).toBeInTheDocument();
+    expect(screen.queryByLabelText("CSV 파일")).not.toBeInTheDocument();
   });
 
   it("renders fee CSV registration content in a modal", async () => {

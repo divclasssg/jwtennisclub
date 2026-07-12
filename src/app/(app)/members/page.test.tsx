@@ -2,168 +2,69 @@ import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import MembersPage from "./page";
 
-const members = [
-  {
-    id: "member-1",
-    name: "김민수",
-    phone_last_four: "1234",
-    operator_profile_id: "profile-id",
-    status: "active",
-    joined_date: "2026-07-01",
-    withdrawn_date: null,
-    withdrawal_reason: null,
-    memo: null,
-  },
-  {
-    id: "member-2",
-    name: "이영희",
-    phone_last_four: "9876",
-    operator_profile_id: null,
-    status: "withdrawn",
-    joined_date: "2026-06-01",
-    withdrawn_date: "2026-07-10",
-    withdrawal_reason: "이사",
-    memo: null,
-  },
-];
+const loadMemberDirectory = vi.fn();
 
-const queryState = {
-  rows: members,
-  profileRows: [
-    {
-      id: "profile-id",
-      club_positions: {
-        name: "president",
-        sort_order: 10,
-      },
-    },
-  ],
+vi.mock("@/features/members/member-directory", () => ({
+  loadMemberDirectory: (...args: unknown[]) => loadMemberDirectory(...args),
+}));
+
+const member = {
+  id: "member-1",
+  memberCode: "JW-000001",
+  name: "김민수",
+  phoneDisplay: "010-****-5678",
+  groupCode: "A",
+  status: "active" as const,
+  joinedDate: "2026-07-01",
+  withdrawnDate: null,
+  memo: null,
 };
 
-function createQueryBuilder(
-  resolver: () => {
-    data: unknown[];
-    error: null;
-  },
-) {
-  const queryBuilder = {
-    select: vi.fn(() => queryBuilder),
-    order: vi.fn(() => queryBuilder),
-    eq: vi.fn(() => queryBuilder),
-    in: vi.fn(() => queryBuilder),
-    or: vi.fn(() => queryBuilder),
-    then: vi.fn((resolve) => resolve(resolver())),
-  };
-
-  return queryBuilder;
-}
-
-const membersQueryBuilder = createQueryBuilder(() => ({
-  data: queryState.rows,
-  error: null,
-}));
-const profilesQueryBuilder = createQueryBuilder(() => ({
-  data: queryState.profileRows,
-  error: null,
-}));
-const from = vi.fn((table: string) =>
-  table === "profiles" ? profilesQueryBuilder : membersQueryBuilder,
-);
-
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn(async () => ({
-    from,
-  })),
-}));
-
 describe("MembersPage", () => {
-  beforeEach(() => {
-    queryState.rows = members;
-    queryState.profileRows = [
-      {
-        id: "profile-id",
-        club_positions: {
-          name: "president",
-          sort_order: 10,
-        },
-      },
-    ];
-    from.mockClear();
+  beforeEach(() => loadMemberDirectory.mockResolvedValue([member]));
 
-    for (const queryBuilder of [membersQueryBuilder, profilesQueryBuilder]) {
-      queryBuilder.select.mockClear();
-      queryBuilder.order.mockClear();
-      queryBuilder.eq.mockClear();
-      queryBuilder.in.mockClear();
-      queryBuilder.or.mockClear();
-      queryBuilder.then.mockClear();
-    }
-  });
-
-  it("renders member rows with search and status tabs", async () => {
+  it("renders permanent member data and directory filters", async () => {
     render(
       await MembersPage({
-        searchParams: Promise.resolve({ q: "김", status: "paused" }),
+        searchParams: Promise.resolve({ q: "JW", status: "active", group: "A" }),
       }),
     );
 
-    expect(
-      screen.getByRole("heading", { name: "회원 관리" }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("검색")).toHaveValue("김");
-    expect(screen.getByDisplayValue("paused")).toHaveAttribute("name", "status");
-    expect(
-      screen.getByRole("link", { name: "활동" }),
-    ).toHaveAttribute("href", "/members?status=active&q=%EA%B9%80");
-    expect(
-      screen.getByRole("link", { name: "휴회" }),
-    ).toHaveAttribute("aria-current", "page");
-    expect(
-      screen.getByRole("link", { name: "탈퇴" }),
-    ).toHaveAttribute("href", "/members?status=withdrawn&q=%EA%B9%80");
+    expect(screen.getByLabelText("검색")).toHaveAttribute(
+      "placeholder",
+      "이름 또는 회원번호 검색",
+    );
+    expect(screen.getByLabelText("그룹")).toHaveValue("A");
+    expect(loadMemberDirectory).toHaveBeenCalledWith({
+      q: "JW",
+      status: "active",
+      group: "A",
+    });
 
-    const list = screen.getByRole("region", { name: "회원 목록" });
-    const table = within(list).getByRole("table");
-    expect(within(list).getByText("총 2명")).toBeInTheDocument();
-    expect(within(table).getByRole("cell", { name: "1234" })).toBeInTheDocument();
-    expect(within(table).getByText("운영진")).toBeInTheDocument();
-    expect(within(table).getByText("일반회원")).toBeInTheDocument();
-    expect(within(table).getByRole("cell", { name: "2026.07.10" })).toBeInTheDocument();
-    expect(within(table).getByRole("cell", { name: "이사" })).toBeInTheDocument();
+    const table = screen.getByRole("table");
+    expect(within(table).getByRole("columnheader", { name: "회원번호" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "그룹" })).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "JW-000001" })).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "010-****-5678" })).toBeInTheDocument();
+    expect(screen.queryByText("탈퇴 사유")).not.toBeInTheDocument();
   });
 
-  it("renders a mobile member list with the same member details", async () => {
-    render(
-      await MembersPage({
-        searchParams: Promise.resolve({ status: "active" }),
-      }),
-    );
+  it("renders the full contact returned for a contact manager", async () => {
+    loadMemberDirectory.mockResolvedValue([
+      { ...member, phoneDisplay: "010-1234-5678" },
+    ]);
+
+    render(await MembersPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("010-1234-5678")).toBeInTheDocument();
+  });
+
+  it("renders member code, group, and protected contact on mobile", async () => {
+    render(await MembersPage({ searchParams: Promise.resolve({}) }));
 
     const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
-    const items = within(mobileList).getAllByRole("listitem");
-
-    expect(items).toHaveLength(2);
-    expect(within(items[0]).getByRole("heading", { name: "김민수" })).toBeInTheDocument();
-    expect(within(items[0]).getByText("연락처 1234")).toBeInTheDocument();
-    expect(within(items[0]).getByText("운영진")).toBeInTheDocument();
-    expect(
-      within(items[0]).getByRole("link", { name: "김민수 수정" }),
-    ).toHaveAttribute("href", "/members/member-1/edit");
-    expect(within(items[1]).getByText("탈퇴일 2026.07.10")).toBeInTheDocument();
-    expect(within(items[1]).getByText("탈퇴 사유 이사")).toBeInTheDocument();
-  });
-
-  it("renders an empty state when no members match", async () => {
-    queryState.rows = [];
-
-    render(
-      await MembersPage({
-        searchParams: Promise.resolve({ q: "없음", status: "active" }),
-      }),
-    );
-
-    expect(
-      screen.getByRole("heading", { name: "표시할 회원이 없습니다" }),
-    ).toBeInTheDocument();
+    expect(within(mobileList).getByText("회원번호 JW-000001")).toBeInTheDocument();
+    expect(within(mobileList).getByText("연락처 010-****-5678")).toBeInTheDocument();
+    expect(within(mobileList).getByText("그룹 A")).toBeInTheDocument();
   });
 });

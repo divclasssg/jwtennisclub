@@ -2,10 +2,9 @@ import Link from "next/link";
 import { Badge } from "@/components/atoms";
 import {
   formatDate,
-  formatMemberKind,
   formatMemberStatus,
-  type MemberListRow,
 } from "./member-list";
+import type { MemberListRow } from "./member-directory";
 import type { MemberStatus } from "./member-model";
 import styles from "./MemberMobileList.module.scss";
 
@@ -34,9 +33,6 @@ export function MemberMobileList({ members }: MemberMobileListProps) {
             <div className={styles["member-mobile-title"]}>
               <h3 className={styles["member-mobile-name"]}>{member.name}</h3>
               <div className={styles["member-mobile-badges"]}>
-                <Badge tone={member.operatorProfileId ? "info" : "muted"}>
-                  {formatMemberKind(member)}
-                </Badge>
                 <Badge tone={getMemberStatusTone(member.status)}>
                   {formatMemberStatus(member.status)}
                 </Badge>
@@ -52,17 +48,13 @@ export function MemberMobileList({ members }: MemberMobileListProps) {
           </div>
 
           <div className={styles["member-mobile-detail-list"]}>
+            <p className={styles["member-mobile-detail"]}>회원번호 {member.memberCode}</p>
             <p className={styles["member-mobile-detail"]}>
-              연락처 {member.phoneLastFour ?? "-"}
+              연락처 {member.phoneDisplay}
             </p>
+            <p className={styles["member-mobile-detail"]}>그룹 {member.groupCode ?? "없음"}</p>
             <p className={styles["member-mobile-detail"]}>
               가입일 {formatDate(member.joinedDate)}
-            </p>
-            <p className={styles["member-mobile-detail"]}>
-              탈퇴일 {formatDate(member.withdrawnDate)}
-            </p>
-            <p className={styles["member-mobile-detail"]}>
-              탈퇴 사유 {member.withdrawalReason ?? "-"}
             </p>
           </div>
         </li>
