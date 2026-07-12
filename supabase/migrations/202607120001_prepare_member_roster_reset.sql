@@ -55,6 +55,15 @@ create table public.member_contacts (
   )
 );
 
+-- This private marker is the rollout gate for the destructive finalization
+-- migration. It is written only by a successful reset transaction.
+create table public.member_roster_reset_state (
+  singleton boolean primary key default true check (singleton),
+  reset_completed_at timestamptz not null
+);
+
+revoke all on table public.member_roster_reset_state from public, anon, authenticated;
+
 alter table public.member_groups enable row level security;
 alter table public.member_contacts enable row level security;
 
@@ -539,6 +548,11 @@ begin
   end if;
 
   select count(*) into imported_count from public.members;
+
+  insert into public.member_roster_reset_state (singleton, reset_completed_at)
+  values (true, now())
+  on conflict (singleton) do update
+  set reset_completed_at = excluded.reset_completed_at;
 
   return jsonb_build_object(
     'status', 'RESET_COMPLETE',

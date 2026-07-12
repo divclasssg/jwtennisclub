@@ -10,6 +10,14 @@ const migrationSql = readFileSync(
   "utf8",
 );
 
+const finalizeMigrationSql = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/migrations/202607120002_finalize_member_roster_reset.sql",
+  ),
+  "utf8",
+);
+
 describe("member roster preparation migration", () => {
   it("backfills codes before making them required and assigns every insert", () => {
     const backfillPosition = migrationSql.indexOf("with numbered_members as");
@@ -132,5 +140,73 @@ describe("member roster preparation migration", () => {
     expect(migrationSql).toContain(
       "member_contacts.member_id = any(member_ids)",
     );
+  });
+
+  it("records a durable completion marker only after a successful roster reset", () => {
+    const deletePosition = migrationSql.indexOf("delete from public.fee_payments");
+    const markerPosition = migrationSql.indexOf(
+      "insert into public.member_roster_reset_state",
+    );
+    const resetFunctionPosition = migrationSql.indexOf(
+      "create or replace function public.admin_reset_member_roster",
+    );
+    const resultPosition = migrationSql.indexOf(
+      "return jsonb_build_object",
+      resetFunctionPosition,
+    );
+
+    expect(migrationSql).toContain("create table public.member_roster_reset_state");
+    expect(markerPosition).toBeGreaterThan(deletePosition);
+    expect(markerPosition).toBeLessThan(resultPosition);
+    expect(migrationSql).toContain("reset_completed_at = excluded.reset_completed_at");
+  });
+});
+
+describe("member roster finalization migration", () => {
+  it("blocks populated databases until the destructive reset completed", () => {
+    const guardPosition = finalizeMigrationSql.indexOf(
+      "member roster reset has not been completed",
+    );
+    const dropPosition = finalizeMigrationSql.indexOf("drop column if exists phone_last_four");
+
+    expect(guardPosition).toBeGreaterThan(-1);
+    expect(guardPosition).toBeLessThan(dropPosition);
+    expect(finalizeMigrationSql).toContain("if exists (select 1 from public.members)");
+    expect(finalizeMigrationSql).toContain("and not exists (");
+    expect(finalizeMigrationSql).toContain("from public.member_roster_reset_state");
+  });
+
+  it("asserts the permanent member-code contract before destructive cleanup", () => {
+    expect(finalizeMigrationSql).toContain("attnotnull");
+    expect(finalizeMigrationSql).toContain("members_member_code_format");
+    expect(finalizeMigrationSql).toContain("members_member_code_unique");
+    expect(finalizeMigrationSql).toContain("members_prevent_member_code_change");
+    expect(finalizeMigrationSql).toContain("public.prevent_member_code_change()");
+  });
+
+  it("removes legacy fields and retires every reset function privilege", () => {
+    expect(finalizeMigrationSql).toContain("drop column if exists phone_last_four");
+    expect(finalizeMigrationSql).toContain("drop column if exists withdrawal_reason");
+    expect(finalizeMigrationSql).toContain(
+      "revoke execute on function public.admin_reset_member_roster(jsonb, text)",
+    );
+    expect(finalizeMigrationSql).toContain(
+      "drop function public.admin_reset_member_roster(jsonb, text)",
+    );
+  });
+
+  it("keeps member saves compatible with the finalized schema", () => {
+    const saveFunctionStart = finalizeMigrationSql.indexOf(
+      "create or replace function public.save_member_with_contact",
+    );
+    const saveFunctionEnd = finalizeMigrationSql.indexOf(
+      "revoke execute on function public.save_member_with_contact",
+    );
+    const saveFunction = finalizeMigrationSql.slice(saveFunctionStart, saveFunctionEnd);
+
+    expect(saveFunctionStart).toBeGreaterThan(-1);
+    expect(saveFunction).not.toContain("phone_last_four");
+    expect(saveFunction).not.toContain("withdrawal_reason");
+    expect(saveFunction).toContain("member_data ? 'phone_number'");
   });
 });
