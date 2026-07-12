@@ -184,6 +184,23 @@ describe("member roster finalization migration", () => {
     expect(finalizeMigrationSql).toContain("public.prevent_member_code_change()");
   });
 
+  it("replaces the rollout partial index with a global member-code unique index", () => {
+    const notNullPosition = finalizeMigrationSql.indexOf(
+      "alter column member_code set not null",
+    );
+    const dropIndexPosition = finalizeMigrationSql.indexOf(
+      "drop index if exists public.members_member_code_unique",
+    );
+    const createIndexPosition = finalizeMigrationSql.indexOf(
+      "create unique index members_member_code_unique\non public.members(member_code);",
+    );
+
+    expect(notNullPosition).toBeGreaterThan(-1);
+    expect(dropIndexPosition).toBeGreaterThan(notNullPosition);
+    expect(createIndexPosition).toBeGreaterThan(dropIndexPosition);
+    expect(finalizeMigrationSql).toContain("index_metadata.indpred is null");
+  });
+
   it("removes legacy fields and retires every reset function privilege", () => {
     expect(finalizeMigrationSql).toContain("drop column if exists phone_last_four");
     expect(finalizeMigrationSql).toContain("drop column if exists withdrawal_reason");

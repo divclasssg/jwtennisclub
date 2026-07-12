@@ -17,6 +17,11 @@ $$;
 alter table public.members
   alter column member_code set not null;
 
+drop index if exists public.members_member_code_unique;
+
+create unique index members_member_code_unique
+on public.members(member_code);
+
 do $$
 begin
   if not exists (
@@ -63,6 +68,7 @@ begin
       and index_metadata.indisready
       and index_metadata.indnkeyatts = 1
       and index_metadata.indexprs is null
+      and index_metadata.indpred is null
       and index_metadata.indkey::smallint[] = array[member_code_attribute.attnum]::smallint[]
   ) then
     raise exception 'members_member_code_unique must be a valid unique index';
