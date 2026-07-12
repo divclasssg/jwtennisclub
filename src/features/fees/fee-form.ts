@@ -86,7 +86,7 @@ export function parseFeePaymentsCsv(source: string): FeePaymentCsvParseResult {
     return { ok: false, line: 1, message: "CSV에 회비 납부 데이터가 없습니다." };
   }
 
-  const headers = rows[0].map((header) => header.trim());
+  const headers = rows[0].cells.map((header) => header.trim());
   const requiredFields: (keyof FeePaymentCsvInput)[] = [
     "memberCode",
     "periodMonth",
@@ -101,7 +101,7 @@ export function parseFeePaymentsCsv(source: string): FeePaymentCsvParseResult {
   const sourceLines: number[] = [];
 
   for (let index = 1; index < rows.length; index += 1) {
-    const row = rows[index];
+    const { cells: row, sourceLine } = rows[index];
 
     if (row.every((cell) => !cell.trim())) {
       continue;
@@ -119,13 +119,13 @@ export function parseFeePaymentsCsv(source: string): FeePaymentCsvParseResult {
     if (errors.length > 0) {
       return {
         ok: false,
-        line: index + 1,
+        line: sourceLine,
         message: errors[0],
       };
     }
 
     payments.push(payment);
-    sourceLines.push(index + 1);
+    sourceLines.push(sourceLine);
   }
 
   if (payments.length === 0) {
@@ -218,10 +218,12 @@ function validateFeePaymentCsvInput(input: FeePaymentCsvInput) {
 }
 
 function parseCsvRows(source: string) {
-  const rows: string[][] = [];
+  const rows: { cells: string[]; sourceLine: number }[] = [];
   let row: string[] = [];
   let cell = "";
   let inQuotes = false;
+  let currentLine = 1;
+  let rowSourceLine = 1;
 
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index];
@@ -244,15 +246,25 @@ function parseCsvRows(source: string) {
       continue;
     }
 
-    if ((character === "\n" || character === "\r") && !inQuotes) {
-      if (character === "\r" && nextCharacter === "\n") {
+    if (character === "\n" || character === "\r") {
+      const newline = character === "\r" && nextCharacter === "\n" ? "\r\n" : character;
+
+      if (newline === "\r\n") {
         index += 1;
       }
 
+      currentLine += 1;
+
+      if (inQuotes) {
+        cell += newline;
+        continue;
+      }
+
       row.push(cell);
-      rows.push(row);
+      rows.push({ cells: row, sourceLine: rowSourceLine });
       row = [];
       cell = "";
+      rowSourceLine = currentLine;
       continue;
     }
 
@@ -260,7 +272,7 @@ function parseCsvRows(source: string) {
   }
 
   row.push(cell);
-  rows.push(row);
+  rows.push({ cells: row, sourceLine: rowSourceLine });
 
   return rows;
 }

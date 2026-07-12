@@ -156,4 +156,29 @@ describe("fee payment actions", () => {
     );
     expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
   });
+
+  it("redirects a missing member with the physical line after a multiline cell", async () => {
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(
+        [
+          [
+            "memberCode,periodMonth,amount,paidDate,memo",
+            'm0001,2026-07,30000,2026-07-03,"첫 줄',
+            '둘째 줄"',
+            "",
+            "m9999,2026-07,30000,2026-07-04,없는 회원",
+          ].join("\r\n"),
+        ],
+        "fees.csv",
+        { type: "text/csv" },
+      ),
+    );
+
+    await expect(importFeePaymentsCsv(formData)).rejects.toThrow(
+      "redirect:/fees/new?importError=member-not-found&line=5",
+    );
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
 });

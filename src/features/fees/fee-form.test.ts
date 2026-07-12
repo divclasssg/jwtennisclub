@@ -109,6 +109,27 @@ describe("parseFeePaymentsCsv", () => {
     });
   });
 
+  it("따옴표 셀의 여러 줄과 빈 행 뒤에도 실제 시작 행을 보존한다", () => {
+    const result = parseFeePaymentsCsv(
+      [
+        "회원번호,납부월,금액,납부일,메모",
+        'M0001,2026-07,30000,2026-07-03,"첫 줄',
+        '둘째 줄"',
+        "",
+        "M0002,2026-07,30000,2026-07-04,후속 납부",
+      ].join("\n"),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      sourceLines: [2, 5],
+      payments: [
+        { memberCode: "M0001", memo: "첫 줄\n둘째 줄" },
+        { memberCode: "M0002", memo: "후속 납부" },
+      ],
+    });
+  });
+
   it("전화번호 헤더로 회원을 찾지 않는다", () => {
     expect(
       parseFeePaymentsCsv(
