@@ -486,20 +486,22 @@
 - Git이 추적하는 `members` 경로 파일이 없음을 확인했다.
 - 테스트 파일을 제외한 `src` 런타임에서 `phone_last_four`, `withdrawal_reason`, `phoneLastFour`, `withdrawalReason` 참조가 없음을 확인했다.
 - 회비 화면과 회비 기능에서 연락처 필드 참조가 없고, 런타임 URL 검색 파라미터에 연락처를 사용하는 참조가 없음을 확인했다.
+- Supabase 준비·안전삭제 패치·최종 마이그레이션을 순서대로 적용하고 승인된 CSV로 회원 명부를 원자적으로 초기화했다.
+- 초기화 후 회원 20명, 연락처 19건, 회비 0건, A 4명, B 15명, 그룹 없음 1명, 활성 운영자 재연결 1명을 비식별 집계로 확인했다.
+- 회원번호의 단일 접두사·고유성·다음 자동발급 번호를 확인했고, 구형 연락처/탈퇴 사유 컬럼과 reset RPC/표식이 제거된 것을 확인했다.
 
 ### 검증 근거
-- `npm test`: 56개 파일, 260개 테스트 통과, 종료 코드 0.
+- `npm test`: 56개 파일, 277개 테스트 통과, 종료 코드 0.
 - `npm run lint`: 통과, 종료 코드 0.
 - `npx tsc --noEmit`: 통과, 종료 코드 0.
 - `git diff --check`: 통과, 종료 코드 0.
-- 실제 `members/members.csv` 로컬 파싱: 20건, A 4건, B 15건, 그룹 없음 1건, 연락처 누락 0건. 기존 문장부호 접두사 1자와 숫자 4자리 회원번호 형식을 유지하도록 파서와 DB 제약을 수정했다.
+- 실제 `members/members.csv` DB 연동 dry-run: 20건, A 4건, B 15건, 그룹 없음 1건, 연락처 누락 1건, 활성 운영자 재연결 1건. 기존 문장부호 접두사 1자와 숫자 4자리 회원번호 형식을 유지하도록 파서와 DB 제약을 수정했다.
 - `rg -n 'phoneLastFour|phone_last_four|withdrawalReason|withdrawal_reason|탈퇴 사유' src --glob '!**/*.test.*' --glob '!**/*.spec.*'`: 런타임 코드 출력 없음, 종료 코드 1.
 - `rg -n 'phone_number|phone_normalized|phoneNumber|phoneDisplay' 'src/app/(app)/fees' src/features/fees --glob '!**/*.test.*' --glob '!**/*.spec.*'`: 회비 런타임 코드 출력 없음, 종료 코드 1.
 - `rg -n 'searchParams.*phone|phone.*searchParams' src --glob '!**/*.test.*' --glob '!**/*.spec.*'`: 런타임 코드 출력 없음, 종료 코드 1. 테스트를 포함한 원래 broad 명령은 연락처 원문이 아닌 `invalid-phone`, `phone-reuse` searchParams fixture 2건을 출력했다.
-- `npm run build`: 120초 제한 안에 완료되지 않았다. 오류 출력 없이 `Creating an optimized production build ...` 단계에서 제한시간 종료 코드 124로 중단되었으므로 빌드 통과로 처리하지 않았다.
+- `npm run build`: 유효한 `.env.local`을 사용해 다시 실행했으나 120초 안에 완료되지 않았다. 오류 출력 없이 `Creating an optimized production build ...` 단계에서 중단했으므로 빌드 통과로 처리하지 않았다.
 - 개발 서버는 3012 포트에서 167ms에 준비되었으나, 작업 트리에 유효한 Supabase 공개 환경 변수가 없어 보호 라우트 요청이 프록시 단계에서 500으로 종료되었다. 기본 기동만 확인했으며 비인증 리다이렉트와 화면 컴파일은 검증하지 못했다.
 
 ### 보류 검증
-- `SUPABASE_SERVICE_ROLE_KEY`가 없어 Supabase A/B 그룹·활성 운영자 프로필을 포함한 DB 연동 dry-run, 준비 마이그레이션, 초기화 실행, 완료 집계 확인, 최종 마이그레이션은 실행하지 않았다.
 - 인증된 관리자/일반 운영자 권한 차이, 연락처 마스킹/수정, 이름·회원번호 검색, 그룹 필터, 중복 확인 흐름은 브라우저에서 검증하지 않았다.
 - 375px 모바일과 1440px 데스크톱 레이아웃, 브라우저 콘솔, 네트워크 및 RSC payload의 개인정보 노출 여부는 인증 환경에서 추가 검증해야 한다.

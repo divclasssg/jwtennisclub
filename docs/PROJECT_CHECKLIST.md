@@ -80,10 +80,10 @@
 - [ ] Verify member and fee operator/general kind columns after real operator/member data exists
 - [ ] Verify operator-first sorting after real club positions are assigned
 - [x] Verify fee inline payment processing after real monthly payment data exists
-- [ ] Supabase에 회원 명부 준비·초기화·최종 마이그레이션 적용
+- [x] Supabase에 회원 명부 준비·안전삭제 패치·초기화·최종 마이그레이션 적용
 - [x] 실제 회원 CSV 로컬 dry-run 후 개인정보 원문 없이 구조·집계 확인
-- [ ] service role 환경에서 A/B 그룹·활성 운영자 재연결을 포함한 DB 연동 dry-run 실행
-- [ ] dry-run 결과 검토 후 파괴적 회원 명부 초기화 실행
+- [x] service role 환경에서 A/B 그룹·활성 운영자 재연결을 포함한 DB 연동 dry-run 실행
+- [x] dry-run 결과 검토 후 파괴적 회원 명부 초기화 실행
 - [ ] 인증 브라우저에서 회원·회비 권한, 중복 확인, 반응형 UI, 콘솔, 네트워크 payload 검증
 - [ ] Next.js 컴파일이 검증 제한시간 안에 완료되는 환경에서 프로덕션 빌드 재실행
 

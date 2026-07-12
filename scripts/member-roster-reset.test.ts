@@ -92,6 +92,12 @@ describe("parseRosterCsv", () => {
     expect(parseRosterCsv(csv)[0]).toMatchObject({ phoneNumber: null, groupCode: null });
   });
 
+  it("숫자가 없는 대시 연락처 placeholder를 null로 변환한다", () => {
+    const csv = validCsv.replace("010-1234-5678", "-");
+
+    expect(parseRosterCsv(csv)[0]?.phoneNumber).toBeNull();
+  });
+
   it("필수 헤더 누락과 중복 헤더를 차단한다", () => {
     expect(() => parseRosterCsv("ID,이름,전화번호,Group,상태\nM0001,홍길동,,A,활동중")).toThrow();
     expect(() => parseRosterCsv("ID,이름,이름,전화번호,Group,상태,가입일\nM0001,홍길동,홍길동,,A,활동중,2026-01-01")).toThrow();

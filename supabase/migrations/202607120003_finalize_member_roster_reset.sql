@@ -93,7 +93,7 @@ begin
       and index_metadata.indnkeyatts = 1
       and index_metadata.indexprs is null
       and index_metadata.indpred is null
-      and index_metadata.indkey::smallint[] = array[member_code_attribute.attnum]::smallint[]
+      and index_metadata.indkey[0] = member_code_attribute.attnum
   ) then
     raise exception 'members_member_code_unique must be a valid unique index';
   end if;

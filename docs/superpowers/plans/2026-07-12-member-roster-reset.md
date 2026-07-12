@@ -30,7 +30,8 @@
 ### 새 파일
 
 - `supabase/migrations/202607120001_prepare_member_roster_reset.sql`: 그룹·회원번호·연락처·권한·원자적 회원 저장 함수와 초기화 전용 함수를 추가한다.
-- `supabase/migrations/202607120002_finalize_member_roster_reset.sql`: 초기화 함수와 구형 연락처/탈퇴 사유 컬럼 및 제약을 제거한다.
+- `supabase/migrations/202607120002_patch_roster_reset_safe_delete.sql`: 원격 안전삭제 정책과 호환되도록 reset 함수의 전량 삭제에 명시적 조건을 추가한다.
+- `supabase/migrations/202607120003_finalize_member_roster_reset.sql`: 초기화 함수와 구형 연락처/탈퇴 사유 컬럼 및 제약을 제거한다.
 - `src/features/members/member-contact.ts`: 연락처 정규화, 검증, 마스킹의 순수 함수를 담당한다.
 - `src/features/members/member-contact.test.ts`: 연락처 순수 함수의 경계값을 검증한다.
 - `src/features/members/member-directory.ts`: `server-only` 회원/연락처 조회와 최소 DTO 조립을 담당한다.
@@ -633,7 +634,7 @@ git commit -m "feat(members): add guarded roster reset tool"
 ### 작업 8: 구형 컬럼 제거와 초기화 함수 폐기
 
 **파일:**
-- 생성: `supabase/migrations/202607120002_finalize_member_roster_reset.sql`
+- 생성: `supabase/migrations/202607120003_finalize_member_roster_reset.sql`
 
 **인터페이스:**
 - 제거: `members.phone_last_four`, `members.withdrawal_reason`
@@ -671,7 +672,7 @@ drop function if exists public.admin_reset_member_roster(jsonb, text);
 - [ ] **4단계: 커밋**
 
 ```bash
-git add supabase/migrations/202607120002_finalize_member_roster_reset.sql
+git add supabase/migrations/202607120003_finalize_member_roster_reset.sql
 git commit -m "chore(members): remove legacy member fields"
 ```
 

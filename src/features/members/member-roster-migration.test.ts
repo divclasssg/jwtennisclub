@@ -13,7 +13,15 @@ const migrationSql = readFileSync(
 const finalizeMigrationSql = readFileSync(
   join(
     process.cwd(),
-    "supabase/migrations/202607120002_finalize_member_roster_reset.sql",
+    "supabase/migrations/202607120003_finalize_member_roster_reset.sql",
+  ),
+  "utf8",
+);
+
+const resetPatchMigrationSql = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/migrations/202607120002_patch_roster_reset_safe_delete.sql",
   ),
   "utf8",
 );
@@ -212,6 +220,17 @@ describe("member roster preparation migration", () => {
     expect(migrationSql).toContain("groups.code in ('A', 'B')");
   });
 
+  it("uses explicit predicates for destructive deletes", () => {
+    expect(migrationSql).toContain("delete from public.fee_payments where true");
+    expect(migrationSql).toContain("delete from public.members where true");
+    expect(resetPatchMigrationSql).toContain(
+      "delete from public.fee_payments where true;",
+    );
+    expect(resetPatchMigrationSql).toContain(
+      "delete from public.members where true;",
+    );
+  });
+
   it("rejects non-A/B groups and withdrawn rows before deleting existing data", () => {
     const deletePosition = migrationSql.indexOf("delete from public.fee_payments");
     const strictGroupPosition = migrationSql.indexOf("row.group_code not in ('A', 'B')");
@@ -332,6 +351,9 @@ describe("member roster finalization migration", () => {
     expect(dropIndexPosition).toBeGreaterThan(notNullPosition);
     expect(createIndexPosition).toBeGreaterThan(dropIndexPosition);
     expect(finalizeMigrationSql).toContain("index_metadata.indpred is null");
+    expect(finalizeMigrationSql).toContain(
+      "index_metadata.indkey[0] = member_code_attribute.attnum",
+    );
   });
 
   it("removes legacy fields and retires every reset function privilege", () => {

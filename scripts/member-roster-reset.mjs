@@ -137,7 +137,8 @@ export function parseRosterCsv(source) {
     if (!name) fail("이름이 비어 있습니다.", rowNumber);
     const rawPhone = values["전화번호"];
     if (rawPhone && !/^[0-9 ()-]+$/.test(rawPhone)) fail("전화번호에 허용되지 않은 문자가 있습니다.", rowNumber);
-    const phoneNumber = rawPhone ? rawPhone.replace(/[^0-9]/g, "") : null;
+    const normalizedPhone = rawPhone ? rawPhone.replace(/[^0-9]/g, "") : "";
+    const phoneNumber = normalizedPhone || null;
     if (phoneNumber && !/^01[016789][0-9]{7,8}$/.test(phoneNumber)) fail("전화번호 형식이 올바르지 않습니다.", rowNumber);
     if (phoneNumber) {
       const duplicateKey = `${normalizeName(name)}\u0000${phoneNumber}`;

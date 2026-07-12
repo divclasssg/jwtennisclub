@@ -517,8 +517,8 @@ begin
   end if;
 
   perform 1 from public.member_code_allocator where singleton for update;
-  delete from public.fee_payments;
-  delete from public.members;
+  delete from public.fee_payments where true;
+  delete from public.members where true;
   perform set_config('app.member_roster_reset_import', 'on', true);
 
   insert into public.members (
