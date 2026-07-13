@@ -12,18 +12,14 @@ import { firstSearchParam } from "@/features/members/member-list";
 export type FeeListSearchParams = {
   month?: string | string[];
   q?: string | string[];
-  status?: string | string[];
+  sort?: string | string[];
+  direction?: string | string[];
 };
 
 export type FeeListFilters = {
   periodMonth: string;
   query: string;
-  status: FeePaymentStatusFilter;
 };
-
-export const FEE_PAYMENT_STATUS_FILTERS = ["all", "unpaid", "paid"] as const;
-
-export type FeePaymentStatusFilter = (typeof FEE_PAYMENT_STATUS_FILTERS)[number];
 
 type FeePaymentDatabaseRow = {
   id: string;
@@ -79,22 +75,10 @@ export function normalizeFeeListFilters(
 ): FeeListFilters {
   const periodMonth =
     normalizePeriodMonth(firstSearchParam(params.month)) || fallbackMonth;
-  const status = firstSearchParam(params.status);
-
   return {
     periodMonth,
     query: firstSearchParam(params.q)?.trim() ?? "",
-    status: isFeePaymentStatusFilter(status) ? status : "all",
   };
-}
-
-export function isFeePaymentStatusFilter(
-  value: unknown,
-): value is FeePaymentStatusFilter {
-  return (
-    typeof value === "string" &&
-    (FEE_PAYMENT_STATUS_FILTERS as readonly string[]).includes(value)
-  );
 }
 
 export function mapFeePaymentRow(
@@ -143,13 +127,11 @@ export function buildFeeBoardRows(input: {
   members: FeeBoardSourceMember[];
   payments: FeePaymentRecord[];
   query?: string;
-  status?: FeePaymentStatusFilter;
 }): FeeBoardMemberRow[] {
   const paymentsByMemberId = new Map(
     input.payments.map((payment) => [payment.memberId, payment]),
   );
   const query = input.query?.toLowerCase() ?? "";
-  const status = input.status ?? "all";
 
   return input.members
     .filter((member) => member.memberCode !== FEE_EXEMPT_MEMBER_CODE)
@@ -172,17 +154,6 @@ export function buildFeeBoardRows(input: {
         row.memberName.toLowerCase().includes(query) ||
         row.memberCode.toLowerCase().includes(query)
       );
-    })
-    .filter((row) => {
-      if (status === "paid") {
-        return Boolean(row.payment);
-      }
-
-      if (status === "unpaid") {
-        return !row.payment;
-      }
-
-      return true;
     });
 }
 

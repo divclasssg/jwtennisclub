@@ -8,7 +8,7 @@ import {
   SummaryCard,
   SummaryGrid,
 } from "@/components/molecules";
-import { DataPanel, DataTable } from "@/components/organisms";
+import { DataPanel, DataTable, parseSortState, SortableTableHeader, stableSortRows } from "@/components/organisms";
 import { ManagementPageTemplate } from "@/components/templates";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -26,6 +26,9 @@ import {
 type ExpensesPageProps = {
   searchParams: Promise<ExpenseListSearchParams>;
 };
+
+const EXPENSE_SORT_KEYS = ["expenseDate", "category", "description", "amount", "memo"] as const;
+type ExpenseSortKey = (typeof EXPENSE_SORT_KEYS)[number];
 
 async function getExpenses(filters: ReturnType<typeof normalizeExpenseListFilters>) {
   const supabase = await createClient();
@@ -58,9 +61,29 @@ function formatCategoryFilterLabel(category: string) {
   return formatExpenseCategory(category as never);
 }
 
+function expenseSortValue(
+  expense: Awaited<ReturnType<typeof getExpenses>>[number],
+  key: ExpenseSortKey,
+) {
+  switch (key) {
+    case "expenseDate": return expense.expenseDate;
+    case "category": return formatExpenseCategory(expense.category);
+    case "description": return expense.description;
+    case "amount": return expense.amount;
+    case "memo": return expense.memo;
+  }
+}
+
 export default async function ExpensesPage({ searchParams }: ExpensesPageProps) {
-  const filters = normalizeExpenseListFilters(await searchParams);
+  const params = await searchParams;
+  const filters = normalizeExpenseListFilters(params);
+  const sortState = parseSortState(params, EXPENSE_SORT_KEYS, { key: "expenseDate", direction: "desc" });
   const expenses = await getExpenses(filters);
+  const sortedExpenses = stableSortRows(expenses, (expense) => expenseSortValue(expense, sortState.key), sortState.direction);
+  const sortSearchParams = {
+    month: filters.periodMonth.slice(0, 7),
+    category: filters.category,
+  };
   const summary = buildExpenseListSummary(expenses);
   const hasFilters = filters.category !== "all";
 
@@ -108,23 +131,23 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
               </ActionLink>
             </>
           }
-          headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${expenses.length}건`}
+          headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${sortedExpenses.length}건`}
         >
-          {expenses.length > 0 ? (
+          {sortedExpenses.length > 0 ? (
             <DataTable>
               <thead>
                 <tr>
-                  <th scope="col">사용일</th>
-                  <th scope="col">카테고리</th>
-                  <th scope="col">내용</th>
-                  <th scope="col">금액</th>
+                  <SortableTableHeader label="사용일" pathname="/expenses" searchParams={sortSearchParams} sortKey="expenseDate" sortState={sortState} />
+                  <SortableTableHeader label="카테고리" pathname="/expenses" searchParams={sortSearchParams} sortKey="category" sortState={sortState} />
+                  <SortableTableHeader label="내용" pathname="/expenses" searchParams={sortSearchParams} sortKey="description" sortState={sortState} />
+                  <SortableTableHeader label="금액" pathname="/expenses" searchParams={sortSearchParams} sortKey="amount" sortState={sortState} />
                   <th scope="col">증빙</th>
-                  <th scope="col">메모</th>
+                  <SortableTableHeader label="메모" pathname="/expenses" searchParams={sortSearchParams} sortKey="memo" sortState={sortState} />
                   <th scope="col">관리</th>
                 </tr>
               </thead>
               <tbody>
-                {expenses.map((expense) => (
+                {sortedExpenses.map((expense) => (
                   <tr key={expense.id}>
                     <td>{expense.expenseDate.replaceAll("-", ".")}</td>
                     <td>{formatExpenseCategory(expense.category)}</td>

@@ -13,6 +13,8 @@ import { firstSearchParam } from "@/features/members/member-list";
 
 export type SettlementSearchParams = {
   month?: string | string[];
+  sort?: string | string[];
+  direction?: string | string[];
 };
 
 export type SettlementFilters = {

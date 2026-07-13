@@ -30,34 +30,38 @@ describe("MembersPage", () => {
     hasCurrentUserPermission.mockResolvedValue(true);
   });
 
-  it("renders permanent member data and directory filters", async () => {
+  it("renders permanent member data without a group search filter", async () => {
     render(
       await MembersPage({
-        searchParams: Promise.resolve({ q: "JW", status: "active", group: "A" }),
+        searchParams: Promise.resolve({ q: "JW", status: "active" }),
       }),
     );
 
     expect(screen.getByLabelText("검색")).toHaveAttribute(
       "placeholder",
-      "이름 또는 회원번호 검색",
+      "이름 또는 회원번호",
     );
-    expect(screen.getByLabelText("그룹")).toHaveValue("A");
+    expect(screen.queryByLabelText("그룹")).not.toBeInTheDocument();
     expect(loadMemberDirectory).toHaveBeenCalledWith({
       q: "JW",
       status: "active",
-      group: "A",
     });
+
+    expect(screen.getByRole("link", { name: "휴회" })).toHaveAttribute(
+      "href",
+      "/members?status=paused&q=JW",
+    );
 
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
-      "회원번호",
-      "이름",
-      "전화번호",
-      "구분",
-      "직책",
-      "그룹",
-      "상태",
-      "가입일",
+      "회원번호↑↓",
+      "이름↑↓",
+      "전화번호↑↓",
+      "구분↑↓",
+      "직책↑↓",
+      "그룹↑↓",
+      "상태↑↓",
+      "가입일↑↓",
       "관리",
     ]);
     expect(within(table).getByRole("cell", { name: "운영진" })).toBeInTheDocument();
@@ -75,6 +79,34 @@ describe("MembersPage", () => {
     render(await MembersPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText("010-1234-5678")).toBeInTheDocument();
+  });
+
+  it("sorts members from header links while preserving member filters", async () => {
+    loadMemberDirectory.mockResolvedValue([
+      member,
+      { ...member, id: "member-2", memberCode: "JW-000002", name: "박지수" },
+    ]);
+
+    render(await MembersPage({
+      searchParams: Promise.resolve({
+        q: "JW",
+        status: "active",
+        sort: "name",
+        direction: "desc",
+      }),
+    }));
+
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("rowheader").map((cell) => cell.textContent)).toEqual(["박지수", "김민수"]);
+    expect(screen.getByRole("link", { name: "이름 내림차순 정렬" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("link", { name: "가입일 오름차순 정렬" })).toHaveAttribute(
+      "href",
+      "/members?q=JW&status=active&sort=joinedDate&direction=asc",
+    );
+    expect(screen.queryByRole("link", { name: "관리 오름차순 정렬" })).not.toBeInTheDocument();
+
+    const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
+    expect(within(mobileList).getAllByRole("heading").map((heading) => heading.textContent)).toEqual(["박지수", "김민수"]);
   });
 
   it("shows 일반회원 in the position column for a non-operator member", async () => {

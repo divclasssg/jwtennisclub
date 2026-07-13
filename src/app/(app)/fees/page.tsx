@@ -1,6 +1,6 @@
 import styles from "./page.module.scss";
 import { cancelFeePayment, createFeePayment } from "./actions";
-import { ActionLink, Button, SelectInput, TextInput } from "@/components/atoms";
+import { ActionLink, Button, TextInput } from "@/components/atoms";
 import {
   EmptyState,
   FilterBar,
@@ -8,13 +8,12 @@ import {
   SummaryCard,
   SummaryGrid,
 } from "@/components/molecules";
-import { DataPanel, DataTable } from "@/components/organisms";
+import { DataPanel, DataTable, parseSortState, SortableTableHeader, stableSortRows } from "@/components/organisms";
 import { ManagementPageTemplate } from "@/components/templates";
 import { createClient } from "@/lib/supabase/server";
 import {
   buildFeeBoardRows,
   buildFeeListSummary,
-  FEE_PAYMENT_STATUS_FILTERS,
   formatCurrency,
   formatPeriodMonth,
   mapFeePaymentRow,
@@ -37,6 +36,9 @@ import {
 type FeesPageProps = {
   searchParams: Promise<FeeListSearchParams>;
 };
+
+const FEE_SORT_KEYS = ["memberCode", "name", "kind", "status", "amount", "paidDate", "memo"] as const;
+type FeeSortKey = (typeof FEE_SORT_KEYS)[number];
 
 type OperatorPositionDatabaseRow = {
   id: string;
@@ -152,20 +154,25 @@ function formatPaymentStatus(row: { payment: unknown }) {
   return row.payment ? "납부완료" : "미납";
 }
 
-function formatStatusFilterLabel(status: (typeof FEE_PAYMENT_STATUS_FILTERS)[number]) {
-  if (status === "paid") {
-    return "납부완료";
+function feeSortValue(
+  row: ReturnType<typeof buildFeeBoardRows>[number],
+  key: FeeSortKey,
+) {
+  switch (key) {
+    case "memberCode": return row.memberCode;
+    case "name": return row.memberName;
+    case "kind": return formatMemberKind(row);
+    case "status": return formatPaymentStatus(row);
+    case "amount": return row.payment?.amount ?? DEFAULT_MONTHLY_FEE_AMOUNT;
+    case "paidDate": return row.payment?.paidDate;
+    case "memo": return row.payment?.memo;
   }
-
-  if (status === "unpaid") {
-    return "미납";
-  }
-
-  return "전체";
 }
 
 export default async function FeesPage({ searchParams }: FeesPageProps) {
-  const filters = normalizeFeeListFilters(await searchParams);
+  const params = await searchParams;
+  const filters = normalizeFeeListFilters(params);
+  const sortState = parseSortState(params, FEE_SORT_KEYS, { key: "memberCode", direction: "asc" });
   const [payments, targetMembers] = await Promise.all([
     getFeePayments(filters.periodMonth),
     getFeeTargetMembers(filters.periodMonth, filters.query),
@@ -174,15 +181,19 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
     members: targetMembers,
     payments,
     query: filters.query,
-    status: filters.status,
   });
+  const sortedBoardRows = stableSortRows(boardRows, (row) => feeSortValue(row, sortState.key), sortState.direction);
+  const sortSearchParams = {
+    month: filters.periodMonth.slice(0, 7),
+    q: filters.query || undefined,
+  };
   const summary = buildFeeListSummary({
     expectedCount: targetMembers.length,
     payments: targetMembers
       .map((member) => payments.find((payment) => payment.memberId === member.id))
       .filter((payment) => payment !== undefined),
   });
-  const hasFilters = filters.query || filters.status !== "all";
+  const hasFilters = Boolean(filters.query);
   const today = getTodayInputValue();
 
   return (
@@ -194,7 +205,7 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
         </>
       }
       filters={
-        <FilterBar aria-label="회비 검색 필터" layout="month-search-status">
+        <FilterBar aria-label="회비 검색 필터" layout="two-controls">
           <FormField label="납부 월">
             <TextInput
               defaultValue={filters.periodMonth.slice(0, 7)}
@@ -212,15 +223,6 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
               type="search"
             />
           </FormField>
-          <FormField label="상태">
-            <SelectInput defaultValue={filters.status} name="status" shape="pill">
-              {FEE_PAYMENT_STATUS_FILTERS.map((status) => (
-                <option key={status} value={status}>
-                  {formatStatusFilterLabel(status)}
-                </option>
-              ))}
-            </SelectInput>
-          </FormField>
           <Button type="submit">조회</Button>
         </FilterBar>
       }
@@ -232,7 +234,7 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
             <EmptyState
               description={
                 <>
-                  납부 월, 검색어, 상태 필터를 조정해서 회비 대상 회원을 확인하세요.
+                  납부 월과 검색어를 조정해서 회비 대상 회원을 확인하세요.
                 </>
               }
               title="표시할 회원이 없습니다"
@@ -246,26 +248,26 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
               </ActionLink>
             </>
           }
-          headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${boardRows.length}명`}
+          headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${sortedBoardRows.length}명`}
         >
-          {boardRows.length > 0 ? (
+          {sortedBoardRows.length > 0 ? (
             <>
               <div className={styles["fees-table-view"]}>
                 <DataTable>
                   <thead>
                     <tr>
-                      <th scope="col">회원번호</th>
-                      <th scope="col">이름</th>
-                      <th scope="col">구분</th>
-                      <th scope="col">상태</th>
-                      <th scope="col">기준 금액</th>
-                      <th scope="col">납부일</th>
-                      <th scope="col">메모</th>
+                      <SortableTableHeader label="회원번호" pathname="/fees" searchParams={sortSearchParams} sortKey="memberCode" sortState={sortState} />
+                      <SortableTableHeader label="이름" pathname="/fees" searchParams={sortSearchParams} sortKey="name" sortState={sortState} />
+                      <SortableTableHeader label="구분" pathname="/fees" searchParams={sortSearchParams} sortKey="kind" sortState={sortState} />
+                      <SortableTableHeader label="상태" pathname="/fees" searchParams={sortSearchParams} sortKey="status" sortState={sortState} />
+                      <SortableTableHeader label="기준 금액" pathname="/fees" searchParams={sortSearchParams} sortKey="amount" sortState={sortState} />
+                      <SortableTableHeader label="납부일" pathname="/fees" searchParams={sortSearchParams} sortKey="paidDate" sortState={sortState} />
+                      <SortableTableHeader label="메모" pathname="/fees" searchParams={sortSearchParams} sortKey="memo" sortState={sortState} />
                       <th scope="col">처리</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {boardRows.map((row) => (
+                    {sortedBoardRows.map((row) => (
                       <tr key={row.memberId}>
                         <td>{row.memberCode}</td>
                         <th scope="row">{row.memberName}</th>
@@ -336,7 +338,7 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                   cancelPaymentAction={cancelFeePayment}
                   createPaymentAction={createFeePayment}
                   periodMonth={filters.periodMonth.slice(0, 7)}
-                  rows={boardRows}
+                  rows={sortedBoardRows}
                   today={today}
                 />
               </div>

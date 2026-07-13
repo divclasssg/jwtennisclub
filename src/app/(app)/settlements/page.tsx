@@ -6,7 +6,7 @@ import {
   SummaryCard,
   SummaryGrid,
 } from "@/components/molecules";
-import { DataPanel, DataTable } from "@/components/organisms";
+import { DataPanel, DataTable, parseSortState, SortableTableHeader, stableSortRows } from "@/components/organisms";
 import { ManagementPageTemplate } from "@/components/templates";
 import { createClient } from "@/lib/supabase/server";
 import { getNextPeriodMonth, isExpenseCategory } from "@/features/expenses/expense-model";
@@ -25,6 +25,9 @@ import {
 type SettlementsPageProps = {
   searchParams: Promise<SettlementSearchParams>;
 };
+
+const SETTLEMENT_SORT_KEYS = ["category", "count", "amount"] as const;
+type SettlementSortKey = (typeof SETTLEMENT_SORT_KEYS)[number];
 
 type FeePaymentDatabaseRow = {
   amount: number;
@@ -75,16 +78,35 @@ async function getSettlementExpenses(
   }));
 }
 
+function settlementSortValue(
+  row: ReturnType<typeof buildSettlementSummary>["expenseCategoryRows"][number],
+  key: SettlementSortKey,
+) {
+  switch (key) {
+    case "category": return formatExpenseCategory(row.category);
+    case "count": return row.count;
+    case "amount": return row.amount;
+  }
+}
+
 export default async function SettlementsPage({
   searchParams,
 }: SettlementsPageProps) {
-  const filters = normalizeSettlementFilters(await searchParams);
+  const params = await searchParams;
+  const filters = normalizeSettlementFilters(params);
+  const sortState = parseSortState(params, SETTLEMENT_SORT_KEYS, { key: "category", direction: "asc" });
   const monthValue = filters.periodMonth.slice(0, 7);
   const [feePayments, expenses] = await Promise.all([
     getSettlementFeePayments(filters.periodMonth),
     getSettlementExpenses(filters.periodMonth),
   ]);
   const summary = buildSettlementSummary({ feePayments, expenses });
+  const sortedCategoryRows = stableSortRows(
+    summary.expenseCategoryRows,
+    (row) => settlementSortValue(row, sortState.key),
+    sortState.direction,
+  );
+  const sortSearchParams = { month: monthValue };
 
   return (
     <ManagementPageTemplate
@@ -122,17 +144,17 @@ export default async function SettlementsPage({
           }
           headerTitle="카테고리별 지출"
         >
-          {summary.expenseCategoryRows.length > 0 ? (
+          {sortedCategoryRows.length > 0 ? (
             <DataTable>
               <thead>
                 <tr>
-                  <th scope="col">카테고리</th>
-                  <th scope="col">건수</th>
-                  <th scope="col">금액</th>
+                  <SortableTableHeader label="카테고리" pathname="/settlements" searchParams={sortSearchParams} sortKey="category" sortState={sortState} />
+                  <SortableTableHeader label="건수" pathname="/settlements" searchParams={sortSearchParams} sortKey="count" sortState={sortState} />
+                  <SortableTableHeader label="금액" pathname="/settlements" searchParams={sortSearchParams} sortKey="amount" sortState={sortState} />
                 </tr>
               </thead>
               <tbody>
-                {summary.expenseCategoryRows.map((row) => (
+                {sortedCategoryRows.map((row) => (
                   <tr key={row.category}>
                     <td>{formatExpenseCategory(row.category)}</td>
                     <td>{row.count}건</td>

@@ -160,14 +160,14 @@ describe("FeesPage", () => {
   it("renders monthly fee board rows with filters and summary", async () => {
     render(
       await FeesPage({
-        searchParams: Promise.resolve({ month: "2026-07", q: "김", status: "all" }),
+        searchParams: Promise.resolve({ month: "2026-07", q: "김" }),
       }),
     );
 
     expect(screen.getByRole("heading", { name: "회비 관리" })).toBeInTheDocument();
     expect(screen.getByLabelText("납부 월")).toHaveValue("2026-07");
     expect(screen.getByLabelText("검색")).toHaveValue("김");
-    expect(screen.getByLabelText("상태")).toHaveValue("all");
+    expect(screen.queryByLabelText("상태")).not.toBeInTheDocument();
     expect(screen.getByText("청구 대상")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "CSV 등록" }),
@@ -180,13 +180,13 @@ describe("FeesPage", () => {
 
     expect(within(list).getByText("2026.07 · 총 1명")).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
-      "회원번호",
-      "이름",
-      "구분",
-      "상태",
-      "기준 금액",
-      "납부일",
-      "메모",
+      "회원번호↑↓",
+      "이름↑↓",
+      "구분↑↓",
+      "상태↑↓",
+      "기준 금액↑↓",
+      "납부일↑↓",
+      "메모↑↓",
       "처리",
     ]);
     expect(within(table).getByRole("cell", { name: "M0001" })).toBeInTheDocument();
@@ -209,7 +209,7 @@ describe("FeesPage", () => {
 
     render(
       await FeesPage({
-        searchParams: Promise.resolve({ month: "2026-07", status: "unpaid" }),
+        searchParams: Promise.resolve({ month: "2026-07" }),
       }),
     );
 
@@ -220,10 +220,34 @@ describe("FeesPage", () => {
     expect(within(table).getAllByText("운영진")).toHaveLength(2);
   });
 
+  it("sorts fee rows by amount and uses the same order on mobile", async () => {
+    queryState.payments = [{ ...payments[0], amount: 40000 }];
+
+    render(await FeesPage({
+      searchParams: Promise.resolve({
+        month: "2026-07",
+        sort: "amount",
+        direction: "asc",
+      }),
+    }));
+
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("rowheader").map((cell) => cell.textContent)).toEqual(["이영희", "김민수"]);
+    expect(screen.getByRole("link", { name: "기준 금액 오름차순 정렬" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("link", { name: "납부일 내림차순 정렬" })).toHaveAttribute(
+      "href",
+      "/fees?month=2026-07&sort=paidDate&direction=desc",
+    );
+    expect(screen.queryByRole("link", { name: "처리 오름차순 정렬" })).not.toBeInTheDocument();
+
+    const mobileList = screen.getByRole("list", { name: "모바일 회비 목록" });
+    expect(within(mobileList).getAllByRole("heading").map((heading) => heading.textContent)).toEqual(["이영희", "김민수"]);
+  });
+
   it("renders a mobile fee list with the same payment details", async () => {
     render(
       await FeesPage({
-        searchParams: Promise.resolve({ month: "2026-07", status: "all" }),
+        searchParams: Promise.resolve({ month: "2026-07" }),
       }),
     );
 

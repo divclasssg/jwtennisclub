@@ -163,4 +163,22 @@ describe("SettlementsPage", () => {
     expect(screen.getByText("+30,000원")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "카테고리별 지출이 없습니다" })).toBeInTheDocument();
   });
+
+  it("sorts settlement category rows and preserves the selected month", async () => {
+    render(await SettlementsPage({
+      searchParams: Promise.resolve({
+        month: "2026-07",
+        sort: "amount",
+        direction: "asc",
+      }),
+    }));
+
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0].textContent)).toEqual(["공", "코트"]);
+    expect(screen.getByRole("link", { name: "금액 오름차순 정렬" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("link", { name: "건수 내림차순 정렬" })).toHaveAttribute(
+      "href",
+      "/settlements?month=2026-07&sort=count&direction=desc",
+    );
+  });
 });

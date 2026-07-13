@@ -224,26 +224,18 @@ async function loadContactDisplays(
 export async function loadMemberDirectory(input: {
   q?: string;
   status?: MemberStatus;
-  group?: string;
 }): Promise<MemberListRow[]> {
   const supabase = await createClient();
   const canManageContacts = await canManageMemberContacts(supabase);
-  const groupRelation = input.group && input.group !== "none" ? "member_groups!inner(code)" : "member_groups(code)";
   let request = supabase
     .from("members")
     .select(
-      `id, member_code, ${groupRelation}, name, operator_profile_id, status, joined_date, withdrawn_date, memo`,
+      "id, member_code, member_groups(code), name, operator_profile_id, status, joined_date, withdrawn_date, memo",
     )
     .order("member_code", { ascending: true });
 
   if (input.status) {
     request = request.eq("status", input.status);
-  }
-
-  if (input.group === "none") {
-    request = request.is("group_id", null);
-  } else if (input.group) {
-    request = request.eq("member_groups.code", input.group);
   }
 
   const query = input.q?.trim();

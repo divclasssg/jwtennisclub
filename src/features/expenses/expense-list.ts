@@ -15,6 +15,8 @@ import { firstSearchParam } from "@/features/members/member-list";
 export type ExpenseListSearchParams = {
   month?: string | string[];
   category?: string | string[];
+  sort?: string | string[];
+  direction?: string | string[];
 };
 
 export type ExpenseListFilters = {

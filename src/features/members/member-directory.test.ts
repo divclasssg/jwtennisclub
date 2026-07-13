@@ -207,7 +207,7 @@ describe("member directory contact query scope", () => {
       canManageContacts: true,
     });
 
-    await expect(loadMemberDirectory({ group: "Z" })).resolves.toEqual([]);
+    await expect(loadMemberDirectory({ status: "active" })).resolves.toEqual([]);
     expect(from).not.toHaveBeenCalledWith("member_contacts");
     expect(rpc).not.toHaveBeenCalled();
   });

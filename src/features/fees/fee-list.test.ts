@@ -16,7 +16,6 @@ describe("normalizeFeeListFilters", () => {
     ).toEqual({
       periodMonth: "2026-07-01",
       query: "김",
-      status: "all",
     });
   });
 
@@ -26,17 +25,6 @@ describe("normalizeFeeListFilters", () => {
     ).toEqual({
       periodMonth: "2026-06-01",
       query: "",
-      status: "all",
-    });
-  });
-
-  it("keeps supported status filters", () => {
-    expect(
-      normalizeFeeListFilters({ status: "unpaid" }, "2026-06-01"),
-    ).toEqual({
-      periodMonth: "2026-06-01",
-      query: "",
-      status: "unpaid",
     });
   });
 });
