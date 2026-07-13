@@ -574,3 +574,9 @@
 
 ### 배포 준비
 - `202607130001_optimize_navigation_queries.sql`이 연결된 Supabase 프로젝트에 적용됐음을 사용자 확인으로 기록했다.
+
+### React 개발 도구 콘솔 조사
+- 페이지 이동 후 발생한 `We are cleaning up async info...` 메시지의 전체 스택이 React Developer Tools Chrome 확장의 `installHook.js`에만 위치함을 확인했다.
+- 확장이 없는 독립 Chromium에서 `/login`을 확인했으며 앱 콘솔 오류가 재현되지 않았다.
+- React Developer Tools를 비활성화한 뒤 Suspense 메시지가 사라졌고, 남은 출력은 HMR 정상 연결, 개발 도구 설치 안내, 미사용 폰트 preload 경고뿐임을 확인했다.
+- 화면 동작이나 서버 요청 실패가 동반되지 않아 앱 코드 및 로딩 경계는 변경하지 않았다.
