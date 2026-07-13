@@ -180,13 +180,13 @@ describe("FeesPage", () => {
 
     expect(within(list).getByText("2026.07 · 총 1명")).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
-      "회원번호↑",
-      "이름↕",
-      "구분↕",
-      "상태↕",
-      "기준 금액↕",
-      "납부일↕",
-      "메모↕",
+      "회원번호",
+      "이름",
+      "구분",
+      "상태",
+      "기준 금액",
+      "납부일",
+      "메모",
       "처리",
     ]);
     expect(within(table).getByRole("cell", { name: "M0001" })).toBeInTheDocument();

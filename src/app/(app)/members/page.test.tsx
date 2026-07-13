@@ -52,14 +52,14 @@ describe("MembersPage", () => {
 
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
-      "회원번호↑",
-      "이름↕",
-      "전화번호↕",
-      "구분↕",
-      "직책↕",
-      "그룹↕",
-      "상태↕",
-      "가입일↕",
+      "회원번호",
+      "이름",
+      "전화번호",
+      "구분",
+      "직책",
+      "그룹",
+      "상태",
+      "가입일",
       "관리",
     ]);
     expect(within(table).getByRole("cell", { name: "운영진" })).toBeInTheDocument();

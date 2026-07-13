@@ -11,8 +11,9 @@
 ## Global Constraints
 
 - Apply the interaction to all tables that use `SortableTableHeader`.
-- Inactive sortable columns display `↕` and sort ascending when clicked.
-- Active sortable columns display `↑` or `↓` and toggle direction when clicked.
+- Inactive sortable columns display both local SVG arrows in the inactive color and sort ascending when clicked.
+- Active sortable columns keep both arrows visible, highlight only the current direction, and toggle direction when clicked.
+- Do not load Google Fonts or Material Symbols; render the arrow icon locally.
 - Preserve all existing URL search parameters other than `sort` and `direction`.
 - Use existing tokens from `src/app/globals.scss`; use meaningful kebab-case SCSS Module names.
 - Read relevant Next.js documentation from `node_modules/next/dist/docs/` before changing code.
@@ -80,4 +81,3 @@ Expected: Next.js production build exits successfully.
 - [ ] **Step 7: Record project context**
 
 Append a dated entry to `docs/WORK_LOG.md` stating that all shared sortable table headers now use a single label link with neutral and active directional arrows, and list the focused test, full test suite, lint, and build results.
-

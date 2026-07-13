@@ -20,7 +20,10 @@ describe("SortableTableHeader", () => {
     expect(header).toHaveAttribute("aria-sort", "ascending");
     expect(link).toHaveAttribute("aria-current", "true");
     expect(link).toHaveAttribute("href", "/members?q=%EA%B9%80&sort=memberCode&direction=desc");
-    expect(link).toHaveTextContent(/회원번호\s*↑/);
+    expect(link).toHaveTextContent("회원번호");
+    expect(link).not.toHaveTextContent(/[↑↓↕]/);
+    expect(link.querySelector('[data-sort-direction="asc"]')).toHaveAttribute("data-state", "active");
+    expect(link.querySelector('[data-sort-direction="desc"]')).toHaveAttribute("data-state", "inactive");
     expect(screen.getAllByRole("link")).toHaveLength(1);
   });
 
@@ -40,7 +43,8 @@ describe("SortableTableHeader", () => {
 
     expect(header).toHaveAttribute("aria-sort", "descending");
     expect(link).toHaveAttribute("href", "/expenses?month=2026-07&sort=amount&direction=asc");
-    expect(link).toHaveTextContent(/금액\s*↓/);
+    expect(link.querySelector('[data-sort-direction="asc"]')).toHaveAttribute("data-state", "inactive");
+    expect(link.querySelector('[data-sort-direction="desc"]')).toHaveAttribute("data-state", "active");
   });
 
   it("renders an inactive header with a neutral arrow that starts ascending", () => {
@@ -60,6 +64,7 @@ describe("SortableTableHeader", () => {
     expect(header).not.toHaveAttribute("aria-sort");
     expect(link).not.toHaveAttribute("aria-current");
     expect(link).toHaveAttribute("href", "/members?q=%EA%B9%80&status=active&sort=name&direction=asc");
-    expect(link).toHaveTextContent(/이름\s*↕/);
+    expect(link.querySelector('[data-sort-direction="asc"]')).toHaveAttribute("data-state", "inactive");
+    expect(link.querySelector('[data-sort-direction="desc"]')).toHaveAttribute("data-state", "inactive");
   });
 });

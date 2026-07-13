@@ -81,12 +81,19 @@
   color: var(--action-blue);
 }
 
-.sort-direction-indicator {
-  color: var(--ink-muted-48);
+.sort-direction-icon {
+  display: block;
+  width: var(--table-sort-icon-size);
+  height: var(--table-sort-icon-size);
+  flex: 0 0 var(--table-sort-icon-size);
 }
 
-.sort-link-active .sort-direction-indicator {
-  color: inherit;
+.sort-direction-arrow {
+  fill: var(--ink-muted-48);
+}
+
+.sort-direction-arrow-active {
+  fill: var(--action-blue);
 }
 
 .form-panel {
