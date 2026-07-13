@@ -19,6 +19,16 @@
   white-space: nowrap;
 }
 
+.form-field-label-visible {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  margin-bottom: var(--spacing-xs);
+  white-space: normal;
+}
+
 .csv-upload-field {
   display: grid;
   gap: var(--spacing-xs);

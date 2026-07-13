@@ -4,17 +4,26 @@ import styles from "./Molecules.module.scss";
 
 type FormFieldProps = LabelHTMLAttributes<HTMLLabelElement> & {
   label: ReactNode;
+  labelVisible?: boolean;
 };
 
 export function FormField({
   children,
   className,
   label,
+  labelVisible = false,
   ...props
 }: FormFieldProps) {
   return (
     <label className={classNames(styles["form-field"], className)} {...props}>
-      <span className={styles["form-field-label"]}>{label}</span>
+      <span
+        className={classNames(
+          styles["form-field-label"],
+          labelVisible && styles["form-field-label-visible"],
+        )}
+      >
+        {label}
+      </span>
       {children}
     </label>
   );
