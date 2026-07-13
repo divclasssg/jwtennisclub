@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import NewMemberPage from "./page";
 
-const hasCurrentUserPermission = vi.fn();
+const currentOperatorHasPermission = vi.fn();
 
 vi.mock("../actions", () => ({ createMember: vi.fn() }));
+vi.mock("@/features/auth/operator-context", () => ({
+  currentOperatorHasPermission: (...args: unknown[]) => currentOperatorHasPermission(...args),
+}));
 vi.mock("@/features/members/member-directory", () => ({
   canManageMemberContacts: vi.fn(async () => false),
-  hasCurrentUserPermission: (...args: unknown[]) => hasCurrentUserPermission(...args),
   loadMemberGroups: vi.fn(async () => [
     { id: "group-a", code: "A" },
     { id: "group-b", code: "B" },
@@ -19,7 +21,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("NewMemberPage", () => {
-  beforeEach(() => hasCurrentUserPermission.mockResolvedValue(true));
+  beforeEach(() => currentOperatorHasPermission.mockImplementation(async (permission: string) => permission !== "members.contacts.manage"));
 
   it("renders the protected member form without CSV import", async () => {
     render(await NewMemberPage({ searchParams: Promise.resolve({}) }));
@@ -49,7 +51,7 @@ describe("NewMemberPage", () => {
   });
 
   it("uses notFound without member create permission", async () => {
-    hasCurrentUserPermission.mockResolvedValue(false);
+    currentOperatorHasPermission.mockResolvedValue(false);
 
     await expect(NewMemberPage({ searchParams: Promise.resolve({}) }))
       .rejects.toThrow("NEXT_NOT_FOUND");

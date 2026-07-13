@@ -27,11 +27,11 @@ function isProtectedPath(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
-  const { response, user } = await updateSession(request);
+  const { response, userId } = await updateSession(request);
   const { pathname } = request.nextUrl;
   const isProtected = isProtectedPath(pathname);
 
-  if (isProtected && !user) {
+  if (isProtected && !userId) {
     const requestedPath = `${pathname}${request.nextUrl.search}`;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -40,7 +40,7 @@ export async function proxy(request: NextRequest) {
     return redirectWithSessionCookies(url, response);
   }
 
-  if (pathname === "/login" && user) {
+  if (pathname === "/login" && userId) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";

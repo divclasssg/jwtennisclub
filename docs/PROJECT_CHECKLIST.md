@@ -57,6 +57,8 @@
 - [x] 변경 불가 회원번호, 비공개 연락처, A/B/그룹 없음 분류를 포함한 회원 명부 초기화 구현
 - [x] 회원 및 회비 런타임 경로에서 레거시 연락처·탈퇴 사유 필드 제거
 - [x] 회원 명부 초기화 자동 테스트, lint, typecheck, 테스트 제외 런타임 개인정보 정적 검사 통과
+- [x] 페이지 이동 성능 개선: 운영자 권한 요청 캐시, 회원 목록 단일 RPC, 로딩 경계, 서울 리전, JWT claims 검증
+- [x] 페이지 이동 성능 개선용 Supabase RPC 마이그레이션 적용
 
 ## Next Work
 - [x] Implement member tabs for separate active, paused, and withdrawn member management
@@ -108,6 +110,8 @@
 - [x] Member schema is applied through Supabase SQL Editor
 - [x] `.env.local` is local-only and ignored by Git
 - [x] Next.js proxy lives at `src/proxy.ts`
+- [x] Vercel Functions run in Seoul (`icn1`) next to the Supabase project
+- [x] Protected-route proxy authentication uses verified JWT claims instead of a remote user lookup
 - [x] Component styles use SCSS Modules with kebab-case hyphen class names
 - [x] SCSS should use `src/app/globals.scss` design tokens and `src/app/_breakpoints.scss` breakpoint variables before hardcoded values
 - [x] `.gstack/` security scan artifacts are local-only and ignored by Git

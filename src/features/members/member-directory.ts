@@ -8,6 +8,7 @@ import {
 } from "./member-contact";
 import { buildMemberSearchFilter } from "./member-list";
 import type { Permission } from "@/features/admin/permissions";
+import { currentOperatorHasPermission } from "@/features/auth/operator-context";
 import type { MemberRecord, MemberStatus } from "./member-model";
 
 export { buildMemberSearchFilter } from "./member-list";
@@ -33,6 +34,64 @@ export type MemberEditRecord = MemberListRow & {
 };
 
 export type MemberGroupOption = { id: string; code: string };
+
+export type MemberDirectoryPage = {
+  members: MemberListRow[];
+  canCreate: boolean;
+  canUpdate: boolean;
+};
+
+type MemberDirectoryPageDatabase = {
+  can_create?: boolean;
+  can_update?: boolean;
+  members?: Array<{
+    id: string;
+    member_code: string;
+    name: string;
+    operator_profile_id: string | null;
+    club_position_label: string | null;
+    phone_display: string | null;
+    group_code: string | null;
+    status: MemberStatus;
+    joined_date: string;
+    withdrawn_date: string | null;
+    memo: string | null;
+  }>;
+};
+
+export async function loadMemberDirectoryPage(input: {
+  q?: string;
+  status?: MemberStatus;
+}): Promise<MemberDirectoryPage> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_member_directory_page", {
+    requested_status: input.status ?? null,
+    search_query: input.q?.trim() || null,
+  });
+
+  if (error) throw new Error("회원 목록을 불러오지 못했습니다.");
+
+  const result = (data ?? {}) as MemberDirectoryPageDatabase;
+  return {
+    canCreate: result.can_create === true,
+    canUpdate: result.can_update === true,
+    members: (result.members ?? []).map((member) => ({
+      id: member.id,
+      memberCode: member.member_code,
+      name: member.name,
+      operatorProfileId: member.operator_profile_id,
+      clubPositionLabel: member.club_position_label,
+      phoneDisplay: member.phone_display?.includes("*")
+        ? member.phone_display
+        : formatPhoneNumber(member.phone_display),
+      groupCode: member.group_code,
+      status: member.status,
+      joinedDate: member.joined_date,
+      withdrawnDate: member.withdrawn_date,
+      memo: member.memo,
+    })),
+  };
+}
 
 export async function loadMemberGroups(): Promise<MemberGroupOption[]> {
   const supabase = await createClient();
@@ -187,10 +246,8 @@ export async function hasCurrentUserPermission(
   return permission?.permission === requiredPermission;
 }
 
-export async function canManageMemberContacts(
-  suppliedClient?: Awaited<ReturnType<typeof createClient>>,
-) {
-  return hasCurrentUserPermission("members.contacts.manage", suppliedClient);
+export async function canManageMemberContacts() {
+  return currentOperatorHasPermission("members.contacts.manage");
 }
 
 async function loadContactDisplays(
@@ -226,7 +283,7 @@ export async function loadMemberDirectory(input: {
   status?: MemberStatus;
 }): Promise<MemberListRow[]> {
   const supabase = await createClient();
-  const canManageContacts = await canManageMemberContacts(supabase);
+  const canManageContacts = await canManageMemberContacts();
   let request = supabase
     .from("members")
     .select(
@@ -299,7 +356,7 @@ export async function loadMemberForEdit(
   id: string,
 ): Promise<MemberEditRecord | null> {
   const supabase = await createClient();
-  const canManageContacts = await canManageMemberContacts(supabase);
+  const canManageContacts = await canManageMemberContacts();
   const { data, error } = await supabase
     .from("members")
     .select(

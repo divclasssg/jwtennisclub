@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import EditMemberPage from "./page";
 
 const loadMemberForEdit = vi.fn();
-const hasCurrentUserPermission = vi.fn();
+const currentOperatorHasPermission = vi.fn();
 
+vi.mock("@/features/auth/operator-context", () => ({
+  currentOperatorHasPermission: (...args: unknown[]) => currentOperatorHasPermission(...args),
+}));
 vi.mock("@/features/members/member-directory", () => ({
-  hasCurrentUserPermission: (...args: unknown[]) => hasCurrentUserPermission(...args),
   loadMemberForEdit: (...args: unknown[]) => loadMemberForEdit(...args),
   loadMemberGroups: vi.fn(async () => [
     { id: "group-a", code: "A" },
@@ -37,7 +39,7 @@ const member = {
 describe("EditMemberPage", () => {
   beforeEach(() => {
     loadMemberForEdit.mockResolvedValue(member);
-    hasCurrentUserPermission.mockResolvedValue(true);
+    currentOperatorHasPermission.mockResolvedValue(true);
   });
 
   it("renders member code and raw contact for a contact manager", async () => {
@@ -80,7 +82,7 @@ describe("EditMemberPage", () => {
   });
 
   it("uses notFound without member update permission", async () => {
-    hasCurrentUserPermission.mockResolvedValue(false);
+    currentOperatorHasPermission.mockResolvedValue(false);
 
     await expect(EditMemberPage({
       params: Promise.resolve({ id: "member-1" }),

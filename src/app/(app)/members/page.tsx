@@ -4,7 +4,7 @@ import { ActionLink, Button, TextInput } from "@/components/atoms";
 import { EmptyState, FilterBar, FormField, TabLink, Tabs } from "@/components/molecules";
 import { DataPanel, DataTable, parseSortState, SortableTableHeader, stableSortRows } from "@/components/organisms";
 import { ManagementPageTemplate } from "@/components/templates";
-import { hasCurrentUserPermission, loadMemberDirectory } from "@/features/members/member-directory";
+import { loadMemberDirectoryPage } from "@/features/members/member-directory";
 import { formatDate, formatMemberDirectoryKind, formatMemberPosition, formatMemberStatus, formatMemberStatusTab } from "@/features/members/member-list";
 import { MemberMobileList } from "@/features/members/MemberMobileList";
 import { MEMBER_STATUSES, type MemberStatus } from "@/features/members/member-model";
@@ -22,7 +22,7 @@ function statusHref(status: MemberStatus, q: string) {
 }
 
 function memberSortValue(
-  member: Awaited<ReturnType<typeof loadMemberDirectory>>[number],
+  member: Awaited<ReturnType<typeof loadMemberDirectoryPage>>["members"][number],
   key: MemberSortKey,
 ) {
   switch (key) {
@@ -42,11 +42,10 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
   const q = first(params.q)?.trim() ?? "";
   const status = statusValue(first(params.status));
   const sortState = parseSortState(params, MEMBER_SORT_KEYS, { key: "memberCode", direction: "asc" });
-  const [members, canCreate, canUpdate] = await Promise.all([
-    loadMemberDirectory({ q: q || undefined, status }),
-    hasCurrentUserPermission("members.create"),
-    hasCurrentUserPermission("members.update"),
-  ]);
+  const { members, canCreate, canUpdate } = await loadMemberDirectoryPage({
+    q: q || undefined,
+    status,
+  });
   const sortedMembers = stableSortRows(members, (member) => memberSortValue(member, sortState.key), sortState.direction);
   const sortSearchParams = { q: q || undefined, status };
   const hasFilters = Boolean(q || status !== "active");

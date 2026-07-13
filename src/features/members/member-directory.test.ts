@@ -3,16 +3,21 @@ import type { MemberRecord } from "./member-model";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
+  currentOperatorHasPermission: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: mocks.createClient,
 }));
+vi.mock("@/features/auth/operator-context", () => ({
+  currentOperatorHasPermission: mocks.currentOperatorHasPermission,
+}));
 
 import {
   buildMemberSearchFilter,
   loadMemberDirectory,
+  loadMemberDirectoryPage,
   loadMemberForEdit,
   searchMemberIdsByPhone,
   toMemberListRow,
@@ -73,11 +78,8 @@ function mockDirectoryClient(options: {
   contactData?: unknown[];
   positionData?: unknown[];
 }) {
-  const profile = queryResult({ role_id: "role-id" });
-  const permission = queryResult(
-    options.canManageContacts
-      ? { permission: "members.contacts.manage" }
-      : null,
+  mocks.currentOperatorHasPermission.mockResolvedValue(
+    options.canManageContacts,
   );
   const members = queryResult(options.members);
   const contacts = queryResult(options.contactData ?? []);
@@ -94,10 +96,8 @@ function mockDirectoryClient(options: {
     data: options.contactData ?? [],
     error: null,
   });
-  let profileQueryCount = 0;
   const from = vi.fn((table: string) => {
-    if (table === "profiles") return profileQueryCount++ === 0 ? profile : positions;
-    if (table === "role_permissions") return permission;
+    if (table === "profiles") return positions;
     if (table === "members") return members;
     if (table === "member_contacts") return contacts;
     throw new Error(`Unexpected table: ${table}`);
@@ -135,9 +135,40 @@ describe("member directory DTO", () => {
   });
 });
 
+describe("member directory page RPC", () => {
+  it("loads rows and permissions with exactly one Supabase call", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: {
+        can_create: true,
+        can_update: false,
+        members: [{
+          ...databaseMemberRow,
+          club_position_label: "총무",
+          phone_display: "010-****-5678",
+          group_code: "A",
+        }],
+      },
+      error: null,
+    });
+    mocks.createClient.mockResolvedValue({ rpc });
+
+    const result = await loadMemberDirectoryPage({ q: " 김민수 ", status: "active" });
+
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("get_member_directory_page", {
+      requested_status: "active",
+      search_query: "김민수",
+    });
+    expect(result.canCreate).toBe(true);
+    expect(result.canUpdate).toBe(false);
+    expect(result.members[0]).toMatchObject({ name: "김민수", phoneDisplay: "010-****-5678" });
+  });
+});
+
 describe("member directory contact query scope", () => {
   beforeEach(() => {
     mocks.createClient.mockReset();
+    mocks.currentOperatorHasPermission.mockReset();
   });
 
   it("연락처 관리자는 필터 결과 회원 ID만 원문 연락처 조회에 전달한다", async () => {
@@ -242,6 +273,7 @@ describe("member directory contact query scope", () => {
 describe("searchMemberIdsByPhone", () => {
   beforeEach(() => {
     mocks.createClient.mockReset();
+    mocks.currentOperatorHasPermission.mockReset();
   });
 
   it("정규화한 전화번호를 전용 RPC에만 전달한다", async () => {

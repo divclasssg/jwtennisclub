@@ -2,12 +2,10 @@ import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import MembersPage from "./page";
 
-const loadMemberDirectory = vi.fn();
-const hasCurrentUserPermission = vi.fn();
+const loadMemberDirectoryPage = vi.fn();
 
 vi.mock("@/features/members/member-directory", () => ({
-  hasCurrentUserPermission: (...args: unknown[]) => hasCurrentUserPermission(...args),
-  loadMemberDirectory: (...args: unknown[]) => loadMemberDirectory(...args),
+  loadMemberDirectoryPage: (...args: unknown[]) => loadMemberDirectoryPage(...args),
 }));
 
 const member = {
@@ -26,8 +24,7 @@ const member = {
 
 describe("MembersPage", () => {
   beforeEach(() => {
-    loadMemberDirectory.mockResolvedValue([member]);
-    hasCurrentUserPermission.mockResolvedValue(true);
+    loadMemberDirectoryPage.mockResolvedValue({ members: [member], canCreate: true, canUpdate: true });
   });
 
   it("renders permanent member data without a group search filter", async () => {
@@ -42,7 +39,8 @@ describe("MembersPage", () => {
       "이름 또는 회원번호",
     );
     expect(screen.queryByLabelText("그룹")).not.toBeInTheDocument();
-    expect(loadMemberDirectory).toHaveBeenCalledWith({
+    expect(loadMemberDirectoryPage).toHaveBeenCalledTimes(1);
+    expect(loadMemberDirectoryPage).toHaveBeenCalledWith({
       q: "JW",
       status: "active",
     });
@@ -72,9 +70,7 @@ describe("MembersPage", () => {
   });
 
   it("renders the full contact returned for a contact manager", async () => {
-    loadMemberDirectory.mockResolvedValue([
-      { ...member, phoneDisplay: "010-1234-5678" },
-    ]);
+    loadMemberDirectoryPage.mockResolvedValue({ members: [{ ...member, phoneDisplay: "010-1234-5678" }], canCreate: true, canUpdate: true });
 
     render(await MembersPage({ searchParams: Promise.resolve({}) }));
 
@@ -82,10 +78,7 @@ describe("MembersPage", () => {
   });
 
   it("sorts members from header links while preserving member filters", async () => {
-    loadMemberDirectory.mockResolvedValue([
-      member,
-      { ...member, id: "member-2", memberCode: "JW-000002", name: "박지수" },
-    ]);
+    loadMemberDirectoryPage.mockResolvedValue({ members: [member, { ...member, id: "member-2", memberCode: "JW-000002", name: "박지수" }], canCreate: true, canUpdate: true });
 
     render(await MembersPage({
       searchParams: Promise.resolve({
@@ -110,9 +103,7 @@ describe("MembersPage", () => {
   });
 
   it("shows 일반회원 in the position column for a non-operator member", async () => {
-    loadMemberDirectory.mockResolvedValue([
-      { ...member, operatorProfileId: null, clubPositionLabel: null },
-    ]);
+    loadMemberDirectoryPage.mockResolvedValue({ members: [{ ...member, operatorProfileId: null, clubPositionLabel: null }], canCreate: true, canUpdate: true });
 
     render(await MembersPage({ searchParams: Promise.resolve({}) }));
 
@@ -136,9 +127,7 @@ describe("MembersPage", () => {
   });
 
   it("hides member management links without create and update permissions", async () => {
-    hasCurrentUserPermission.mockImplementation(async (permission: string) =>
-      permission !== "members.create" && permission !== "members.update"
-    );
+    loadMemberDirectoryPage.mockResolvedValue({ members: [member], canCreate: false, canUpdate: false });
 
     render(await MembersPage({ searchParams: Promise.resolve({}) }));
 
