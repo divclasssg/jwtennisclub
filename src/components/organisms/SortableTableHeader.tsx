@@ -1,6 +1,6 @@
 import Link from "next/link";
 import styles from "./Organisms.module.scss";
-import { buildSortHref, type SortDirection, type SortSearchParams, type SortState } from "./table-sort";
+import { buildSortHref, type SortSearchParams, type SortState } from "./table-sort";
 
 type SortableTableHeaderProps<TKey extends string> = {
   label: string;
@@ -10,11 +10,6 @@ type SortableTableHeaderProps<TKey extends string> = {
   sortState: SortState<TKey>;
 };
 
-const DIRECTIONS: { direction: SortDirection; label: string; symbol: string }[] = [
-  { direction: "asc", label: "오름차순", symbol: "↑" },
-  { direction: "desc", label: "내림차순", symbol: "↓" },
-];
-
 export function SortableTableHeader<TKey extends string>({
   label,
   pathname,
@@ -22,27 +17,27 @@ export function SortableTableHeader<TKey extends string>({
   sortKey,
   sortState,
 }: SortableTableHeaderProps<TKey>) {
+  const isActive = sortState.key === sortKey;
+  const nextDirection = isActive && sortState.direction === "asc" ? "desc" : "asc";
+  const symbol = isActive ? (sortState.direction === "asc" ? "↑" : "↓") : "↕";
+  const nextDirectionLabel = nextDirection === "asc" ? "오름차순" : "내림차순";
+
   return (
-    <th scope="col">
-      <span className={styles["sortable-table-header"]}>
+    <th
+      aria-sort={isActive ? (sortState.direction === "asc" ? "ascending" : "descending") : undefined}
+      scope="col"
+    >
+      <Link
+        aria-current={isActive ? "true" : undefined}
+        aria-label={`${label} ${nextDirectionLabel} 정렬`}
+        className={`${styles["sort-link"]}${isActive ? ` ${styles["sort-link-active"]}` : ""}`}
+        href={buildSortHref(pathname, searchParams, sortKey, nextDirection)}
+      >
         <span>{label}</span>
-        <span className={styles["sort-controls"]}>
-          {DIRECTIONS.map(({ direction, label: directionLabel, symbol }) => {
-            const isActive = sortState.key === sortKey && sortState.direction === direction;
-            return (
-              <Link
-                aria-current={isActive ? "true" : undefined}
-                aria-label={`${label} ${directionLabel} 정렬`}
-                className={`${styles["sort-link"]}${isActive ? ` ${styles["sort-link-active"]}` : ""}`}
-                href={buildSortHref(pathname, searchParams, sortKey, direction)}
-                key={direction}
-              >
-                {symbol}
-              </Link>
-            );
-          })}
+        <span aria-hidden="true" className={styles["sort-direction-indicator"]}>
+          {symbol}
         </span>
-      </span>
+      </Link>
     </th>
   );
 }

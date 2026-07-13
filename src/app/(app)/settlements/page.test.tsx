@@ -175,10 +175,10 @@ describe("SettlementsPage", () => {
 
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0].textContent)).toEqual(["공", "코트"]);
-    expect(screen.getByRole("link", { name: "금액 오름차순 정렬" })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("link", { name: "건수 내림차순 정렬" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "금액 내림차순 정렬" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("link", { name: "건수 오름차순 정렬" })).toHaveAttribute(
       "href",
-      "/settlements?month=2026-07&sort=count&direction=desc",
+      "/settlements?month=2026-07&sort=count&direction=asc",
     );
   });
 });

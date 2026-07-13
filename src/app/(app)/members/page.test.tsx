@@ -52,14 +52,14 @@ describe("MembersPage", () => {
 
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
-      "회원번호↑↓",
-      "이름↑↓",
-      "전화번호↑↓",
-      "구분↑↓",
-      "직책↑↓",
-      "그룹↑↓",
-      "상태↑↓",
-      "가입일↑↓",
+      "회원번호↑",
+      "이름↕",
+      "전화번호↕",
+      "구분↕",
+      "직책↕",
+      "그룹↕",
+      "상태↕",
+      "가입일↕",
       "관리",
     ]);
     expect(within(table).getByRole("cell", { name: "운영진" })).toBeInTheDocument();
@@ -91,7 +91,7 @@ describe("MembersPage", () => {
 
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("rowheader").map((cell) => cell.textContent)).toEqual(["박지수", "김민수"]);
-    expect(screen.getByRole("link", { name: "이름 내림차순 정렬" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("link", { name: "이름 오름차순 정렬" })).toHaveAttribute("aria-current", "true");
     expect(screen.getByRole("link", { name: "가입일 오름차순 정렬" })).toHaveAttribute(
       "href",
       "/members?q=JW&status=active&sort=joinedDate&direction=asc",

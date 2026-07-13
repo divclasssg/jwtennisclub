@@ -128,10 +128,10 @@ describe("ExpensesPage", () => {
 
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[2].textContent)).toEqual(["공 구입", "코트 대관"]);
-    expect(screen.getByRole("link", { name: "금액 오름차순 정렬" })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("link", { name: "메모 내림차순 정렬" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "금액 내림차순 정렬" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("link", { name: "메모 오름차순 정렬" })).toHaveAttribute(
       "href",
-      "/expenses?month=2026-07&category=court&sort=memo&direction=desc",
+      "/expenses?month=2026-07&category=court&sort=memo&direction=asc",
     );
     expect(screen.queryByRole("link", { name: "증빙 오름차순 정렬" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "관리 오름차순 정렬" })).not.toBeInTheDocument();
