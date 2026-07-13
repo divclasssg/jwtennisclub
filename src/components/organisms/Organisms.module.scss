@@ -52,6 +52,10 @@
     background: var(--surface-pearl);
   }
 
+  tbody tr:hover {
+    background: var(--table-row-hover-surface);
+  }
+
   tbody a {
     color: var(--action-blue);
     font-weight: var(--text-body-weight);
