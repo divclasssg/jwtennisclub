@@ -19,6 +19,7 @@ vi.mock("@/features/members/member-directory", () => ({
 vi.mock("../../actions", () => ({ updateMember: vi.fn() }));
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(() => { throw new Error("NEXT_NOT_FOUND"); }),
+  useRouter: () => ({ back: vi.fn() }),
 }));
 
 const member = {
@@ -48,6 +49,7 @@ describe("EditMemberPage", () => {
       searchParams: Promise.resolve({}),
     }));
 
+    expect(screen.getByRole("dialog", { name: "회원 수정" })).toBeInTheDocument();
     expect(screen.getByText("JW-000001")).toBeInTheDocument();
     expect(screen.getByLabelText("연락처")).toHaveValue("01012345678");
     expect(screen.getByLabelText("연락처")).toHaveAttribute("autocomplete", "tel");
