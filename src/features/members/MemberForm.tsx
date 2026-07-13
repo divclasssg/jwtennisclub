@@ -66,17 +66,18 @@ export function MemberForm({
       </p>
 
       <FormGrid>
-        <FormField label="이름">
+        <FormField label="이름" labelVisible>
           <TextInput
             defaultValue={candidate?.name ?? member?.name}
             maxLength={50}
             name="name"
+            placeholder="홍길동"
             required
             type="text"
           />
         </FormField>
         {canManageContacts ? (
-          <FormField label="연락처">
+          <FormField label="연락처" labelVisible>
             <TextInput
               autoComplete="tel"
               defaultValue={candidate?.phoneNumber ?? member?.phoneNumber ?? ""}
@@ -93,20 +94,20 @@ export function MemberForm({
             <strong>{member?.phoneDisplay}</strong>
           </div>
         ) : null}
-        <FormField label="그룹">
+        <FormField label="그룹" labelVisible>
           <SelectInput defaultValue={candidate?.groupId ?? member?.groupId ?? ""} name="groupId">
             <option value="">그룹 없음</option>
             {groups.map((group) => <option key={group.id} value={group.id}>{group.code}</option>)}
           </SelectInput>
         </FormField>
-        <FormField label="가입일">
+        <FormField label="가입일" labelVisible>
           <DateInput
             defaultValue={candidate?.joinedDate ?? member?.joinedDate}
             name="joinedDate"
             required
           />
         </FormField>
-        <FormField label="상태">
+        <FormField label="상태" labelVisible>
           <SelectInput defaultValue={candidate?.status ?? member?.status ?? "active"} name="status">
             {MEMBER_STATUSES.map((status) => (
               <option key={status} value={status}>
@@ -115,7 +116,7 @@ export function MemberForm({
             ))}
           </SelectInput>
         </FormField>
-        <FormField label="탈퇴일">
+        <FormField label="탈퇴일" labelVisible>
           <DateInput
             defaultValue={candidate?.withdrawnDate ?? member?.withdrawnDate ?? ""}
             name="withdrawnDate"
@@ -127,11 +128,12 @@ export function MemberForm({
         <div className={styles["duplicate-warning"]} role="alert">{duplicateMessage}</div>
       ) : null}
 
-      <FormField label="메모">
+      <FormField label="메모" labelVisible>
         <TextArea
           defaultValue={candidate?.memo ?? member?.memo ?? ""}
           maxLength={500}
           name="memo"
+          placeholder="특이사항을 입력하세요"
           rows={4}
         />
       </FormField>
