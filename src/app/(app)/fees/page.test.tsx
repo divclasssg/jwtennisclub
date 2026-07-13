@@ -180,13 +180,13 @@ describe("FeesPage", () => {
 
     expect(within(list).getByText("2026.07 · 총 1명")).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
-      "회원번호↑↓",
-      "이름↑↓",
-      "구분↑↓",
-      "상태↑↓",
-      "기준 금액↑↓",
-      "납부일↑↓",
-      "메모↑↓",
+      "회원번호↑",
+      "이름↕",
+      "구분↕",
+      "상태↕",
+      "기준 금액↕",
+      "납부일↕",
+      "메모↕",
       "처리",
     ]);
     expect(within(table).getByRole("cell", { name: "M0001" })).toBeInTheDocument();
@@ -233,10 +233,10 @@ describe("FeesPage", () => {
 
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("rowheader").map((cell) => cell.textContent)).toEqual(["이영희", "김민수"]);
-    expect(screen.getByRole("link", { name: "기준 금액 오름차순 정렬" })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("link", { name: "납부일 내림차순 정렬" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "기준 금액 내림차순 정렬" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("link", { name: "납부일 오름차순 정렬" })).toHaveAttribute(
       "href",
-      "/fees?month=2026-07&sort=paidDate&direction=desc",
+      "/fees?month=2026-07&sort=paidDate&direction=asc",
     );
     expect(screen.queryByRole("link", { name: "처리 오름차순 정렬" })).not.toBeInTheDocument();
 
