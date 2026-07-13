@@ -580,3 +580,9 @@
 - 확장이 없는 독립 Chromium에서 `/login`을 확인했으며 앱 콘솔 오류가 재현되지 않았다.
 - React Developer Tools를 비활성화한 뒤 Suspense 메시지가 사라졌고, 남은 출력은 HMR 정상 연결, 개발 도구 설치 안내, 미사용 폰트 preload 경고뿐임을 확인했다.
 - 화면 동작이나 서버 요청 실패가 동반되지 않아 앱 코드 및 로딩 경계는 변경하지 않았다.
+
+### 브랜드 파비콘 적용
+- 제공된 `jwtennis.jpg`에서 작은 브라우저 탭에서도 식별 가능한 상단 `JW` 심볼만 정사각형으로 크롭했다.
+- `favicon.ico`에는 16/32/48px RGBA PNG 아이콘을 포함하고, `icon.png` 512px 및 `apple-icon.png` 180px을 추가했다.
+- Next.js 개발 서버가 favicon, 일반 앱 아이콘, Apple Touch 아이콘 메타데이터를 자동 생성하는지 확인했다.
+- `/favicon.ico`, `/icon.png`, `/apple-icon.png`가 올바른 콘텐츠 타입으로 200 응답하는 것을 확인했다.
