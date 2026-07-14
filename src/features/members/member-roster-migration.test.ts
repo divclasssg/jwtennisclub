@@ -26,6 +26,22 @@ const resetPatchMigrationSql = readFileSync(
   "utf8",
 );
 
+const meetingMigrationSql = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/migrations/202607130002_add_club_meetings.sql",
+  ),
+  "utf8",
+).toLowerCase();
+
+const meetingRecoverySql = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/recovery/202607130002_restore_member_rpc_contracts.sql",
+  ),
+  "utf8",
+).toLowerCase();
+
 describe("member roster preparation migration", () => {
   it("backfills codes before making them required and assigns every insert", () => {
     const backfillPosition = migrationSql.indexOf("with numbered_members as");
@@ -382,5 +398,104 @@ describe("member roster finalization migration", () => {
     expect(saveFunction).toContain("member_data ? 'phone_number'");
     expect(saveFunction).toContain("member_id is null and normalized_phone is null and name_exists");
     expect(saveFunction).toContain("normalized_name text := lower(btrim(normalize(member_data->>'name', NFKC)))");
+  });
+});
+
+describe("meeting roster member-write integration", () => {
+  it("defines idempotent KST meeting and roster automation with a single bootstrap", () => {
+    expect(meetingMigrationSql).toContain("at time zone 'asia/seoul'");
+    expect(meetingMigrationSql).toContain("order by period_month");
+    expect(meetingMigrationSql).toContain("meeting-period-month:");
+    expect(meetingMigrationSql).toContain(
+      "meeting_month_rosters_single_bootstrap_unique",
+    );
+    expect(meetingMigrationSql).toContain(
+      "on conflict (period_month, regular_occurrence)",
+    );
+    expect(meetingMigrationSql).toContain(
+      "on conflict (meeting_id, member_id) do nothing",
+    );
+    expect(meetingMigrationSql).toContain(
+      "active profile required to bootstrap club meeting automation",
+    );
+  });
+
+  it("locks meeting months before member changes and syncs the next preparing roster afterward", () => {
+    const saveStart = meetingMigrationSql.indexOf(
+      "create or replace function public.save_member_with_contact",
+    );
+    const saveEnd = meetingMigrationSql.indexOf(
+      "revoke execute on function public.save_member_with_contact",
+      saveStart,
+    );
+    const saveFunction = meetingMigrationSql.slice(saveStart, saveEnd);
+    const lockPosition = saveFunction.indexOf(
+      "public.prepare_meeting_rosters_before_member_change",
+    );
+    const memberWritePosition = saveFunction.indexOf(
+      "insert into public.members",
+    );
+    const syncPosition = saveFunction.indexOf(
+      "public.sync_meeting_rosters_after_member_change",
+    );
+
+    expect(saveStart).toBeGreaterThan(-1);
+    expect(lockPosition).toBeGreaterThan(-1);
+    expect(memberWritePosition).toBeGreaterThan(lockPosition);
+    expect(syncPosition).toBeGreaterThan(memberWritePosition);
+    expect(saveFunction).toContain("returns jsonb");
+    expect(saveFunction).toContain("set search_path = ''");
+    expect(saveFunction).toMatch(/'status',\s*'saved'/);
+    expect(saveFunction).toMatch(/'member_id',\s*saved_member_id/);
+    expect(saveFunction).toContain("'member_code'");
+  });
+
+  it("routes operator member creation and name synchronization through the same roster boundary", () => {
+    for (const helper of [
+      "ensure_operator_member",
+      "sync_operator_member_name",
+    ]) {
+      const start = meetingMigrationSql.indexOf(
+        `create or replace function public.${helper}()`,
+      );
+      const end = meetingMigrationSql.indexOf("$$;", start);
+      const functionSql = meetingMigrationSql.slice(start, end);
+
+      expect(start, helper).toBeGreaterThan(-1);
+      expect(functionSql).toContain("set search_path = ''");
+      expect(functionSql).toContain(
+        "public.prepare_meeting_rosters_before_member_change",
+      );
+      expect(functionSql).toContain(
+        "public.sync_meeting_rosters_after_member_change",
+      );
+    }
+  });
+
+  it("revokes authenticated direct member writes without changing the public save signature", () => {
+    expect(meetingMigrationSql).toContain(
+      "revoke insert, update, delete on table public.members from authenticated",
+    );
+    expect(meetingMigrationSql).toMatch(
+      /revoke execute on function public\.save_member_with_contact\(uuid, jsonb, text\)\s+from public, anon/,
+    );
+    expect(meetingMigrationSql).toMatch(
+      /grant execute on function public\.save_member_with_contact\(uuid, jsonb, text\)\s+to authenticated/,
+    );
+  });
+
+  it("provides a forward recovery script for only the three member integration functions", () => {
+    for (const helper of [
+      "save_member_with_contact",
+      "ensure_operator_member",
+      "sync_operator_member_name",
+    ]) {
+      expect(meetingRecoverySql).toContain(
+        `create or replace function public.${helper}`,
+      );
+    }
+    expect(meetingRecoverySql).toContain("set search_path = ''");
+    expect(meetingRecoverySql).not.toContain("drop table");
+    expect(meetingRecoverySql).not.toContain("delete from public.meeting_");
   });
 });

@@ -64,6 +64,22 @@ describe("club meeting migration", () => {
     );
     expect(migrationSql).toContain("meeting_attendance_target_origin_link");
     expect(migrationSql).toContain("monthly roster month mismatch");
+    expect(migrationSql).toContain(
+      "create trigger meeting_month_rosters_prevent_period_month_change",
+    );
+  });
+
+  it("validates immutable attendance references without reversing automation locks", () => {
+    const start = migrationSql.indexOf(
+      "create or replace function public.validate_meeting_attendance_invariants()",
+    );
+    const end = migrationSql.indexOf("$$;", start);
+    const functionSql = migrationSql.slice(start, end);
+
+    expect(migrationSql).toContain(
+      "create or replace function public.prevent_meeting_roster_period_month_change()",
+    );
+    expect(functionSql).not.toContain("for share");
   });
 
   it("keeps bootstrap rosters out of statistics and preserves deletion history", () => {
@@ -118,6 +134,7 @@ describe("club meeting migration", () => {
     const helpers = [
       "validate_club_meeting_relationship",
       "prevent_club_meeting_period_month_change",
+      "prevent_meeting_roster_period_month_change",
       "validate_meeting_attendance_invariants",
       "prevent_meeting_lifecycle_event_mutation",
     ];
@@ -148,5 +165,23 @@ describe("club meeting migration", () => {
       expect(migrationSql).toContain(`('${permission}')`);
     }
     expect(migrationSql).toContain("where roles.name in ('admin', 'operator')");
+  });
+
+  it("emits executable roster sync and regular-meeting bootstrap statements", () => {
+    const bootstrapStart = migrationSql.indexOf(
+      "create or replace function public.bootstrap_club_meeting_automation",
+    );
+    const bootstrapEnd = migrationSql.indexOf(
+      "create or replace function public.prepare_meeting_rosters_before_member_change",
+      bootstrapStart,
+    );
+    const bootstrapFunction = migrationSql.slice(bootstrapStart, bootstrapEnd);
+
+    expect(migrationSql).not.toContain(
+      "insert into public.meeting_month_roster_members (\n  insert into",
+    );
+    expect(bootstrapFunction).toMatch(
+      /perform public\.ensure_regular_club_meetings\(\s*target_period_month,\s*actor_profile_id\s*\)/,
+    );
   });
 });
