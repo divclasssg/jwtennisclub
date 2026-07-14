@@ -2108,6 +2108,349 @@ from public, anon, authenticated, service_role;
 
 revoke insert, update, delete on table public.members from authenticated;
 
+create or replace function public.prepare_club_meeting_month(
+  requested_period_month date
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  normalized_period_month date := pg_catalog.date_trunc(
+    'month',
+    requested_period_month
+  )::date;
+  actor_profile_id uuid;
+  kst_today date := public.meeting_kst_today();
+  current_period_month date := pg_catalog.date_trunc('month', kst_today)::date;
+begin
+  if requested_period_month is null
+    or requested_period_month <> normalized_period_month
+  then
+    raise exception 'period month must be the first day'
+      using errcode = '22023';
+  end if;
+
+  actor_profile_id := public.require_meeting_operator(array[]::text[]);
+
+  perform public.bootstrap_club_meeting_automation(
+    kst_today,
+    actor_profile_id,
+    false
+  );
+
+  if normalized_period_month >= current_period_month then
+    perform public.lock_meeting_period_months(array[normalized_period_month]);
+    perform public.lock_meeting_automation_rows(array[normalized_period_month]);
+    perform public.ensure_regular_club_meetings(
+      normalized_period_month,
+      actor_profile_id
+    );
+  end if;
+
+  return pg_catalog.jsonb_build_object(
+    'status',
+    'prepared',
+    'period_month',
+    normalized_period_month
+  );
+end;
+$$;
+
+create or replace function public.get_club_meeting_directory_page(
+  requested_period_month date,
+  requested_selected_meeting_id text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+stable
+as $$
+declare
+  normalized_period_month date := pg_catalog.date_trunc(
+    'month',
+    requested_period_month
+  )::date;
+  month_roster_status public.meeting_roster_status;
+  roster_json jsonb;
+  meetings_json jsonb;
+  summary_json jsonb;
+  selected_meeting_id uuid;
+  selected_meeting_json jsonb;
+  selected_targets_json jsonb;
+  ad_hoc_candidates_json jsonb;
+  lifecycle_events_json jsonb;
+  selected_selection_json jsonb;
+  modal_error text;
+  can_manage_meeting boolean;
+  can_manage_attendance boolean;
+begin
+  if requested_period_month is null
+    or requested_period_month <> normalized_period_month
+  then
+    raise exception 'period month must be the first day'
+      using errcode = '22023';
+  end if;
+
+  perform public.require_meeting_operator(array[]::text[]);
+  can_manage_meeting := public.has_permission('meetings.manage');
+  can_manage_attendance := public.has_permission(
+    'meetings.attendance.manage'
+  );
+
+  select
+    rosters.status,
+    pg_catalog.jsonb_build_object(
+      'status', rosters.status,
+      'roster_origin', rosters.roster_origin,
+      'statistics_eligible', rosters.statistics_eligible
+    )
+  into month_roster_status, roster_json
+  from public.meeting_month_rosters as rosters
+  where rosters.period_month = normalized_period_month;
+
+  with attendance_counts as (
+    select
+      attendance.meeting_id,
+      pg_catalog.count(*) as total,
+      pg_catalog.count(*) filter (
+        where attendance.rsvp_status = 'unanswered'
+      ) as rsvp_unanswered,
+      pg_catalog.count(*) filter (
+        where attendance.rsvp_status = 'attending'
+      ) as rsvp_attending,
+      pg_catalog.count(*) filter (
+        where attendance.rsvp_status = 'late'
+      ) as rsvp_late,
+      pg_catalog.count(*) filter (
+        where attendance.rsvp_status = 'declined'
+      ) as rsvp_declined,
+      pg_catalog.count(*) filter (
+        where attendance.attendance_status = 'unchecked'
+      ) as attendance_unchecked,
+      pg_catalog.count(*) filter (
+        where attendance.attendance_status = 'present'
+      ) as attendance_present,
+      pg_catalog.count(*) filter (
+        where attendance.attendance_status = 'late'
+      ) as attendance_late,
+      pg_catalog.count(*) filter (
+        where attendance.attendance_status = 'absent'
+      ) as attendance_absent
+    from public.meeting_attendance as attendance
+    inner join public.club_meetings as attendance_meetings
+      on attendance_meetings.id = attendance.meeting_id
+    where attendance_meetings.period_month = normalized_period_month
+    group by attendance.meeting_id
+  )
+  select coalesce(
+    pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object(
+        'id', meetings.id,
+        'meeting_kind', meetings.meeting_kind,
+        'period_month', meetings.period_month,
+        'regular_occurrence', meetings.regular_occurrence,
+        'meeting_date', meetings.meeting_date,
+        'start_time', meetings.start_time,
+        'end_time', meetings.end_time,
+        'title', meetings.title,
+        'location', meetings.location,
+        'linked_regular_meeting_id', meetings.linked_regular_meeting_id,
+        'status', case
+          when meetings.cancelled_at is not null then 'cancelled'
+          when meetings.attendance_closed_at is not null then 'completed'
+          else 'scheduled'
+        end,
+        'counts', case
+          when month_roster_status = 'locked' then
+            pg_catalog.jsonb_build_object(
+              'total', coalesce(attendance_counts.total, 0),
+              'rsvp_unanswered', coalesce(
+                attendance_counts.rsvp_unanswered,
+                0
+              ),
+              'rsvp_attending', coalesce(
+                attendance_counts.rsvp_attending,
+                0
+              ),
+              'rsvp_late', coalesce(attendance_counts.rsvp_late, 0),
+              'rsvp_declined', coalesce(
+                attendance_counts.rsvp_declined,
+                0
+              ),
+              'attendance_unchecked', coalesce(
+                attendance_counts.attendance_unchecked,
+                0
+              ),
+              'attendance_present', coalesce(
+                attendance_counts.attendance_present,
+                0
+              ),
+              'attendance_late', coalesce(
+                attendance_counts.attendance_late,
+                0
+              ),
+              'attendance_absent', coalesce(
+                attendance_counts.attendance_absent,
+                0
+              )
+            )
+          else null
+        end
+      )
+      order by meetings.meeting_date, meetings.start_time, meetings.id
+    ),
+    '[]'::jsonb
+  )
+  into meetings_json
+  from public.club_meetings as meetings
+  left join attendance_counts
+    on attendance_counts.meeting_id = meetings.id
+  where meetings.period_month = normalized_period_month;
+
+  select pg_catalog.jsonb_build_object(
+    'total', pg_catalog.count(*),
+    'scheduled', pg_catalog.count(*) filter (
+      where meetings.cancelled_at is null
+        and meetings.attendance_closed_at is null
+    ),
+    'completed', pg_catalog.count(*) filter (
+      where meetings.cancelled_at is null
+        and meetings.attendance_closed_at is not null
+    ),
+    'cancelled', pg_catalog.count(*) filter (
+      where meetings.cancelled_at is not null
+    )
+  )
+  into summary_json
+  from public.club_meetings as meetings
+  where meetings.period_month = normalized_period_month;
+
+  if nullif(pg_catalog.btrim(requested_selected_meeting_id), '') is not null
+  then
+    select requested_meeting.id
+    into selected_meeting_id
+    from public.club_meetings as requested_meeting
+    where requested_meeting.id::text = requested_selected_meeting_id
+      and requested_meeting.period_month = normalized_period_month;
+
+    if selected_meeting_id is null then
+      modal_error := 'selected meeting unavailable';
+    else
+      select meeting_value
+      into selected_meeting_json
+      from pg_catalog.jsonb_array_elements(meetings_json)
+        as meeting_rows(meeting_value)
+      where meeting_value->>'id' = selected_meeting_id::text;
+
+      select coalesce(
+        pg_catalog.jsonb_agg(
+          pg_catalog.jsonb_build_object(
+            'member_id', attendance.member_id,
+            'target_origin', attendance.target_origin,
+            'member_code_snapshot', attendance.member_code_snapshot,
+            'member_name_snapshot', attendance.member_name_snapshot,
+            'group_code_snapshot', attendance.group_code_snapshot,
+            'rsvp_status', attendance.rsvp_status,
+            'attendance_status', attendance.attendance_status,
+            'arrival_time', attendance.arrival_time,
+            'attendance_origin', attendance.attendance_origin,
+            'has_recorded_state',
+              attendance.rsvp_updated_by is not null
+              or attendance.attendance_updated_by is not null,
+            'rsvp_updated_at', attendance.rsvp_updated_at,
+            'attendance_updated_at', attendance.attendance_updated_at
+          )
+          order by
+            attendance.member_code_snapshot,
+            attendance.member_name_snapshot,
+            attendance.member_id
+        ),
+        '[]'::jsonb
+      )
+      into selected_targets_json
+      from public.meeting_attendance as attendance
+      where attendance.meeting_id = selected_meeting_id;
+
+      if can_manage_attendance then
+        select coalesce(
+          pg_catalog.jsonb_agg(
+            pg_catalog.jsonb_build_object(
+              'id', members.id,
+              'member_code', members.member_code,
+              'name', members.name,
+              'group_code', member_groups.code
+            )
+            order by members.member_code, members.name, members.id
+          ),
+          '[]'::jsonb
+        )
+        into ad_hoc_candidates_json
+        from public.members as members
+        left join public.member_groups as member_groups
+          on member_groups.id = members.group_id
+        where members.status = 'active'
+          and not exists (
+            select 1
+            from public.meeting_attendance as existing_attendance
+            where existing_attendance.meeting_id = selected_meeting_id
+              and existing_attendance.member_id = members.id
+          );
+      else
+        ad_hoc_candidates_json := '[]'::jsonb;
+      end if;
+
+      select coalesce(
+        pg_catalog.jsonb_agg(
+          pg_catalog.jsonb_build_object(
+            'id', lifecycle_events.id,
+            'event_type', lifecycle_events.event_type,
+            'actor_display_name', actor_profiles.display_name,
+            'occurred_at', lifecycle_events.occurred_at,
+            'reason', lifecycle_events.reason,
+            'details', lifecycle_events.details
+          )
+          order by
+            lifecycle_events.occurred_at desc,
+            lifecycle_events.id desc
+        ),
+        '[]'::jsonb
+      )
+      into lifecycle_events_json
+      from public.meeting_lifecycle_events as lifecycle_events
+      inner join public.profiles as actor_profiles
+        on actor_profiles.id = lifecycle_events.actor_profile_id
+      where lifecycle_events.meeting_id = selected_meeting_id;
+
+      selected_selection_json := pg_catalog.jsonb_build_object(
+        'meeting', selected_meeting_json,
+        'targets', selected_targets_json,
+        'ad_hoc_candidates', ad_hoc_candidates_json,
+        'lifecycle_events', lifecycle_events_json
+      );
+    end if;
+  end if;
+
+  return pg_catalog.jsonb_build_object(
+    'period_month', normalized_period_month,
+    'can_manage_meeting', can_manage_meeting,
+    'can_manage_attendance', can_manage_attendance,
+    'roster', roster_json,
+    'summary', summary_json,
+    'meetings', meetings_json,
+    'selected_meeting', selected_selection_json,
+    'modal_error', modal_error
+  );
+end;
+$$;
+
+revoke execute on function public.prepare_club_meeting_month(date) from public, anon;
+grant execute on function public.prepare_club_meeting_month(date) to authenticated;
+revoke execute on function public.get_club_meeting_directory_page(date, text) from public, anon;
+grant execute on function public.get_club_meeting_directory_page(date, text) to authenticated;
+
 do $$
 declare
   kst_today date := public.meeting_kst_today();

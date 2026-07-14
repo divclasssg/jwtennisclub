@@ -109,6 +109,66 @@ export type MeetingLifecycleEventRecord = {
   details: Readonly<Record<string, unknown>>;
 };
 
+export type MeetingAttendanceCounts = {
+  total: number;
+  rsvpUnanswered: number;
+  rsvpAttending: number;
+  rsvpLate: number;
+  rsvpDeclined: number;
+  attendanceUnchecked: number;
+  attendancePresent: number;
+  attendanceLate: number;
+  attendanceAbsent: number;
+};
+
+export type MeetingDirectoryRow = Pick<
+  ClubMeetingRecord,
+  | "id"
+  | "meetingKind"
+  | "periodMonth"
+  | "regularOccurrence"
+  | "meetingDate"
+  | "startTime"
+  | "endTime"
+  | "title"
+  | "location"
+  | "linkedRegularMeetingId"
+> & {
+  status: MeetingStatus;
+  counts: MeetingAttendanceCounts | null;
+};
+
+export type MeetingDirectoryTarget = Pick<
+  MeetingAttendanceRecord,
+  | "memberId"
+  | "targetOrigin"
+  | "memberCodeSnapshot"
+  | "memberNameSnapshot"
+  | "groupCodeSnapshot"
+  | "rsvpStatus"
+  | "attendanceStatus"
+  | "arrivalTime"
+  | "attendanceOrigin"
+  | "rsvpUpdatedAt"
+  | "attendanceUpdatedAt"
+> & {
+  hasRecordedState: boolean;
+};
+
+export type MeetingAdHocCandidate = {
+  id: string;
+  memberCode: string;
+  name: string;
+  groupCode: string | null;
+};
+
+export type MeetingLifecycleEventDisplay = Pick<
+  MeetingLifecycleEventRecord,
+  "id" | "eventType" | "occurredAt" | "reason" | "details"
+> & {
+  actorDisplayName: string;
+};
+
 export function getMeetingStatus(
   meeting: Pick<ClubMeetingRecord, "cancelledAt" | "attendanceClosedAt">,
 ): MeetingStatus {
