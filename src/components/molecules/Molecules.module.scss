@@ -327,6 +327,13 @@
   box-shadow: var(--product-shadow);
 }
 
+.modal-panel-large {
+  width: min(
+    100%,
+    calc(var(--modal-panel-max-width) + var(--spacing-section) * 4)
+  );
+}
+
 .modal-header {
   display: flex;
   align-items: center;

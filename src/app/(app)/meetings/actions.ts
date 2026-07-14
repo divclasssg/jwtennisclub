@@ -2,17 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import {
+  mutateMeetingRow,
+  type SafeMeetingRow,
+} from "@/features/meetings/meeting-row-mutation";
 import { createClient } from "@/lib/supabase/server";
 
 const uuidSchema = z.string().uuid();
-const timestampSchema = z.string().datetime({ offset: true });
 const dateSchema = z.string().date();
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
-const nullableTimeSchema = z.union([timeSchema, z.null()]);
-const databaseNullableTimeSchema = z.union([
-  z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?$/),
-  z.null(),
-]);
 
 const meetingTargetSchema = z.object({ meetingId: uuidSchema });
 const meetingMemberSchema = meetingTargetSchema.extend({ memberId: uuidSchema });
@@ -22,24 +20,6 @@ const locationSchema = meetingTargetSchema.extend({
 const cancellationSchema = meetingTargetSchema.extend({
   reason: z.string().trim().min(1).max(500),
 });
-const rsvpSchema = meetingMemberSchema.extend({
-  rsvpStatus: z.enum(["unanswered", "attending", "late", "declined"]),
-  expectedUpdatedAt: timestampSchema,
-});
-const attendanceSchema = meetingMemberSchema
-  .extend({
-    attendanceStatus: z.enum(["unchecked", "present", "late", "absent"]),
-    arrivalTime: nullableTimeSchema,
-    expectedUpdatedAt: timestampSchema,
-  })
-  .superRefine((value, context) => {
-    if (value.attendanceStatus === "late" && value.arrivalTime === null) {
-      context.addIssue({ code: "custom", message: "arrival time required" });
-    }
-    if (value.attendanceStatus !== "late" && value.arrivalTime !== null) {
-      context.addIssue({ code: "custom", message: "arrival time not allowed" });
-    }
-  });
 const lightningSchema = z
   .object({
     linkedRegularMeetingId: uuidSchema,
@@ -52,21 +32,9 @@ const lightningSchema = z
     message: "end time must be after start time",
   });
 
-const safeAttendanceRowSchema = z
-  .object({
-    meetingId: uuidSchema,
-    memberId: uuidSchema,
-    rsvpStatus: z.enum(["unanswered", "attending", "late", "declined"]),
-    attendanceStatus: z.enum(["unchecked", "present", "late", "absent"]),
-    arrivalTime: databaseNullableTimeSchema,
-    rsvpUpdatedAt: timestampSchema,
-    attendanceUpdatedAt: timestampSchema,
-  })
-  .strip();
-
 export type MeetingActionResult =
-  | { status: "saved"; row?: z.infer<typeof safeAttendanceRowSchema> }
-  | { status: "conflict"; row: z.infer<typeof safeAttendanceRowSchema> }
+  | { status: "saved"; row?: SafeMeetingRow }
+  | { status: "conflict"; row: SafeMeetingRow }
   | { status: "error"; message: string };
 
 const invalidInputResult = {
@@ -107,22 +75,14 @@ function safeErrorMessage(error: unknown) {
   return genericErrorResult.message;
 }
 
-function normalizeRpcResult(
-  data: unknown,
-  requireRow: boolean,
-): MeetingActionResult {
+function normalizeRpcResult(data: unknown): MeetingActionResult {
   if (!data || typeof data !== "object" || !("status" in data)) {
     return genericErrorResult;
   }
 
   const status = String(data.status);
-  const row = "row" in data ? safeAttendanceRowSchema.safeParse(data.row) : null;
-  if (status === "conflict" && row?.success) {
-    return { status: "conflict", row: row.data };
-  }
   if (status === "saved") {
-    if (row?.success) return { status: "saved", row: row.data };
-    return requireRow ? genericErrorResult : { status: "saved" };
+    return { status: "saved" };
   }
   return genericErrorResult;
 }
@@ -130,7 +90,7 @@ function normalizeRpcResult(
 async function invokeMeetingRpc(
   rpcName: string,
   params: Record<string, unknown>,
-  options: { schedule?: boolean; requireRow?: boolean } = {},
+  options: { schedule?: boolean } = {},
 ): Promise<MeetingActionResult> {
   const supabase = await createClient();
   const {
@@ -143,7 +103,7 @@ async function invokeMeetingRpc(
   const { data, error } = await supabase.rpc(rpcName, params);
   if (error) return { status: "error", message: safeErrorMessage(error) };
 
-  const result = normalizeRpcResult(data, options.requireRow ?? false);
+  const result = normalizeRpcResult(data);
   if (result.status === "saved") {
     revalidatePath("/meetings");
     if (options.schedule) revalidatePath("/schedule");
@@ -183,34 +143,17 @@ export async function removeMeetingAdHocMember(input: unknown) {
 }
 
 export async function saveMeetingRsvp(input: unknown) {
-  const parsed = rsvpSchema.safeParse(input);
-  if (!parsed.success) return invalidInputResult;
-  return invokeMeetingRpc(
-    "save_meeting_rsvp",
-    {
-      requested_meeting_id: parsed.data.meetingId,
-      requested_member_id: parsed.data.memberId,
-      requested_rsvp_status: parsed.data.rsvpStatus,
-      expected_rsvp_updated_at: parsed.data.expectedUpdatedAt,
-    },
-    { requireRow: true },
-  );
+  return mutateMeetingRow({
+    ...(input && typeof input === "object" ? input : {}),
+    kind: "rsvp",
+  });
 }
 
 export async function saveMeetingAttendance(input: unknown) {
-  const parsed = attendanceSchema.safeParse(input);
-  if (!parsed.success) return invalidInputResult;
-  return invokeMeetingRpc(
-    "save_meeting_attendance",
-    {
-      requested_meeting_id: parsed.data.meetingId,
-      requested_member_id: parsed.data.memberId,
-      requested_attendance_status: parsed.data.attendanceStatus,
-      requested_arrival_time: parsed.data.arrivalTime,
-      expected_attendance_updated_at: parsed.data.expectedUpdatedAt,
-    },
-    { requireRow: true },
-  );
+  return mutateMeetingRow({
+    ...(input && typeof input === "object" ? input : {}),
+    kind: "attendance",
+  });
 }
 
 export async function cancelClubMeeting(input: unknown) {

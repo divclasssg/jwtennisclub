@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Button, TextInput } from "@/components/atoms";
 import {
@@ -21,6 +21,7 @@ import {
 } from ".";
 
 const back = vi.fn();
+const replace = vi.fn();
 const moleculesStyles = readFileSync(
   "src/components/molecules/Molecules.module.scss",
   "utf8",
@@ -29,12 +30,14 @@ const moleculesStyles = readFileSync(
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     back,
+    replace,
   }),
 }));
 
 describe("molecules", () => {
   beforeEach(() => {
     back.mockClear();
+    replace.mockClear();
   });
 
   it("renders summary cards inside a labelled grid", () => {
@@ -220,5 +223,80 @@ describe("molecules", () => {
 
     screen.getByRole("button", { name: "닫기" }).click();
     expect(back).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("uses the same explicit destination for close button, backdrop, and Escape", () => {
+    const { rerender } = render(
+      <ModalDialog closeHref="/meetings?month=2026-07" title="정모 명단">
+        <button type="button">첫 작업</button>
+      </ModalDialog>,
+    );
+
+    screen.getByRole("button", { name: "닫기" }).click();
+    rerender(
+      <ModalDialog closeHref="/meetings?month=2026-07" title="정모 명단">
+        <button type="button">첫 작업</button>
+      </ModalDialog>,
+    );
+    screen.getByRole("button", { name: "모달 닫기" }).click();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+
+    expect(replace).toHaveBeenCalledTimes(3);
+    expect(replace).toHaveBeenNthCalledWith(1, "/meetings?month=2026-07");
+    expect(replace).toHaveBeenNthCalledWith(2, "/meetings?month=2026-07");
+    expect(replace).toHaveBeenNthCalledWith(3, "/meetings?month=2026-07");
+    expect(back).not.toHaveBeenCalled();
+  });
+
+  it("moves focus into the dialog, traps tab focus, and returns focus to the opener", () => {
+    const opener = document.createElement("button");
+    opener.textContent = "명단 열기";
+    document.body.append(opener);
+    opener.focus();
+
+    render(
+      <ModalDialog closeHref="/meetings?month=2026-07" title="정모 명단">
+        <button type="button">첫 작업</button>
+        <button type="button">마지막 작업</button>
+      </ModalDialog>,
+    );
+
+    const closeButton = screen.getByRole("button", { name: "닫기" });
+    const lastButton = screen.getByRole("button", { name: "마지막 작업" });
+
+    expect(closeButton).toHaveFocus();
+
+    lastButton.focus();
+    fireEvent.keyDown(lastButton, { key: "Tab" });
+    expect(closeButton).toHaveFocus();
+
+    fireEvent.keyDown(closeButton, { key: "Tab", shiftKey: true });
+    expect(lastButton).toHaveFocus();
+
+    screen.getByRole("button", { name: "닫기" }).click();
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
+
+  it("supports a large modal without changing the default panel contract", () => {
+    const { rerender } = render(
+      <ModalDialog size="large" title="큰 모달">
+        <p>내용</p>
+      </ModalDialog>,
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "큰 모달" }).className,
+    ).toContain("modal-panel-large");
+
+    rerender(
+      <ModalDialog title="기본 모달">
+        <p>내용</p>
+      </ModalDialog>,
+    );
+    expect(
+      screen.getByRole("dialog", { name: "기본 모달" }).className,
+    ).not.toContain("modal-panel-large");
   });
 });

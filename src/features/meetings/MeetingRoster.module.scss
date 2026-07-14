@@ -1,0 +1,260 @@
+@use "../../app/breakpoints" as bp;
+
+.roster-modal {
+  display: grid;
+  gap: var(--spacing-md);
+  min-height: 0;
+}
+
+.meeting-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-md);
+  align-items: center;
+  padding-bottom: var(--spacing-md);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+  color: var(--ink-muted-48);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line-height);
+
+  strong {
+    color: var(--ink);
+  }
+}
+
+.roster-tabs {
+  position: sticky;
+  top: 0;
+  z-index: var(--modal-z-index);
+  display: flex;
+  background: var(--canvas);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+}
+
+.roster-tab {
+  min-height: var(--button-icon-size);
+  padding: 0 var(--spacing-md);
+  border: none;
+  border-bottom: var(--selected-ring-width) solid transparent;
+  background: var(--canvas);
+  color: var(--ink-muted-48);
+  cursor: pointer;
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--text-body-line-height);
+
+  &[aria-selected="true"] {
+    border-bottom-color: var(--action-blue);
+    color: var(--action-blue);
+  }
+}
+
+.roster-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-md);
+  background: var(--canvas);
+
+  span {
+    padding: var(--spacing-sm);
+    border-left: var(--hairline-width) solid var(--hairline);
+    color: var(--ink-muted-48);
+    font-size: var(--text-caption-size);
+    line-height: var(--text-caption-line-height);
+    text-align: center;
+
+    &:first-child {
+      border-left: none;
+      color: var(--ink);
+      font-weight: var(--font-weight-semibold);
+    }
+  }
+}
+
+.roster-guidance,
+.candidate-status,
+.empty-roster {
+  margin: 0;
+  color: var(--ink-muted-48);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-line-height);
+}
+
+.roster-guidance {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-md);
+  background: var(--surface-pearl);
+}
+
+.ad-hoc-panel {
+  display: grid;
+  gap: var(--spacing-xs);
+
+  h3 {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--text-body-size);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--text-body-line-height);
+  }
+}
+
+.candidate-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: var(--spacing-xs);
+  align-items: end;
+}
+
+.candidate-field {
+  display: grid;
+  gap: var(--spacing-xxs);
+  color: var(--ink-muted-48);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-line-height);
+}
+
+.candidate-status {
+  min-height: var(--text-caption-line-height);
+}
+
+.candidate-status[data-state="error"] {
+  color: var(--error-text);
+}
+
+.candidate-status[data-state="saved"] {
+  color: var(--success-text);
+}
+
+.roster-target-list {
+  min-height: 0;
+}
+
+.empty-roster {
+  padding: var(--spacing-xl) var(--spacing-md);
+  text-align: center;
+}
+
+.history-details {
+  border-top: var(--hairline-width) solid var(--hairline);
+  color: var(--ink-muted-48);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-line-height);
+
+  summary {
+    padding: var(--spacing-md) 0;
+    color: var(--ink);
+    cursor: pointer;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  ol {
+    display: grid;
+    gap: var(--spacing-xs);
+    margin: 0;
+    padding: 0 0 0 var(--spacing-lg);
+  }
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xxs) var(--spacing-xs);
+  }
+}
+
+.roster-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--spacing-md);
+  align-items: start;
+  padding: var(--spacing-md) 0;
+  border-bottom: var(--hairline-width) solid var(--hairline);
+}
+
+.member-summary {
+  display: grid;
+  gap: var(--spacing-xxs);
+  color: var(--ink);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line-height);
+
+  span {
+    color: var(--ink-muted-48);
+    font-size: var(--text-caption-size);
+    line-height: var(--text-caption-line-height);
+  }
+}
+
+.row-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: end;
+}
+
+.row-field {
+  display: grid;
+  flex: 1 1 var(--members-status-filter-width);
+  gap: var(--spacing-xxs);
+  color: var(--ink-muted-48);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-line-height);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.row-note,
+.row-status {
+  grid-column: 1 / -1;
+  min-height: var(--text-caption-line-height);
+  margin: 0;
+  color: var(--ink-muted-48);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-line-height);
+}
+
+.row-status[data-state="error"] {
+  color: var(--error-text);
+}
+
+.row-status[data-state="saved"] {
+  color: var(--success-text);
+}
+
+@media (max-width: bp.$breakpoint-phone) {
+  .roster-summary,
+  .candidate-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-summary span {
+    border-top: var(--hairline-width) solid var(--hairline);
+    border-left: none;
+
+    &:first-child {
+      border-top: none;
+    }
+  }
+
+  .roster-row {
+    grid-template-columns: 1fr;
+  }
+
+  .row-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .row-actions {
+    button {
+      min-height: var(--button-icon-size);
+    }
+  }
+}
