@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildMonthCalendar,
   buildWeekCalendar,
+  createEventCalendarPreview,
+  createMeetingCalendarPreview,
 } from "./event-calendar";
 import {
   MonthCalendarView,
@@ -14,12 +16,13 @@ import {
 import type { EventRecord } from "./event-model";
 import styles from "./ScheduleCalendar.module.scss";
 
-const events: EventRecord[] = [
+const eventRecords: EventRecord[] = [
   event("event-1", "2026-07-11", "09:00", "첫 번째", "올림픽공원"),
   event("event-2", "2026-07-11", "10:00", "두 번째", "올림픽공원"),
   event("event-3", "2026-07-11", "11:00", "세 번째", "올림픽공원"),
   event("event-4", "2026-07-11", "12:00", "네 번째", "올림픽공원"),
 ];
+const events = eventRecords.map(createEventCalendarPreview);
 
 const buildHref = vi.fn((params: Record<string, string>) => {
   const searchParams = new URLSearchParams(params);
@@ -181,6 +184,55 @@ describe("ScheduleCalendar components", () => {
     expect(eventCard).toHaveAttribute("style", expect.stringContaining("--week-event-day: 7"));
     expect(eventCard).toHaveAttribute("style", expect.stringContaining("--week-event-row: 4"));
     expect(eventCard).toHaveAttribute("style", expect.stringContaining("--week-event-offset: 0"));
+  });
+
+  it("uses each common preview source link and exposes meeting state badges", () => {
+    const meeting = createMeetingCalendarPreview(
+      {
+        id: "meeting-1",
+        meetingKind: "regular",
+        periodMonth: "2026-07-01",
+        meetingDate: "2026-07-11",
+        startTime: "18:00",
+        title: "취소 정모",
+        location: null,
+        status: "cancelled",
+      },
+      "/schedule?month=2026-07&selectedDate=2026-07-11",
+    );
+    const calendar = buildMonthCalendar("2026-07", [events[0], meeting]);
+
+    render(
+      <>
+        <MonthCalendarView
+          buildHref={buildHref}
+          calendar={calendar}
+          selectedDate="2026-07-11"
+        />
+        <SelectedEventList
+          events={[events[0], meeting]}
+          formatDateLong={() => "2026.07.11"}
+          month="2026-07"
+          renderActions={(event) =>
+            event.canEdit ? <span>일정 관리</span> : <a href={event.href}>명단</a>
+          }
+          selectedDate="2026-07-11"
+        />
+      </>,
+    );
+
+    expect(screen.getAllByRole("link", { name: /취소 정모/ })[0]).toHaveAttribute(
+      "href",
+      meeting.href,
+    );
+    expect(screen.getAllByText("정모").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("취소").length).toBeGreaterThan(0);
+    const selected = screen.getByRole("region", { name: "선택한 날짜 일정" });
+    expect(within(selected).getByText("일정 관리")).toBeInTheDocument();
+    expect(within(selected).getByRole("link", { name: "명단" })).toHaveAttribute(
+      "href",
+      meeting.href,
+    );
   });
 });
 

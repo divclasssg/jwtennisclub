@@ -159,9 +159,14 @@ export function MonthCalendarView({
             <span className={styles["schedule-day-number"]}>{day.dayNumber}</span>
             <ol className={styles["schedule-day-events"]}>
               {day.visibleEvents.map((event) => (
-                <li key={event.id}>
-                  <Link href={`/schedule/${event.id}/edit`}>
-                    {formatEventTime(event.eventTime)} {event.title}
+                <li key={`${event.kind}:${event.id}`}>
+                  <Link
+                    aria-label={formatEventAccessibleName(event)}
+                    href={event.href}
+                  >
+                    <span>{formatEventTime(event.eventTime)} {event.title}</span>
+                    <span>{event.badge}</span>
+                    {event.cancelled ? <span>취소</span> : null}
                   </Link>
                 </li>
               ))}
@@ -241,12 +246,14 @@ export function WeekCalendarView({ calendar }: WeekCalendarViewProps) {
               <li
                 aria-label={`${event.title} ${formatEventTime(event.eventTime)} ${event.location}`}
                 data-tone={getWeekEventTone(event.id)}
-                key={event.id}
+                key={`${event.kind}:${event.id}`}
                 style={style}
               >
-                <Link aria-label={event.title} href={`/schedule/${event.id}/edit`}>
+                <Link aria-label={formatEventAccessibleName(event)} href={event.href}>
                   {formatEventTime(event.eventTime)} {event.title}
                 </Link>
+                <span>{event.badge}</span>
+                {event.cancelled ? <span>취소</span> : null}
                 <span>{event.location}</span>
               </li>
             ))}
@@ -276,10 +283,19 @@ export function SelectedEventList({
       {events.length > 0 ? (
         <ol>
           {events.map((event) => (
-            <li key={event.id}>
+            <li key={`${event.kind}:${event.id}`}>
               <div>
                 <time>{formatEventTime(event.eventTime)}</time>
-                <strong>{event.title}</strong>
+                <span>{event.badge}</span>
+                {event.cancelled ? <span>취소</span> : null}
+                <strong>
+                  <Link
+                    aria-label={formatEventAccessibleName(event)}
+                    href={event.href}
+                  >
+                    {event.title}
+                  </Link>
+                </strong>
                 <span>{event.location}</span>
               </div>
               {renderActions(event, month)}
@@ -307,6 +323,11 @@ export function ScheduleEventActions({
 
 function formatEventTime(value: string) {
   return value.slice(0, 5);
+}
+
+function formatEventAccessibleName(event: CalendarEventPreview) {
+  if (event.kind === "event") return event.title;
+  return `${event.cancelled ? "취소 " : ""}${event.badge} ${event.title}`;
 }
 
 function formatDateLong(value: string) {

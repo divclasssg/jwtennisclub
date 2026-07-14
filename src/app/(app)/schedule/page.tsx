@@ -1,12 +1,18 @@
 import { deleteEvent } from "./actions";
+import { notFound } from "next/navigation";
 import { ActionLink, Button } from "@/components/atoms";
+import { loadCurrentOperatorContext } from "@/features/auth/operator-context";
 import { PageTitle } from "@/features/shell/PageTitleContext";
 import {
   buildMonthCalendar,
   buildWeekCalendar,
+  createEventCalendarPreview,
+  createMeetingCalendarPreview,
+  getKstTodayDateKey,
   getMonthRange,
   getNextMonth,
   getPreviousMonth,
+  getWeekRange,
   type CalendarEventPreview,
 } from "@/features/events/event-calendar";
 import {
@@ -18,6 +24,7 @@ import {
   WeekCalendarView,
 } from "@/features/events/ScheduleCalendar";
 import type { EventRecord } from "@/features/events/event-model";
+import { loadMeetingScheduleRecords } from "@/features/meetings/meeting-schedule";
 import { createClient } from "@/lib/supabase/server";
 import styles from "./page.module.scss";
 
@@ -50,16 +57,15 @@ type EventDatabaseRow = {
   updated_at: string;
 };
 
-async function getEvents(periodMonth: string) {
-  const { start, end } = getMonthRange(periodMonth);
+async function getEvents(range: { start: string; end: string }) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("events")
     .select(
       "id, event_date, event_time, title, location, created_by, updated_by, created_at, updated_at",
     )
-    .gte("event_date", start)
-    .lt("event_date", end)
+    .gte("event_date", range.start)
+    .lt("event_date", range.end)
     .order("event_date", { ascending: true })
     .order("event_time", { ascending: true });
 
@@ -72,7 +78,41 @@ async function getEvents(periodMonth: string) {
 
 export default async function SchedulePage({ searchParams }: SchedulePageProps) {
   const filters = normalizeScheduleFilters(await searchParams);
-  const events = await getEvents(filters.periodMonth);
+  const operator = await loadCurrentOperatorContext();
+
+  if (!operator?.permissions.includes("events.view")) {
+    notFound();
+  }
+
+  const range = filters.view === "week"
+    ? getWeekRange(filters.selectedDate)
+    : getMonthRange(filters.periodMonth);
+  const returnTo = filters.view === "week"
+    ? buildScheduleHref({ view: "week", date: filters.selectedDate })
+    : buildScheduleHref({
+        view: "month",
+        month: filters.periodMonth,
+        selectedDate: filters.selectedDate,
+      });
+  let events: CalendarEventPreview[];
+
+  try {
+    const [eventRecords, meetingRecords] = await Promise.all([
+      getEvents(range),
+      operator.permissions.includes("meetings.view")
+        ? loadMeetingScheduleRecords(range)
+        : Promise.resolve([]),
+    ]);
+    events = [
+      ...eventRecords.map(createEventCalendarPreview),
+      ...meetingRecords.map((meeting) =>
+        createMeetingCalendarPreview(meeting, returnTo)
+      ),
+    ];
+  } catch {
+    throw new Error("일정 목록을 불러오지 못했습니다.");
+  }
+
   const monthCalendar = buildMonthCalendar(filters.periodMonth, events);
   const weekCalendar = buildWeekCalendar(filters.selectedDate, events);
   const periodNavigation = buildPeriodNavigation(filters);
@@ -135,9 +175,19 @@ function EventActions({
   event: CalendarEventPreview;
   month: string;
 }) {
+  if (!event.canEdit) {
+    return (
+      <ScheduleEventActions>
+        <ActionLink href={event.href} size="compact" variant="secondary">
+          명단
+        </ActionLink>
+      </ScheduleEventActions>
+    );
+  }
+
   return (
     <ScheduleEventActions>
-      <ActionLink href={`/schedule/${event.id}/edit`} size="compact" variant="secondary">
+      <ActionLink href={event.href} size="compact" variant="secondary">
         수정
       </ActionLink>
       <form action={deleteEvent}>
@@ -152,7 +202,7 @@ function EventActions({
 }
 
 function normalizeScheduleFilters(params: ScheduleSearchParams): ScheduleFilters {
-  const today = getTodayDateKey();
+  const today = getKstTodayDateKey();
   const view = firstSearchParam(params.view) === "week" ? "week" : "month";
   const selectedDate =
     normalizeDateKey(firstSearchParam(params.date)) ||
@@ -218,7 +268,7 @@ function buildPeriodNavigation(filters: ScheduleFilters) {
       }),
       todayHref: buildScheduleHref({
         view: "week",
-        date: getTodayDateKey(),
+        date: getKstTodayDateKey(),
       }),
       nextHref: buildScheduleHref({
         view: "week",
@@ -248,10 +298,6 @@ function normalizeMonthKey(value: string | undefined) {
 
 function normalizeDateKey(value: string | undefined) {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
-}
-
-function getTodayDateKey() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function addDaysToDateKey(value: string, days: number) {

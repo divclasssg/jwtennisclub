@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { buildMonthCalendar, buildWeekCalendar, getMonthRange } from "./event-calendar";
+import {
+  buildMonthCalendar,
+  buildWeekCalendar,
+  createEventCalendarPreview,
+  createMeetingCalendarPreview,
+  getKstTodayDateKey,
+  getMonthRange,
+  getWeekRange,
+} from "./event-calendar";
 import type { EventRecord } from "./event-model";
 
-const events: EventRecord[] = [
+const records: EventRecord[] = [
   event("1", "2026-07-11", "11:00", "세 번째"),
   event("2", "2026-07-11", "09:00", "첫 번째"),
   event("3", "2026-07-11", "10:00", "두 번째"),
   event("4", "2026-07-11", "12:00", "네 번째"),
 ];
+const events = records.map(createEventCalendarPreview);
 
 describe("event calendar", () => {
   it("builds complete month weeks and caps visible events at three", () => {
@@ -44,6 +53,73 @@ describe("event calendar", () => {
       start: "2026-07-01",
       end: "2026-08-01",
     });
+  });
+
+  it("returns the actual Sunday-to-Sunday range for a cross-month week", () => {
+    expect(getWeekRange("2026-08-01")).toEqual({
+      start: "2026-07-26",
+      end: "2026-08-02",
+    });
+  });
+
+  it("derives today in Asia/Seoul instead of slicing UTC", () => {
+    expect(getKstTodayDateKey(new Date("2026-07-31T15:30:00.000Z"))).toBe(
+      "2026-08-01",
+    );
+  });
+
+  it("merges common previews with stable source links and meeting badges", () => {
+    const ordinary = createEventCalendarPreview(
+      event("event", "2026-08-01", "18:00", "일반 일정"),
+    );
+    const regular = createMeetingCalendarPreview(
+      {
+        id: "meeting",
+        meetingKind: "regular",
+        periodMonth: "2026-08-01",
+        meetingDate: "2026-08-01",
+        startTime: "18:00",
+        title: "정모",
+        location: null,
+        status: "cancelled",
+      },
+      "/schedule?view=week&date=2026-08-01",
+    );
+    const lightning = createMeetingCalendarPreview(
+      {
+        id: "lightning",
+        meetingKind: "lightning",
+        periodMonth: "2026-07-01",
+        meetingDate: "2026-08-01",
+        startTime: "18:00",
+        title: "대체 번개",
+        location: "코트",
+        status: "scheduled",
+      },
+      "/schedule?view=week&date=2026-08-01",
+    );
+
+    const day = buildMonthCalendar("2026-08", [lightning, regular, ordinary])
+      .weeks.flat()
+      .find((item) => item.date === "2026-08-01");
+
+    expect(day?.events.map((item) => item.kind)).toEqual([
+      "event",
+      "meeting",
+      "meeting",
+    ]);
+    expect(ordinary).toMatchObject({
+      href: "/schedule/event/edit",
+      badge: "일정",
+      cancelled: false,
+      canEdit: true,
+    });
+    expect(regular).toMatchObject({ badge: "정모", cancelled: true, canEdit: false });
+    expect(lightning.href).toContain("month=2026-07");
+    expect(lightning.href).toContain("meeting=lightning");
+    expect(decodeURIComponent(lightning.href)).toContain(
+      "returnTo=/schedule?view=week&date=2026-08-01",
+    );
   });
 });
 
