@@ -12,6 +12,7 @@ export default async function AppLayout({ children, modal }: AppLayoutProps) {
   return (
     <AppShell
       modal={modal}
+      showMeetings={operator?.permissions.includes("meetings.view") ?? false}
       userDisplayName={operator?.displayName ?? operator?.email ?? "JW TENNIS CLUB"}
       userPositionLabel={operator?.positionLabel ?? null}
       userRoleLabel={operator?.roleLabel ?? "운영 원장"}

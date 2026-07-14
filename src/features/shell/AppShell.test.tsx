@@ -86,4 +86,29 @@ describe("AppShell", () => {
       "모달 내용",
     );
   });
+
+  it("shows the meeting navigation only when the operator can view meetings", () => {
+    const { rerender } = render(
+      <AppShell showMeetings>
+        <h1>정모 화면</h1>
+      </AppShell>,
+    );
+
+    expect(
+      within(screen.getByLabelText("주요 메뉴")).getByRole("link", {
+        name: "정모",
+      }),
+    ).toHaveAttribute("href", "/meetings");
+
+    rerender(
+      <AppShell showMeetings={false}>
+        <h1>일반 화면</h1>
+      </AppShell>,
+    );
+    expect(
+      within(screen.getByLabelText("주요 메뉴")).queryByRole("link", {
+        name: "정모",
+      }),
+    ).not.toBeInTheDocument();
+  });
 });

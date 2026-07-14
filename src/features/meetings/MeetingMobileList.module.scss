@@ -1,0 +1,97 @@
+@use "../../app/_breakpoints" as bp;
+
+.meeting-mobile-list {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin: 0;
+  padding: var(--spacing-md);
+  list-style: none;
+}
+
+.meeting-mobile-item {
+  display: grid;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: var(--hairline-width) solid var(--divider-soft);
+  border-radius: var(--rounded-md);
+  background: var(--canvas);
+}
+
+.meeting-mobile-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.meeting-mobile-title {
+  display: grid;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.meeting-mobile-name {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--font-size-tagline);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tagline);
+  letter-spacing: var(--letter-spacing-tagline);
+  overflow-wrap: anywhere;
+}
+
+.meeting-mobile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.meeting-mobile-roster-link {
+  flex: 0 0 auto;
+  color: var(--action-blue);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-caption-strong);
+  letter-spacing: var(--letter-spacing-caption);
+  white-space: nowrap;
+
+  &:focus-visible {
+    border-radius: var(--rounded-xs);
+    outline: var(--focus-ring-width) solid var(--action-blue-focus);
+    outline-offset: var(--focus-ring-width);
+  }
+}
+
+.meeting-mobile-detail-list,
+.meeting-mobile-count-list {
+  display: grid;
+  gap: var(--spacing-xs);
+}
+
+.meeting-mobile-detail,
+.meeting-mobile-count,
+.meeting-mobile-preparing {
+  margin: 0;
+  color: var(--ink-muted-48);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-caption);
+}
+
+.meeting-mobile-count:first-child,
+.meeting-mobile-preparing {
+  color: var(--ink-muted-80);
+  font-weight: var(--font-weight-semibold);
+}
+
+.meeting-mobile-actions {
+  padding-top: var(--spacing-sm);
+  border-top: var(--hairline-width) solid var(--divider-soft);
+}
+
+@media (max-width: bp.$breakpoint-small-phone) {
+  .meeting-mobile-list,
+  .meeting-mobile-item {
+    padding: var(--spacing-sm);
+  }
+}

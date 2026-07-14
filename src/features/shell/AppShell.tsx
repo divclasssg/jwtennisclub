@@ -4,7 +4,7 @@ import { PageTitleProvider, ShellPageTitle } from "./PageTitleContext";
 import { ShellNavigation } from "./ShellNavigation";
 import styles from "./AppShell.module.scss";
 
-const navigationItems = [
+const baseNavigationItems = [
     { href: "/dashboard", label: "홈" },
     { href: "/members", label: "회원" },
     { href: "/fees", label: "회비" },
@@ -16,6 +16,7 @@ const navigationItems = [
 type AppShellProps = {
     children: React.ReactNode;
     modal?: React.ReactNode;
+    showMeetings?: boolean;
     userPositionLabel?: string | null;
     userRoleLabel?: string;
     userDisplayName?: string;
@@ -24,10 +25,18 @@ type AppShellProps = {
 export function AppShell({
     children,
     modal,
+    showMeetings = false,
     userPositionLabel,
     userRoleLabel = "운영 원장",
     userDisplayName = "JW TENNIS CLUB",
 }: AppShellProps) {
+    const navigationItems = showMeetings
+        ? [
+            ...baseNavigationItems.slice(0, 5),
+            { href: "/meetings", label: "정모" },
+            ...baseNavigationItems.slice(5),
+        ]
+        : baseNavigationItems;
     const shellKicker = [userRoleLabel, userPositionLabel]
         .filter(Boolean)
         .join(" · ");
