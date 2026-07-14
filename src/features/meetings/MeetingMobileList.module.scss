@@ -46,20 +46,28 @@
   gap: var(--spacing-xs);
 }
 
-.meeting-mobile-roster-link {
+.meeting-mobile-roster-link,
+.meeting-mobile-roster-disabled {
   flex: 0 0 auto;
-  color: var(--action-blue);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-caption-strong);
   letter-spacing: var(--letter-spacing-caption);
   white-space: nowrap;
+}
+
+.meeting-mobile-roster-link {
+  color: var(--action-blue);
 
   &:focus-visible {
     border-radius: var(--rounded-xs);
     outline: var(--focus-ring-width) solid var(--action-blue-focus);
     outline-offset: var(--focus-ring-width);
   }
+}
+
+.meeting-mobile-roster-disabled {
+  color: var(--ink-muted-48);
 }
 
 .meeting-mobile-detail-list,

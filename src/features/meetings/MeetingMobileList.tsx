@@ -49,7 +49,11 @@ function MeetingCounts({ meeting }: { meeting: MeetingDirectoryRow }) {
   const { counts } = meeting;
 
   if (!counts) {
-    return <p className={styles["meeting-mobile-preparing"]}>명단 준비 전</p>;
+    return (
+      <p className={styles["meeting-mobile-preparing"]}>
+        전월 마지막 7일에 명단이 준비됩니다.
+      </p>
+    );
   }
 
   return (
@@ -95,13 +99,19 @@ export function MeetingMobileList({ meetings, renderActions }: MeetingMobileList
                   ) : null}
                 </div>
               </div>
-              <Link
-                aria-label={`${meeting.title} 명단 보기`}
-                className={styles["meeting-mobile-roster-link"]}
-                href={`/meetings?month=${meeting.periodMonth.slice(0, 7)}&meeting=${meeting.id}`}
-              >
-                명단
-              </Link>
+              {meeting.counts ? (
+                <Link
+                  aria-label={`${meeting.title} 명단 보기`}
+                  className={styles["meeting-mobile-roster-link"]}
+                  href={`/meetings?month=${meeting.periodMonth.slice(0, 7)}&meeting=${meeting.id}`}
+                >
+                  명단
+                </Link>
+              ) : (
+                <span className={styles["meeting-mobile-roster-disabled"]}>
+                  명단 준비 전
+                </span>
+              )}
             </div>
 
             <div className={styles["meeting-mobile-detail-list"]}>

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { ActionLink, Button, TextInput } from "@/components/atoms";
+import { ActionLink, Badge, Button, TextInput } from "@/components/atoms";
 import {
   EmptyState,
   FilterBar,
@@ -117,10 +117,20 @@ function formatMeetingKind(meeting: MeetingDirectoryRow) {
   return meeting.meetingKind === "regular" ? "정기" : "번개";
 }
 
+function getMeetingKindTone(meeting: MeetingDirectoryRow) {
+  return meeting.meetingKind === "regular" ? "info" : "muted";
+}
+
 function formatMeetingStatus(meeting: MeetingDirectoryRow) {
   if (meeting.status === "completed") return "완료";
   if (meeting.status === "cancelled") return "취소";
   return "예정";
+}
+
+function getMeetingStatusTone(meeting: MeetingDirectoryRow) {
+  if (meeting.status === "completed") return "success";
+  if (meeting.status === "cancelled") return "danger";
+  return "info";
 }
 
 function formatTime(value: string) {
@@ -209,30 +219,43 @@ function MeetingDirectoryTable({
     <DataTable>
       <thead>
         <tr>
-          <th scope="col">날짜</th>
-          <th scope="col">종류</th>
           <th scope="col">회차</th>
-          <th scope="col">시간</th>
+          <th scope="col">일시</th>
           <th scope="col">장소</th>
           <th scope="col">상태</th>
           <th scope="col">사전 참석</th>
           <th scope="col">출석</th>
+          <th scope="col">명단</th>
           <th scope="col">관리</th>
         </tr>
       </thead>
       <tbody>
         {directory.meetings.map((meeting) => (
           <tr key={meeting.id}>
-            <td>{meeting.meetingDate}</td>
-            <td>{formatMeetingKind(meeting)}</td>
-            <th scope="row">{meeting.title}</th>
-            <td>{formatTime(meeting.startTime)}–{formatTime(meeting.endTime)}</td>
+            <th scope="row">
+              <span className={styles["meeting-title-cell"]}>
+                <span>{meeting.title}</span>
+                <Badge tone={getMeetingKindTone(meeting)}>
+                  {formatMeetingKind(meeting)}
+                </Badge>
+              </span>
+            </th>
+            <td>
+              <span className={styles["meeting-datetime-cell"]}>
+                <span>{meeting.meetingDate}</span>
+                <span>{formatTime(meeting.startTime)}–{formatTime(meeting.endTime)}</span>
+              </span>
+            </td>
             <td>{meeting.location ?? "미정"}</td>
-            <td>{formatMeetingStatus(meeting)}</td>
+            <td>
+              <Badge tone={getMeetingStatusTone(meeting)}>
+                {formatMeetingStatus(meeting)}
+              </Badge>
+            </td>
             <td>{formatRsvpCounts(meeting)}</td>
             <td>{formatAttendanceCounts(meeting)}</td>
             <td>
-              <div className={styles["meeting-row-actions"]}>
+              {meeting.counts ? (
                 <ActionLink
                   aria-label={`${meeting.title} 명단 보기`}
                   href={getMeetingLink(meeting)}
@@ -241,15 +264,22 @@ function MeetingDirectoryTable({
                 >
                   명단
                 </ActionLink>
-                {directory.canManageMeeting ? (
-                  <MeetingManagementDisclosure meetingTitle={meeting.title}>
-                    <MeetingLifecycleControls
-                      {...lifecycleProps.get(meeting.id)!}
-                      meeting={meeting}
-                    />
-                  </MeetingManagementDisclosure>
-                ) : null}
-              </div>
+              ) : (
+                <span className={styles["meeting-roster-unavailable"]}>
+                  <strong>명단 준비 전</strong>
+                  <span>전월 마지막 7일에 준비</span>
+                </span>
+              )}
+            </td>
+            <td>
+              {directory.canManageMeeting ? (
+                <MeetingManagementDisclosure meetingTitle={meeting.title}>
+                  <MeetingLifecycleControls
+                    {...lifecycleProps.get(meeting.id)!}
+                    meeting={meeting}
+                  />
+                </MeetingManagementDisclosure>
+              ) : null}
             </td>
           </tr>
         ))}
@@ -346,11 +376,31 @@ export default async function MeetingsPage({ searchParams }: MeetingsPageProps) 
           </>
         }
         summary={
-          <SummaryGrid aria-label="정모 요약" columns={4}>
-            <SummaryCard label="전체" value={`${directory.summary.total}회`} />
-            <SummaryCard label="예정" value={`${directory.summary.scheduled}회`} />
-            <SummaryCard label="완료" value={`${directory.summary.completed}회`} />
-            <SummaryCard label="취소" value={`${directory.summary.cancelled}회`} />
+          <SummaryGrid
+            aria-label="정모 요약"
+            className={styles["meeting-summary-grid"]}
+            columns={4}
+          >
+            <SummaryCard
+              className={styles["meeting-summary-card"]}
+              label="전체"
+              value={`${directory.summary.total}회`}
+            />
+            <SummaryCard
+              className={styles["meeting-summary-card"]}
+              label="예정"
+              value={`${directory.summary.scheduled}회`}
+            />
+            <SummaryCard
+              className={styles["meeting-summary-card"]}
+              label="완료"
+              value={`${directory.summary.completed}회`}
+            />
+            <SummaryCard
+              className={styles["meeting-summary-card"]}
+              label="취소"
+              value={`${directory.summary.cancelled}회`}
+            />
           </SummaryGrid>
         }
         title="정모 관리"

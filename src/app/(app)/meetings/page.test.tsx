@@ -172,11 +172,12 @@ describe("MeetingsPage", () => {
     expect(screen.getByText("최초 배포 월 · 통계 제외")).toBeInTheDocument();
 
     const table = screen.getByRole("table");
-    expect(within(table).getAllByRole("rowheader").map((cell) => cell.textContent)).toEqual([
-      "7월 첫째 주 정모",
-      "7월 셋째 주 정모",
-      "대체 번개",
-    ]);
+    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent))
+      .toEqual(["회차", "일시", "장소", "상태", "사전 참석", "출석", "명단", "관리"]);
+    const rowHeaders = within(table).getAllByRole("rowheader");
+    ["7월 첫째 주 정모", "7월 셋째 주 정모", "대체 번개"].forEach(
+      (title, index) => expect(rowHeaders[index]).toHaveTextContent(title),
+    );
     const mobileList = screen.getByRole("list", { name: "모바일 정모 목록" });
     expect(within(mobileList).getAllByRole("heading").map((heading) => heading.textContent)).toEqual([
       "7월 첫째 주 정모",
@@ -252,6 +253,30 @@ describe("MeetingsPage", () => {
     );
     render(await MeetingsPage({ searchParams: Promise.resolve({ month: ["2026-07", "2026-08"] }) }));
     expect(screen.getByText("명단 준비 전")).toBeInTheDocument();
+  });
+
+  it("explains a meeting roster that is not ready without linking to it", async () => {
+    const unavailableMeeting = { ...regularMeeting, counts: null };
+    mocks.loadMeetingDirectoryPage.mockResolvedValueOnce(
+      cloneDirectoryPage({
+        meetings: [unavailableMeeting],
+        summary: { total: 1, scheduled: 1, completed: 0, cancelled: 0 },
+      }),
+    );
+
+    render(await MeetingsPage({ searchParams: Promise.resolve({ month: "2026-07" }) }));
+
+    const table = screen.getByRole("table");
+    const mobileList = screen.getByRole("list", { name: "모바일 정모 목록" });
+    expect(within(table).queryByRole("link", {
+      name: "7월 첫째 주 정모 명단 보기",
+    })).not.toBeInTheDocument();
+    expect(within(table).getByText("전월 마지막 7일에 준비")).toBeInTheDocument();
+    expect(within(mobileList).queryByRole("link", {
+      name: "7월 첫째 주 정모 명단 보기",
+    })).not.toBeInTheDocument();
+    expect(within(mobileList).getByText("전월 마지막 7일에 명단이 준비됩니다."))
+      .toBeInTheDocument();
   });
 
   it("opens a selected roster with a canonical schedule close path and wires ad-hoc actions", async () => {

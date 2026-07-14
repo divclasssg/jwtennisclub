@@ -52,7 +52,7 @@ const independentLightningMeeting: MeetingDirectoryRow = {
 };
 
 describe("MeetingMobileList", () => {
-  it("renders meetings in the sorted input order with roster links that preserve each period month", () => {
+  it("renders meetings in the sorted input order and preserves the available roster href", () => {
     render(
       <MeetingMobileList
         meetings={[
@@ -71,16 +71,16 @@ describe("MeetingMobileList", () => {
       "7월 첫째 주 정모",
       "일요일 번개",
     ]);
-    expect(within(items[0]).getByRole("link", { name: "복식 번개 명단 보기" })).toHaveAttribute(
+    expect(within(items[1]).getByRole("link", {
+      name: "7월 첫째 주 정모 명단 보기",
+    })).toHaveAttribute(
       "href",
-      `/meetings?month=2026-07&meeting=${linkedLightningMeeting.id}`,
+      `/meetings?month=2026-07&meeting=${regularMeeting.id}`,
     );
-    expect(
-      within(items[2]).getByRole("link", { name: "일요일 번개 명단 보기" }),
-    ).toHaveAttribute(
-      "href",
-      `/meetings?month=2026-08&meeting=${independentLightningMeeting.id}`,
-    );
+    expect(within(items[0]).queryByRole("link", { name: /명단 보기/ }))
+      .not.toBeInTheDocument();
+    expect(within(items[2]).queryByRole("link", { name: /명단 보기/ }))
+      .not.toBeInTheDocument();
   });
 
   it("shows kind, lifecycle status, schedule, location, and lightning linkage", () => {
@@ -126,6 +126,10 @@ describe("MeetingMobileList", () => {
       within(items[0]).getByText("출석 2명 · 지각 1명 · 결석 1명 · 미확인 3명"),
     ).toBeInTheDocument();
     expect(within(items[1]).getByText("명단 준비 전")).toBeInTheDocument();
+    expect(within(items[1]).getByText("전월 마지막 7일에 명단이 준비됩니다."))
+      .toBeInTheDocument();
+    expect(within(items[1]).queryByRole("link", { name: /명단 보기/ }))
+      .not.toBeInTheDocument();
   });
 
   it("renders server-composed lifecycle actions inside each mobile card", () => {

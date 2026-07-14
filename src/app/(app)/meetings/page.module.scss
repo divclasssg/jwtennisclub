@@ -19,9 +19,35 @@
   letter-spacing: var(--letter-spacing-caption);
 }
 
-.meeting-row-actions {
+.meeting-title-cell,
+.meeting-datetime-cell,
+.meeting-roster-unavailable {
   display: grid;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-xxs);
+}
+
+.meeting-title-cell {
+  justify-items: start;
+}
+
+.meeting-datetime-cell,
+.meeting-roster-unavailable {
+  color: var(--ink-muted-80);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-caption);
+}
+
+.meeting-roster-unavailable span {
+  color: var(--ink-muted-48);
+  font-size: var(--font-size-fine-print);
+  line-height: var(--line-height-micro-legal);
+  letter-spacing: var(--letter-spacing-fine-print);
+}
+
+.meeting-summary-card {
+  gap: var(--spacing-xxs);
+  padding: var(--spacing-sm) var(--spacing-md);
 }
 
 .meeting-management-disclosure {
@@ -87,6 +113,14 @@
 }
 
 @media (max-width: bp.$breakpoint-phone) {
+  .meeting-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .meeting-summary-card:nth-child(odd) {
+    border-left: none;
+  }
+
   .meetings-table-view {
     display: none;
   }
