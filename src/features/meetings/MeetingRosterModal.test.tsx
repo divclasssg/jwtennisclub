@@ -161,7 +161,9 @@ describe("MeetingRosterModal", () => {
     renderModal();
 
     const summary = screen.getByRole("region", { name: "사전 참석 요약" });
-    expect(within(summary).getByText("미응답 2명")).toBeInTheDocument();
+    expect(within(summary).getByRole("button", {
+      name: "미응답 2명 필터",
+    })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
       target: { value: "attending" },
@@ -172,9 +174,98 @@ describe("MeetingRosterModal", () => {
 
     expect(await screen.findByText("김하나 저장됨")).toBeInTheDocument();
     await waitFor(() =>
-      expect(within(summary).getByText("참석 1명")).toBeInTheDocument(),
+      expect(within(summary).getByRole("button", {
+        name: "참석 1명 필터",
+      })).toBeInTheDocument(),
     );
     expect(screen.getByText("김하나 저장됨")).toBeInTheDocument();
+  });
+
+  it("searches by name or member code and filters by the current-tab summary", () => {
+    renderModal({
+      targets: [
+        targets[0],
+        {
+          ...targets[1],
+          memberCodeSnapshot: "0099",
+          rsvpStatus: "attending",
+        },
+      ],
+    });
+
+    const search = screen.getByRole("searchbox", { name: "명단 회원 검색" });
+    fireEvent.change(search, { target: { value: "0099" } });
+    expect(screen.queryByLabelText("김하나 사전 참석 행")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("이둘 사전 참석 행")).toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: "김하나" } });
+    expect(screen.getByLabelText("김하나 사전 참석 행")).toBeInTheDocument();
+    expect(screen.queryByLabelText("이둘 사전 참석 행")).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: "" } });
+    const attendingFilter = screen.getByRole("button", {
+      name: "참석 1명 필터",
+    });
+    fireEvent.click(attendingFilter);
+    expect(attendingFilter).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByLabelText("김하나 사전 참석 행")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("이둘 사전 참석 행")).toBeInTheDocument();
+  });
+
+  it("keeps the search query across tabs, resets status to all, and can clear a filtered empty state", () => {
+    renderModal({
+      targets: [
+        targets[0],
+        { ...targets[1], attendanceStatus: "present" },
+      ],
+    });
+
+    const search = screen.getByRole("searchbox", { name: "명단 회원 검색" });
+    fireEvent.change(search, { target: { value: "김하나" } });
+    fireEvent.click(screen.getByRole("button", { name: "참석 0명 필터" }));
+    expect(screen.getByText("조건에 맞는 회원이 없습니다.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "출석 체크" }));
+    expect(search).toHaveValue("김하나");
+    expect(screen.getByRole("button", { name: "전체 2명 필터" }))
+      .toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("김하나 실제 출석 행")).toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: "없는 회원" } });
+    expect(screen.getByText("조건에 맞는 회원이 없습니다.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
+    expect(search).toHaveValue("");
+    expect(screen.getByLabelText("김하나 실제 출석 행")).toBeInTheDocument();
+    expect(screen.getByLabelText("이둘 실제 출석 행")).toBeInTheDocument();
+  });
+
+  it("keeps an actually empty roster distinct from filtered results", () => {
+    renderModal({ targets: [] });
+
+    expect(screen.getByText("대상 회원이 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "필터 초기화" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("keeps ad-hoc controls closed after the member list and before history", () => {
+    renderModal({ onAddAdHocMember: vi.fn() });
+
+    const adHocSummary = screen.getByText("임시 대상 추가 0명");
+    const historySummary = screen.getByText("변경 이력 1건");
+    expect(adHocSummary.closest("details")).not.toHaveAttribute("open");
+    expect(
+      screen.getByLabelText("김하나 사전 참석 행").compareDocumentPosition(
+        adHocSummary,
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      adHocSummary.compareDocumentPosition(historySummary) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    fireEvent.click(adHocSummary);
+    expect(screen.getByRole("searchbox", { name: "임시 대상 검색" }))
+      .toBeInTheDocument();
   });
 
   it("searches, adds, and removes an eligible ad-hoc member through callbacks", async () => {
@@ -190,6 +281,7 @@ describe("MeetingRosterModal", () => {
     const onRemoveAdHocMember = vi.fn().mockResolvedValue({ status: "saved" });
     renderModal({ onAddAdHocMember, onRemoveAdHocMember });
 
+    fireEvent.click(screen.getByText("임시 대상 추가 0명"));
     fireEvent.change(screen.getByLabelText("임시 대상 검색"), {
       target: { value: "후보" },
     });
@@ -227,6 +319,7 @@ describe("MeetingRosterModal", () => {
       .mockRejectedValue(new Error("relation public.secret does not exist"));
     renderModal({ onAddAdHocMember });
 
+    fireEvent.click(screen.getByText("임시 대상 추가 0명"));
     fireEvent.change(screen.getByLabelText("임시 대상 후보"), {
       target: { value: candidates[0].id },
     });

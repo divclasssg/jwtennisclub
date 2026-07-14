@@ -50,26 +50,44 @@
 }
 
 .roster-summary {
+  display: flex;
+  gap: var(--spacing-xs);
+  overflow-x: auto;
+}
+
+.roster-summary-filter {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  flex: 0 0 auto;
+  gap: var(--spacing-xxs);
+  min-height: var(--button-icon-size);
+  padding: var(--spacing-xs) var(--spacing-sm);
   border: var(--hairline-width) solid var(--hairline);
   border-radius: var(--rounded-md);
   background: var(--canvas);
+  color: var(--ink-muted-48);
+  cursor: pointer;
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-line-height);
+  text-align: center;
 
-  span {
-    padding: var(--spacing-sm);
-    border-left: var(--hairline-width) solid var(--hairline);
-    color: var(--ink-muted-48);
-    font-size: var(--text-caption-size);
-    line-height: var(--text-caption-line-height);
-    text-align: center;
-
-    &:first-child {
-      border-left: none;
-      color: var(--ink);
-      font-weight: var(--font-weight-semibold);
-    }
+  &[aria-pressed="true"] {
+    border-color: var(--action-blue);
+    color: var(--action-blue);
   }
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--action-blue-focus);
+    outline-offset: var(--focus-ring-width);
+  }
+}
+
+.roster-search-toolbar {
+  display: flex;
+  align-items: center;
+}
+
+.roster-search-input {
+  flex: 1 1 var(--members-status-filter-width);
 }
 
 .roster-guidance,
@@ -91,14 +109,7 @@
 .ad-hoc-panel {
   display: grid;
   gap: var(--spacing-xs);
-
-  h3 {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--text-body-size);
-    font-weight: var(--font-weight-semibold);
-    line-height: var(--text-body-line-height);
-  }
+  padding-bottom: var(--spacing-md);
 }
 
 .candidate-controls {
@@ -135,8 +146,13 @@
 .empty-roster {
   padding: var(--spacing-xl) var(--spacing-md);
   text-align: center;
+
+  p {
+    margin: 0 0 var(--spacing-sm);
+  }
 }
 
+.ad-hoc-details,
 .history-details {
   border-top: var(--hairline-width) solid var(--hairline);
   color: var(--ink-muted-48);
@@ -149,6 +165,9 @@
     cursor: pointer;
     font-weight: var(--font-weight-semibold);
   }
+}
+
+.history-details {
 
   ol {
     display: grid;
@@ -229,18 +248,8 @@
 }
 
 @media (max-width: bp.$breakpoint-phone) {
-  .roster-summary,
   .candidate-controls {
     grid-template-columns: 1fr;
-  }
-
-  .roster-summary span {
-    border-top: var(--hairline-width) solid var(--hairline);
-    border-left: none;
-
-    &:first-child {
-      border-top: none;
-    }
   }
 
   .roster-row {

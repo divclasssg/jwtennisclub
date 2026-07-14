@@ -50,6 +50,7 @@ type MeetingRosterModalProps = {
 };
 
 type RosterMode = "rsvp" | "attendance";
+type RosterFilter = "all" | RsvpStatus | AttendanceStatus;
 
 const tabs: ReadonlyArray<{ mode: RosterMode; label: string }> = [
   { mode: "rsvp", label: "사전 참석" },
@@ -161,6 +162,8 @@ export function MeetingRosterModal({
   const tabsId = useId();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [mode, setMode] = useState<RosterMode>("rsvp");
+  const [targetQuery, setTargetQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<RosterFilter>("all");
   const [rowOverrides, setRowOverrides] = useState<
     Record<string, Partial<MeetingDirectoryTarget>>
   >({});
@@ -217,12 +220,40 @@ export function MeetingRosterModal({
     hiddenCandidateIds,
   ]);
 
+  const filteredTargets = useMemo(() => {
+    const query = targetQuery.trim().toLocaleLowerCase("ko-KR");
+    return displayedTargets.filter((target) => {
+      const matchesQuery = !query || [
+        target.memberCodeSnapshot,
+        target.memberNameSnapshot,
+      ]
+        .join(" ")
+        .toLocaleLowerCase("ko-KR")
+        .includes(query);
+      const currentStatus = mode === "rsvp"
+        ? target.rsvpStatus
+        : target.attendanceStatus;
+      return matchesQuery &&
+        (statusFilter === "all" || currentStatus === statusFilter);
+    });
+  }, [displayedTargets, mode, statusFilter, targetQuery]);
+
   const tabId = `${tabsId}-${mode}-tab`;
   const panelId = `${tabsId}-${mode}-panel`;
   const canChangeRoster = canManageAttendance && meeting.status === "scheduled";
   const selectedCandidate = adHocCandidates.find(
     (candidate) => candidate.id === selectedCandidateId,
   );
+
+  function selectMode(nextMode: RosterMode) {
+    setMode(nextMode);
+    setStatusFilter("all");
+  }
+
+  function clearRosterFilters() {
+    setTargetQuery("");
+    setStatusFilter("all");
+  }
 
   function handleTabKeyDown(
     event: KeyboardEvent<HTMLButtonElement>,
@@ -241,7 +272,7 @@ export function MeetingRosterModal({
 
     if (nextIndex === null) return;
     event.preventDefault();
-    setMode(tabs[nextIndex].mode);
+    selectMode(tabs[nextIndex].mode);
     tabRefs.current[nextIndex]?.focus();
   }
 
@@ -378,7 +409,7 @@ export function MeetingRosterModal({
                 className={styles["roster-tab"]}
                 id={`${tabsId}-${tab.mode}-tab`}
                 key={tab.mode}
-                onClick={() => setMode(tab.mode)}
+                onClick={() => selectMode(tab.mode)}
                 onKeyDown={(event) => handleTabKeyDown(event, index)}
                 ref={(element) => {
                   tabRefs.current[index] = element;
@@ -398,79 +429,47 @@ export function MeetingRosterModal({
           className={styles["roster-summary"]}
           role="region"
         >
-          <span>전체 {displayedTargets.length}명</span>
-          {(mode === "rsvp" ? rsvpSummary : attendanceSummary).map((item) => {
-            const count = displayedTargets.filter((target) =>
-              mode === "rsvp"
-                ? target.rsvpStatus === item.status
-                : target.attendanceStatus === item.status,
-            ).length;
+          {[
+            { status: "all" as const, label: "전체", count: displayedTargets.length },
+            ...(mode === "rsvp" ? rsvpSummary : attendanceSummary).map((item) => ({
+              ...item,
+              count: displayedTargets.filter((target) =>
+                mode === "rsvp"
+                  ? target.rsvpStatus === item.status
+                  : target.attendanceStatus === item.status,
+              ).length,
+            })),
+          ].map((item) => {
             return (
-              <span key={item.status}>
-                {item.label} {count}명
-              </span>
+              <button
+                aria-label={`${item.label} ${item.count}명 필터`}
+                aria-pressed={statusFilter === item.status}
+                className={styles["roster-summary-filter"]}
+                key={item.status}
+                onClick={() => setStatusFilter(item.status)}
+                type="button"
+              >
+                <span>{item.label}</span>
+                <strong>{item.count}명</strong>
+              </button>
             );
           })}
         </section>
 
+        <div className={styles["roster-search-toolbar"]}>
+          <TextInput
+            aria-label="명단 회원 검색"
+            className={styles["roster-search-input"]}
+            onChange={(event) => setTargetQuery(event.target.value)}
+            placeholder="이름 또는 회원번호"
+            type="search"
+            value={targetQuery}
+          />
+        </div>
+
         {guidance ? (
           <p className={styles["roster-guidance"]}>{guidance}</p>
         ) : null}
-
-        {canChangeRoster && onAddAdHocMember ? (
-          <section
-            aria-label="임시 대상 추가"
-            className={styles["ad-hoc-panel"]}
-          >
-            <h3>임시 대상 추가</h3>
-            <div className={styles["candidate-controls"]}>
-              <label className={styles["candidate-field"]}>
-                <span>회원 검색</span>
-                <TextInput
-                  aria-label="임시 대상 검색"
-                  onChange={(event) => {
-                    setCandidateQuery(event.target.value);
-                    setSelectedCandidateId("");
-                  }}
-                  type="search"
-                  value={candidateQuery}
-                />
-              </label>
-              <label className={styles["candidate-field"]}>
-                <span>추가할 회원</span>
-                <SelectInput
-                  aria-label="임시 대상 후보"
-                  onChange={(event) => setSelectedCandidateId(event.target.value)}
-                  value={selectedCandidateId}
-                >
-                  <option value="">회원을 선택하세요</option>
-                  {availableCandidates.map((candidate) => (
-                    <option key={candidate.id} value={candidate.id}>
-                      {candidate.memberCode} · {candidate.name} ·{" "}
-                      {candidate.groupCode ?? "그룹 없음"}
-                    </option>
-                  ))}
-                </SelectInput>
-              </label>
-              <Button
-                disabled={!selectedCandidateId || candidateState === "saving"}
-                onClick={() => void handleAddCandidate()}
-                type="button"
-              >
-                임시 대상 추가
-              </Button>
-            </div>
-          </section>
-        ) : null}
-
-        <p
-          aria-live="polite"
-          className={styles["candidate-status"]}
-          data-state={candidateState}
-          role={candidateState === "error" ? "alert" : undefined}
-        >
-          {candidateMessage}
-        </p>
 
         <div
           aria-labelledby={tabId}
@@ -479,8 +478,10 @@ export function MeetingRosterModal({
           role="tabpanel"
           tabIndex={0}
         >
-          {displayedTargets.length ? (
-            displayedTargets.map((target) => (
+          {!displayedTargets.length ? (
+            <p className={styles["empty-roster"]}>대상 회원이 없습니다.</p>
+          ) : filteredTargets.length ? (
+            filteredTargets.map((target) => (
               <MeetingRosterRow
                 attendanceStarted={attendanceStarted}
                 canManage={canManageAttendance}
@@ -500,9 +501,74 @@ export function MeetingRosterModal({
               />
             ))
           ) : (
-            <p className={styles["empty-roster"]}>대상 회원이 없습니다.</p>
+            <div className={styles["empty-roster"]}>
+              <p>조건에 맞는 회원이 없습니다.</p>
+              <Button onClick={clearRosterFilters} size="compact" type="button">
+                필터 초기화
+              </Button>
+            </div>
           )}
         </div>
+
+        {canChangeRoster && onAddAdHocMember ? (
+          <details className={styles["ad-hoc-details"]}>
+            <summary>
+              임시 대상 추가 {displayedTargets.filter(
+                (target) => target.targetOrigin === "ad_hoc",
+              ).length}명
+            </summary>
+            <section
+              aria-label="임시 대상 추가"
+              className={styles["ad-hoc-panel"]}
+            >
+              <div className={styles["candidate-controls"]}>
+                <label className={styles["candidate-field"]}>
+                  <span>회원 검색</span>
+                  <TextInput
+                    aria-label="임시 대상 검색"
+                    onChange={(event) => {
+                      setCandidateQuery(event.target.value);
+                      setSelectedCandidateId("");
+                    }}
+                    type="search"
+                    value={candidateQuery}
+                  />
+                </label>
+                <label className={styles["candidate-field"]}>
+                  <span>추가할 회원</span>
+                  <SelectInput
+                    aria-label="임시 대상 후보"
+                    onChange={(event) => setSelectedCandidateId(event.target.value)}
+                    value={selectedCandidateId}
+                  >
+                    <option value="">회원을 선택하세요</option>
+                    {availableCandidates.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.memberCode} · {candidate.name} ·{" "}
+                        {candidate.groupCode ?? "그룹 없음"}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </label>
+                <Button
+                  disabled={!selectedCandidateId || candidateState === "saving"}
+                  onClick={() => void handleAddCandidate()}
+                  type="button"
+                >
+                  임시 대상 추가
+                </Button>
+              </div>
+              <p
+                aria-live="polite"
+                className={styles["candidate-status"]}
+                data-state={candidateState}
+                role={candidateState === "error" ? "alert" : undefined}
+              >
+                {candidateMessage}
+              </p>
+            </section>
+          </details>
+        ) : null}
 
         <details className={styles["history-details"]}>
           <summary>변경 이력 {lifecycleEvents.length}건</summary>
