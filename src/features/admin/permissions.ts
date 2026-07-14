@@ -14,6 +14,9 @@ export const PERMISSIONS = [
   "events.create",
   "events.update",
   "events.delete",
+  "meetings.view",
+  "meetings.manage",
+  "meetings.attendance.manage",
   "settlements.close",
   "settlements.reopen",
   "operators.manage",
@@ -41,6 +44,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Readonly<
     "events.create",
     "events.update",
     "events.delete",
+    "meetings.view",
+    "meetings.manage",
+    "meetings.attendance.manage",
   ] as const),
 });
 

@@ -54,6 +54,27 @@ describe("hasPermission", () => {
     expect(hasPermission("operator", "events.delete")).toBe(true);
   });
 
+  it("allows admins and operators to view, manage, and record meeting attendance", () => {
+    for (const role of ["admin", "operator"] as const) {
+      expect(hasPermission(role, "meetings.view")).toBe(true);
+      expect(hasPermission(role, "meetings.manage")).toBe(true);
+      expect(hasPermission(role, "meetings.attendance.manage")).toBe(true);
+    }
+  });
+
+  it("allows custom roles to receive only explicitly assigned meeting permissions", () => {
+    expect(
+      hasPermission("meeting-reader", "meetings.view", {
+        "meeting-reader": ["meetings.view"],
+      }),
+    ).toBe(true);
+    expect(
+      hasPermission("meeting-reader", "meetings.manage", {
+        "meeting-reader": ["meetings.view"],
+      }),
+    ).toBe(false);
+  });
+
   it("blocks default operators from destructive admin actions", () => {
     expect(hasPermission("operator", "members.delete")).toBe(false);
     expect(hasPermission("operator", "expenses.delete")).toBe(false);
