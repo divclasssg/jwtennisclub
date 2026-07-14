@@ -29,16 +29,15 @@ export function MeetingManagementDisclosure({
       >
         관리
       </Button>
-      {open ? (
-        <div
-          aria-label={`${meetingTitle} 회차 관리`}
-          className={styles["meeting-management-panel"]}
-          id={panelId}
-          role="region"
-        >
-          {children}
-        </div>
-      ) : null}
+      <div
+        aria-label={`${meetingTitle} 회차 관리`}
+        className={styles["meeting-management-panel"]}
+        hidden={!open}
+        id={panelId}
+        role="region"
+      >
+        {children}
+      </div>
     </div>
   );
 }

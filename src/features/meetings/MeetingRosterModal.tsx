@@ -154,6 +154,7 @@ export function MeetingRosterModal({
   const [mode, setMode] = useState<RosterMode>("rsvp");
   const [targetQuery, setTargetQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<RosterFilter>("all");
+  const [retryTargetIds, setRetryTargetIds] = useState<string[]>([]);
   const [rowOverrides, setRowOverrides] = useState<
     Record<string, Partial<MeetingDirectoryTarget>>
   >({});
@@ -217,10 +218,12 @@ export function MeetingRosterModal({
       const currentStatus = mode === "rsvp"
         ? target.rsvpStatus
         : target.attendanceStatus;
-      return matchesQuery &&
-        (statusFilter === "all" || currentStatus === statusFilter);
+      const matchesStatus =
+        statusFilter === "all" || currentStatus === statusFilter;
+      return retryTargetIds.includes(target.memberId) ||
+        (matchesQuery && matchesStatus);
     });
-  }, [displayedTargets, mode, statusFilter, targetQuery]);
+  }, [displayedTargets, mode, retryTargetIds, statusFilter, targetQuery]);
 
   const { adHocCount, rosterSummary } = useMemo(() => {
     const statusOptions: ReadonlyArray<{
@@ -301,6 +304,16 @@ export function MeetingRosterModal({
         hasRecordedState: true,
       },
     }));
+  }
+
+  function handleRetryAvailabilityChange(memberId: string, available: boolean) {
+    setRetryTargetIds((current) => {
+      const includesMember = current.includes(memberId);
+      if (available) return includesMember ? current : [...current, memberId];
+      return includesMember
+        ? current.filter((currentMemberId) => currentMemberId !== memberId)
+        : current;
+    });
   }
 
   async function handleAddCandidate() {
@@ -500,6 +513,7 @@ export function MeetingRosterModal({
                     ? () => handleRemoveCandidate(target)
                     : undefined
                 }
+                onRetryAvailabilityChange={handleRetryAvailabilityChange}
                 onRowConfirmed={handleRowConfirmed}
                 target={target}
               />

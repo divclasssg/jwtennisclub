@@ -37,6 +37,7 @@ type MeetingRosterRowProps = {
   meetingStatus: MeetingStatus;
   mode: "rsvp" | "attendance";
   onRemove?: () => Promise<void> | void;
+  onRetryAvailabilityChange?: (memberId: string, available: boolean) => void;
   onRowConfirmed?: (row: SafeMeetingRow) => void;
   target: MeetingDirectoryTarget;
 };
@@ -68,6 +69,7 @@ export function MeetingRosterRow({
   meetingStatus,
   mode,
   onRemove,
+  onRetryAvailabilityChange,
   onRowConfirmed,
   target,
 }: MeetingRosterRowProps) {
@@ -124,12 +126,20 @@ export function MeetingRosterRow({
     }
   }
 
+  function updateRetryAttempt(
+    nextAttempt: SaveAttempt | null,
+    keepVisible = nextAttempt !== null,
+  ) {
+    setRetryAttempt(nextAttempt);
+    onRetryAvailabilityChange?.(target.memberId, keepVisible);
+  }
+
   async function save(attempt: SaveAttempt) {
     if (saving || !editable) return;
 
     setRequestState("saving");
     setMessage(`${target.memberNameSnapshot} 저장 중`);
-    setRetryAttempt(null);
+    updateRetryAttempt(null, retryAttempt !== null);
 
     const request =
       attempt.kind === "rsvp"
@@ -157,6 +167,7 @@ export function MeetingRosterRow({
 
       if (response.ok && result.status === "saved") {
         applyServerRow(result.row);
+        updateRetryAttempt(null);
         setRequestState("saved");
         setMessage(`${target.memberNameSnapshot} 저장됨`);
         return;
@@ -164,7 +175,7 @@ export function MeetingRosterRow({
 
       if (response.ok && result.status === "conflict") {
         applyServerRow(result.row);
-        setRetryAttempt(attempt);
+        updateRetryAttempt(attempt);
         setRequestState("error");
         setMessage(
           "다른 운영진이 먼저 변경했습니다. 최신 값으로 복원했습니다.",
@@ -173,12 +184,12 @@ export function MeetingRosterRow({
       }
 
       restoreConfirmedDraft();
-      setRetryAttempt(attempt);
+      updateRetryAttempt(attempt);
       setRequestState("error");
       setMessage(result.status === "error" ? result.message : genericErrorMessage);
     } catch {
       restoreConfirmedDraft();
-      setRetryAttempt(attempt);
+      updateRetryAttempt(attempt);
       setRequestState("error");
       setMessage(genericErrorMessage);
     }
@@ -188,7 +199,7 @@ export function MeetingRosterRow({
     if (requestState !== "saving") {
       setRequestState("idle");
       setMessage("");
-      setRetryAttempt(null);
+      updateRetryAttempt(null);
     }
   }
 
@@ -219,7 +230,6 @@ export function MeetingRosterRow({
     if (nextStatus === "late") {
       setArrivalDraft("");
       setRequestState("error");
-      setRetryAttempt(null);
       setMessage(
         `${target.memberNameSnapshot} 회원의 실제 도착 시간을 입력해 주세요.`,
       );
@@ -238,7 +248,7 @@ export function MeetingRosterRow({
     const error = validateArrivalTime(value);
     if (error) {
       setRequestState("error");
-      setRetryAttempt(null);
+      updateRetryAttempt(null);
       setMessage(error);
       return;
     }

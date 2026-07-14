@@ -198,6 +198,103 @@ describe("MeetingRosterModal", () => {
     expect(screen.getByText("김하나 저장됨")).toBeInTheDocument();
   });
 
+  it("keeps a conflicting row visible until its retry succeeds under a status filter", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({
+          status: "conflict",
+          row: {
+            meetingId: meeting.id,
+            memberId: targets[0].memberId,
+            rsvpStatus: "late",
+            attendanceStatus: "unchecked",
+            arrivalTime: null,
+            rsvpUpdatedAt: "2026-07-14T09:04:00.000Z",
+            attendanceUpdatedAt: targets[0].attendanceUpdatedAt,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          status: "saved",
+          row: {
+            meetingId: meeting.id,
+            memberId: targets[0].memberId,
+            rsvpStatus: "attending",
+            attendanceStatus: "unchecked",
+            arrivalTime: null,
+            rsvpUpdatedAt: "2026-07-14T09:05:00.000Z",
+            attendanceUpdatedAt: targets[0].attendanceUpdatedAt,
+          },
+        }),
+      );
+    renderModal();
+
+    fireEvent.click(screen.getByRole("button", { name: "미응답 2명 필터" }));
+    fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
+      target: { value: "attending" },
+    });
+
+    expect(
+      await screen.findByText("다른 운영진이 먼저 변경했습니다. 최신 값으로 복원했습니다."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("김하나 사전 참석 행")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "김하나 사전 참석 재시도" }),
+    );
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[1]?.[1]?.body)))
+      .toMatchObject({
+        rsvpStatus: "attending",
+        expectedUpdatedAt: "2026-07-14T09:04:00.000Z",
+      });
+    await waitFor(() =>
+      expect(screen.queryByLabelText("김하나 사전 참석 행"))
+        .not.toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText("이둘 사전 참석 행")).toBeInTheDocument();
+  });
+
+  it("stops pinning a filtered row when local validation clears its retry", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      Response.json({
+        status: "conflict",
+        row: {
+          meetingId: meeting.id,
+          memberId: targets[0].memberId,
+          rsvpStatus: "unanswered",
+          attendanceStatus: "absent",
+          arrivalTime: null,
+          rsvpUpdatedAt: targets[0].rsvpUpdatedAt,
+          attendanceUpdatedAt: "2026-07-14T09:04:00.000Z",
+        },
+      }),
+    );
+    renderModal();
+
+    fireEvent.click(screen.getByRole("tab", { name: "출석 체크" }));
+    fireEvent.click(screen.getByRole("button", { name: "미체크 2명 필터" }));
+    fireEvent.change(screen.getByLabelText("김하나 실제 출석"), {
+      target: { value: "present" },
+    });
+
+    expect(
+      await screen.findByText("다른 운영진이 먼저 변경했습니다. 최신 값으로 복원했습니다."),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("김하나 실제 출석"), {
+      target: { value: "late" },
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByLabelText("김하나 실제 출석 행"))
+        .not.toBeInTheDocument(),
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("이둘 실제 출석 행")).toBeInTheDocument();
+  });
+
   it("searches by name or member code and filters by the current-tab summary", () => {
     renderModal({
       targets: [
