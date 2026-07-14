@@ -49,6 +49,24 @@ describe("proxy", () => {
     );
   });
 
+  it("protects the club meeting route and preserves its deep link", async () => {
+    mockedUpdateSession.mockResolvedValue({
+      response: NextResponse.next(),
+      userId: null,
+    });
+
+    const response = await proxy(
+      new NextRequest(
+        "https://club.example/meetings?month=2026-07&meeting=11111111-1111-4111-8111-111111111111",
+      ),
+    );
+
+    expect(response.status).toBe(307);
+    expect(getRedirectUrl(response)).toBe(
+      "https://club.example/login?next=%2Fmeetings%3Fmonth%3D2026-07%26meeting%3D11111111-1111-4111-8111-111111111111",
+    );
+  });
+
   it("redirects authenticated login requests to the dashboard", async () => {
     mockedUpdateSession.mockResolvedValue({
       response: NextResponse.next(),

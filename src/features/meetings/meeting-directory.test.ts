@@ -430,7 +430,9 @@ describe("meeting directory SQL boundary", () => {
     expect(migrationSql).toContain("'attendance_unchecked'");
     expect(migrationSql).toContain("'ad_hoc_candidates'");
     expect(migrationSql).toContain("'lifecycle_events'");
-    expect(migrationSql).toContain("if can_manage_attendance then");
+    expect(migrationSql).toContain(
+      "if can_manage_attendance and month_roster_status = 'locked' then",
+    );
     expect(migrationSql).toContain("requested_meeting.id::text = requested_selected_meeting_id");
     expect(migrationSql).toContain("requested_meeting.period_month = normalized_period_month");
   });
