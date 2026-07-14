@@ -108,17 +108,15 @@ describe("MeetingRosterRow", () => {
     fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
       target: { value: "attending" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 사전 참석 저장" }));
-
-    expect(
-      screen.getByRole("button", { name: "김하나 사전 참석 저장" }),
-    ).toBeDisabled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("김하나 사전 참석")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "김하나 사전 참석 저장" }))
+      .not.toBeInTheDocument();
     expect(screen.getByLabelText("이둘 사전 참석")).toBeEnabled();
 
     fireEvent.change(screen.getByLabelText("이둘 사전 참석"), {
       target: { value: "declined" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "이둘 사전 참석 저장" }));
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     await act(async () => {
@@ -181,15 +179,53 @@ describe("MeetingRosterRow", () => {
     fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
       target: { value: "attending" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 사전 참석 저장" }));
     expect(screen.getByLabelText("김하나 실제 출석")).toBeEnabled();
 
     fireEvent.change(screen.getByLabelText("김하나 실제 출석"), {
       target: { value: "present" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 실제 출석 저장" }));
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("auto-saves a non-late attendance selection", async () => {
+    const target = createTarget(
+      "22222222-2222-4222-8222-222222222222",
+      "김하나",
+    );
+    fetchMock.mockResolvedValue(
+      response({
+        status: "saved",
+        row: createServerRow(target, {
+          attendanceStatus: "present",
+          attendanceUpdatedAt: "2026-07-14T09:08:00.000Z",
+        }),
+      }),
+    );
+
+    render(
+      <MeetingRosterRow
+        attendanceStarted
+        canManage
+        meetingId={meetingId}
+        meetingStatus="scheduled"
+        mode="attendance"
+        target={target}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("김하나 실제 출석"), {
+      target: { value: "present" },
+    });
+
+    expect(await screen.findByText("김하나 저장됨")).toBeInTheDocument();
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+      kind: "attendance",
+      attendanceStatus: "present",
+      arrivalTime: null,
+    });
+    expect(screen.queryByRole("button", { name: "김하나 실제 출석 저장" }))
+      .not.toBeInTheDocument();
   });
 
   it("restores a conflict row and retries the attempted value with its new token", async () => {
@@ -229,7 +265,6 @@ describe("MeetingRosterRow", () => {
     fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
       target: { value: "attending" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 사전 참석 저장" }));
 
     expect(await screen.findByText(/다른 운영진이 먼저 변경/)).toBeInTheDocument();
     expect(screen.getByLabelText("김하나 사전 참석")).toHaveValue("late");
@@ -289,7 +324,6 @@ describe("MeetingRosterRow", () => {
     fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
       target: { value: "attending" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 사전 참석 저장" }));
 
     expect(await screen.findByText(/다른 운영진이 먼저 변경/)).toBeInTheDocument();
     expect(
@@ -318,7 +352,6 @@ describe("MeetingRosterRow", () => {
     fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
       target: { value: "declined" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 사전 참석 저장" }));
 
     expect(await screen.findByText("다시 시도해 주세요.")).toBeInTheDocument();
     expect(screen.getByLabelText("김하나 사전 참석")).toHaveValue(
@@ -348,7 +381,6 @@ describe("MeetingRosterRow", () => {
     fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
       target: { value: "declined" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 사전 참석 저장" }));
 
     expect(
       await screen.findByText("요청을 처리하지 못했습니다. 다시 시도해 주세요."),
@@ -393,7 +425,6 @@ describe("MeetingRosterRow", () => {
     fireEvent.change(screen.getByLabelText("김하나 실제 출석"), {
       target: { value: "late" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 실제 출석 저장" }));
 
     const arrivalInput = screen.getByLabelText("김하나 실제 도착 시간");
     const error = screen.getByText("김하나 회원의 실제 도착 시간을 입력해 주세요.");
@@ -401,15 +432,14 @@ describe("MeetingRosterRow", () => {
     expect(fetchMock).not.toHaveBeenCalled();
 
     fireEvent.change(arrivalInput, { target: { value: "18:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 실제 출석 저장" }));
     expect(
       screen.getByText("김하나 회원의 실제 도착 시간은 시작 후 종료 이내여야 합니다."),
     ).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
 
     fireEvent.change(arrivalInput, { target: { value: "18:30" } });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 실제 출석 저장" }));
     expect(await screen.findByText("김하나 저장됨")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("expresses permission, lifecycle, start-time, and ad-hoc removal rules", () => {
@@ -505,7 +535,6 @@ describe("MeetingRosterRow", () => {
     fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
       target: { value: "attending" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "김하나 사전 참석 저장" }));
 
     expect(
       screen.getByRole("button", { name: "김하나 임시 대상 제거" }),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState } from "react";
 import { Button, SelectInput, TextInput } from "@/components/atoms";
 import {
   ATTENDANCE_STATUSES,
@@ -192,14 +192,40 @@ export function MeetingRosterRow({
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (mode === "rsvp") {
-      void save({ kind: "rsvp", rsvpStatus: rsvpDraft });
-      return;
+  function resetFeedback() {
+    if (requestState !== "saving") {
+      setRequestState("idle");
+      setMessage("");
+      setRetryAttempt(null);
     }
+  }
 
-    if (attendanceDraft === "late" && !arrivalDraft) {
+  function validateArrivalTime(value: string) {
+    if (!value) {
+      return `${target.memberNameSnapshot} 회원의 실제 도착 시간을 입력해 주세요.`;
+    }
+    const meetingStart = meetingStartTime?.slice(0, 5);
+    const meetingEnd = meetingEndTime?.slice(0, 5);
+    if (
+      (meetingStart !== undefined && value <= meetingStart) ||
+      (meetingEnd !== undefined && value > meetingEnd)
+    ) {
+      return `${target.memberNameSnapshot} 회원의 실제 도착 시간은 시작 후 종료 이내여야 합니다.`;
+    }
+    return null;
+  }
+
+  function handleRsvpChange(nextStatus: RsvpStatus) {
+    setRsvpDraft(nextStatus);
+    resetFeedback();
+    void save({ kind: "rsvp", rsvpStatus: nextStatus });
+  }
+
+  function handleAttendanceChange(nextStatus: AttendanceStatus) {
+    setAttendanceDraft(nextStatus);
+    resetFeedback();
+    if (nextStatus === "late") {
+      setArrivalDraft("");
       setRequestState("error");
       setRetryAttempt(null);
       setMessage(
@@ -207,35 +233,29 @@ export function MeetingRosterRow({
       );
       return;
     }
-
-    const meetingStart = meetingStartTime?.slice(0, 5);
-    const meetingEnd = meetingEndTime?.slice(0, 5);
-    if (
-      attendanceDraft === "late" &&
-      ((meetingStart !== undefined && arrivalDraft <= meetingStart) ||
-        (meetingEnd !== undefined && arrivalDraft > meetingEnd))
-    ) {
-      setRequestState("error");
-      setRetryAttempt(null);
-      setMessage(
-        `${target.memberNameSnapshot} 회원의 실제 도착 시간은 시작 후 종료 이내여야 합니다.`,
-      );
-      return;
-    }
-
+    setArrivalDraft("");
     void save({
       kind: "attendance",
-      attendanceStatus: attendanceDraft,
-      arrivalTime: attendanceDraft === "late" ? arrivalDraft : null,
+      attendanceStatus: nextStatus,
+      arrivalTime: null,
     });
   }
 
-  function resetFeedback() {
-    if (requestState !== "saving") {
-      setRequestState("idle");
-      setMessage("");
+  function handleArrivalChange(value: string) {
+    setArrivalDraft(value);
+    const error = validateArrivalTime(value);
+    if (error) {
+      setRequestState("error");
       setRetryAttempt(null);
+      setMessage(error);
+      return;
     }
+    resetFeedback();
+    void save({
+      kind: "attendance",
+      attendanceStatus: "late",
+      arrivalTime: value,
+    });
   }
 
   return (
@@ -251,17 +271,15 @@ export function MeetingRosterRow({
         {target.targetOrigin === "ad_hoc" ? <span>임시 대상</span> : null}
       </div>
 
-      <form className={styles["row-form"]} onSubmit={handleSubmit}>
+      <div className={styles["row-form"]}>
         <label className={styles["row-field"]}>
           <span>{`${target.memberNameSnapshot} ${domainLabel}`}</span>
           {mode === "rsvp" ? (
             <SelectInput
               aria-label={`${target.memberNameSnapshot} 사전 참석`}
               disabled={!editable || saving}
-              onChange={(event) => {
-                setRsvpDraft(event.target.value as RsvpStatus);
-                resetFeedback();
-              }}
+              onChange={(event) =>
+                handleRsvpChange(event.target.value as RsvpStatus)}
               value={rsvpDraft}
             >
               {RSVP_STATUSES.map((status) => (
@@ -274,11 +292,8 @@ export function MeetingRosterRow({
             <SelectInput
               aria-label={`${target.memberNameSnapshot} 실제 출석`}
               disabled={!editable || saving}
-              onChange={(event) => {
-                setAttendanceDraft(event.target.value as AttendanceStatus);
-                if (event.target.value !== "late") setArrivalDraft("");
-                resetFeedback();
-              }}
+              onChange={(event) =>
+                handleAttendanceChange(event.target.value as AttendanceStatus)}
               value={attendanceDraft}
             >
               {ATTENDANCE_STATUSES.map((status) => (
@@ -299,51 +314,42 @@ export function MeetingRosterRow({
               disabled={!editable || saving}
               max={meetingEndTime}
               min={meetingStartTime}
-              onChange={(event) => {
-                setArrivalDraft(event.target.value);
-                resetFeedback();
-              }}
+              onChange={(event) => handleArrivalChange(event.target.value)}
               type="time"
               value={arrivalDraft}
             />
           </label>
         ) : null}
 
-        <div className={styles["row-actions"]}>
-          <Button
-            aria-label={`${target.memberNameSnapshot} ${domainLabel} 저장`}
-            disabled={!editable || saving}
-            size="compact"
-            type="submit"
-          >
-            {saving ? "저장 중" : "저장"}
-          </Button>
-          {retryAttempt ? (
-            <Button
-              aria-label={`${target.memberNameSnapshot} ${domainLabel} 재시도`}
-              disabled={!editable || saving}
-              onClick={() => void save(retryAttempt)}
-              size="compact"
-              type="button"
-              variant="secondary"
-            >
-              재시도
-            </Button>
-          ) : null}
-          {canRemove ? (
-            <Button
-              aria-label={`${target.memberNameSnapshot} 임시 대상 제거`}
-              disabled={saving}
-              onClick={() => void onRemove?.()}
-              size="compact"
-              type="button"
-              variant="danger"
-            >
-              제거
-            </Button>
-          ) : null}
-        </div>
-      </form>
+        {retryAttempt || canRemove ? (
+          <div className={styles["row-actions"]}>
+            {retryAttempt ? (
+              <Button
+                aria-label={`${target.memberNameSnapshot} ${domainLabel} 재시도`}
+                disabled={!editable || saving}
+                onClick={() => void save(retryAttempt)}
+                size="compact"
+                type="button"
+                variant="secondary"
+              >
+                재시도
+              </Button>
+            ) : null}
+            {canRemove ? (
+              <Button
+                aria-label={`${target.memberNameSnapshot} 임시 대상 제거`}
+                disabled={saving}
+                onClick={() => void onRemove?.()}
+                size="compact"
+                type="button"
+                variant="danger"
+              >
+                제거
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       {target.targetOrigin === "ad_hoc" && recordedState ? (
         <p className={styles["row-note"]}>기록이 있어 제거할 수 없습니다.</p>

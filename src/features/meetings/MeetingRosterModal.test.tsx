@@ -168,9 +168,6 @@ describe("MeetingRosterModal", () => {
     fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
       target: { value: "attending" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "김하나 사전 참석 저장" }),
-    );
 
     expect(await screen.findByText("김하나 저장됨")).toBeInTheDocument();
     await waitFor(() =>

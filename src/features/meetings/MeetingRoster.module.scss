@@ -207,8 +207,8 @@
 }
 
 .row-form {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--spacing-xs);
   align-items: end;
 }
@@ -257,8 +257,7 @@
   }
 
   .row-form {
-    align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .row-actions {
