@@ -64,6 +64,7 @@
 - [x] 정모 목록 스캔 중심 UI와 접힌 회차 관리 작업 구현
 - [x] 정모 명단 검색·상태 필터·행 단위 자동 저장·모바일 작업면 개선
 - [x] 정모 관리 disclosure 진행 상태 보존과 필터 중 충돌 재시도 행 유지 회귀 수정
+- [x] 정모 참석·출석 관리와 UI 개선을 `main`에 fast-forward 병합하고 원격 푸시
 
 ## Next Work
 - [x] Implement `docs/superpowers/plans/2026-07-13-club-meeting-attendance.md`
