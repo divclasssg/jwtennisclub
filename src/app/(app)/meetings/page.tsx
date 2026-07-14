@@ -18,6 +18,11 @@ import {
 import { MeetingMobileList } from "@/features/meetings/MeetingMobileList";
 import { getKstPeriodMonth } from "@/features/meetings/meeting-calendar";
 import type { MeetingDirectoryRow } from "@/features/meetings/meeting-model";
+import {
+  formatMeetingTime,
+  getMeetingKindPresentation,
+  getMeetingStatusPresentation,
+} from "@/features/meetings/meeting-presentation";
 import { MeetingRosterModal } from "@/features/meetings/MeetingRosterModal";
 import {
   addMeetingAdHocMember,
@@ -111,30 +116,6 @@ export function canonicalizeScheduleReturnTo(value: string | undefined) {
 function formatPeriodMonth(periodMonth: string) {
   const [year, month] = periodMonth.split("-");
   return `${year}년 ${Number(month)}월`;
-}
-
-function formatMeetingKind(meeting: MeetingDirectoryRow) {
-  return meeting.meetingKind === "regular" ? "정기" : "번개";
-}
-
-function getMeetingKindTone(meeting: MeetingDirectoryRow) {
-  return meeting.meetingKind === "regular" ? "info" : "muted";
-}
-
-function formatMeetingStatus(meeting: MeetingDirectoryRow) {
-  if (meeting.status === "completed") return "완료";
-  if (meeting.status === "cancelled") return "취소";
-  return "예정";
-}
-
-function getMeetingStatusTone(meeting: MeetingDirectoryRow) {
-  if (meeting.status === "completed") return "success";
-  if (meeting.status === "cancelled") return "danger";
-  return "info";
-}
-
-function formatTime(value: string) {
-  return value.slice(0, 5);
 }
 
 function formatRsvpCounts(meeting: MeetingDirectoryRow) {
@@ -235,21 +216,21 @@ function MeetingDirectoryTable({
             <th scope="row">
               <span className={styles["meeting-title-cell"]}>
                 <span>{meeting.title}</span>
-                <Badge tone={getMeetingKindTone(meeting)}>
-                  {formatMeetingKind(meeting)}
+                <Badge tone={getMeetingKindPresentation(meeting.meetingKind).tone}>
+                  {getMeetingKindPresentation(meeting.meetingKind).label}
                 </Badge>
               </span>
             </th>
             <td>
               <span className={styles["meeting-datetime-cell"]}>
                 <span>{meeting.meetingDate}</span>
-                <span>{formatTime(meeting.startTime)}–{formatTime(meeting.endTime)}</span>
+                <span>{formatMeetingTime(meeting.startTime)}–{formatMeetingTime(meeting.endTime)}</span>
               </span>
             </td>
             <td>{meeting.location ?? "미정"}</td>
             <td>
-              <Badge tone={getMeetingStatusTone(meeting)}>
-                {formatMeetingStatus(meeting)}
+              <Badge tone={getMeetingStatusPresentation(meeting.status).tone}>
+                {getMeetingStatusPresentation(meeting.status).label}
               </Badge>
             </td>
             <td>{formatRsvpCounts(meeting)}</td>

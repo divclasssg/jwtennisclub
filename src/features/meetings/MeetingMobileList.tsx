@@ -2,48 +2,17 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/atoms";
 import type { MeetingDirectoryRow } from "./meeting-model";
+import {
+  formatMeetingTime,
+  getMeetingKindPresentation,
+  getMeetingStatusPresentation,
+} from "./meeting-presentation";
 import styles from "./MeetingMobileList.module.scss";
 
 type MeetingMobileListProps = {
   meetings: MeetingDirectoryRow[];
   renderActions?: (meeting: MeetingDirectoryRow) => ReactNode;
 };
-
-function formatMeetingKind(meeting: MeetingDirectoryRow) {
-  return meeting.meetingKind === "regular" ? "정기" : "번개";
-}
-
-function getMeetingKindTone(meeting: MeetingDirectoryRow) {
-  return meeting.meetingKind === "regular" ? "info" : "muted";
-}
-
-function formatMeetingStatus(meeting: MeetingDirectoryRow) {
-  if (meeting.status === "completed") {
-    return "완료";
-  }
-
-  if (meeting.status === "cancelled") {
-    return "취소";
-  }
-
-  return "예정";
-}
-
-function getMeetingStatusTone(meeting: MeetingDirectoryRow) {
-  if (meeting.status === "completed") {
-    return "success";
-  }
-
-  if (meeting.status === "cancelled") {
-    return "danger";
-  }
-
-  return "info";
-}
-
-function formatMeetingTime(time: string) {
-  return time.slice(0, 5);
-}
 
 function MeetingCounts({ meeting }: { meeting: MeetingDirectoryRow }) {
   const { counts } = meeting;
@@ -86,11 +55,11 @@ export function MeetingMobileList({ meetings, renderActions }: MeetingMobileList
               <div className={styles["meeting-mobile-title"]}>
                 <h3 className={styles["meeting-mobile-name"]}>{meeting.title}</h3>
                 <div className={styles["meeting-mobile-badges"]}>
-                  <Badge tone={getMeetingKindTone(meeting)}>
-                    {formatMeetingKind(meeting)}
+                  <Badge tone={getMeetingKindPresentation(meeting.meetingKind).tone}>
+                    {getMeetingKindPresentation(meeting.meetingKind).label}
                   </Badge>
-                  <Badge tone={getMeetingStatusTone(meeting)}>
-                    {formatMeetingStatus(meeting)}
+                  <Badge tone={getMeetingStatusPresentation(meeting.status).tone}>
+                    {getMeetingStatusPresentation(meeting.status).label}
                   </Badge>
                   {meeting.meetingKind === "lightning" ? (
                     <Badge tone={meeting.linkedRegularMeetingId ? "info" : "muted"}>

@@ -17,17 +17,14 @@ import type {
   MeetingLifecycleEventDisplay,
   RsvpStatus,
 } from "./meeting-model";
+import type { SafeMeetingRow } from "./meeting-row-contract";
+import {
+  ATTENDANCE_STATUS_OPTIONS,
+  formatMeetingTime,
+  RSVP_STATUS_OPTIONS,
+} from "./meeting-presentation";
 import { MeetingRosterRow } from "./MeetingRosterRow";
 import styles from "./MeetingRoster.module.scss";
-
-type ConfirmedRow = {
-  memberId: string;
-  rsvpStatus: RsvpStatus;
-  attendanceStatus: AttendanceStatus;
-  arrivalTime: string | null;
-  rsvpUpdatedAt: string;
-  attendanceUpdatedAt: string;
-};
 
 export type MeetingRosterMutationResult =
   | { status: "saved"; target?: MeetingDirectoryTarget }
@@ -57,23 +54,6 @@ const tabs: ReadonlyArray<{ mode: RosterMode; label: string }> = [
   { mode: "attendance", label: "출석 체크" },
 ];
 
-const rsvpSummary: ReadonlyArray<{ status: RsvpStatus; label: string }> = [
-  { status: "unanswered", label: "미응답" },
-  { status: "attending", label: "참석" },
-  { status: "late", label: "늦참" },
-  { status: "declined", label: "불참" },
-];
-
-const attendanceSummary: ReadonlyArray<{
-  status: AttendanceStatus;
-  label: string;
-}> = [
-  { status: "unchecked", label: "미체크" },
-  { status: "present", label: "출석" },
-  { status: "late", label: "지각" },
-  { status: "absent", label: "결석" },
-];
-
 const lifecycleLabels: Readonly<
   Record<MeetingLifecycleEventDisplay["eventType"], string>
 > = {
@@ -89,19 +69,29 @@ const lifecycleLabels: Readonly<
 const genericMutationMessage =
   "요청을 처리하지 못했습니다. 다시 시도해 주세요.";
 
-function formatTime(value: string) {
-  return value.slice(0, 5);
-}
+const lifecycleDateFormatter = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 function formatOccurredAt(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return lifecycleDateFormatter.format(new Date(value));
+}
+
+function matchesNormalizedQuery(
+  values: ReadonlyArray<string | null>,
+  query: string,
+) {
+  const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
+  return !normalizedQuery || values
+    .map((value) => value ?? "")
+    .join(" ")
+    .toLocaleLowerCase("ko-KR")
+    .includes(normalizedQuery);
 }
 
 function formatLifecycleDetails(details: Readonly<Record<string, unknown>>) {
@@ -195,7 +185,6 @@ export function MeetingRosterModal({
   }, [addedTargets, removedTargetIds, rowOverrides, targets]);
 
   const availableCandidates = useMemo(() => {
-    const normalizedQuery = candidateQuery.trim().toLocaleLowerCase("ko-KR");
     const displayedMemberIds = new Set(
       displayedTargets.map((target) => target.memberId),
     );
@@ -207,11 +196,10 @@ export function MeetingRosterModal({
       ) {
         return false;
       }
-      if (!normalizedQuery) return true;
-      return [candidate.memberCode, candidate.name, candidate.groupCode ?? ""]
-        .join(" ")
-        .toLocaleLowerCase("ko-KR")
-        .includes(normalizedQuery);
+      return matchesNormalizedQuery(
+        [candidate.memberCode, candidate.name, candidate.groupCode],
+        candidateQuery,
+      );
     });
   }, [
     adHocCandidates,
@@ -221,15 +209,11 @@ export function MeetingRosterModal({
   ]);
 
   const filteredTargets = useMemo(() => {
-    const query = targetQuery.trim().toLocaleLowerCase("ko-KR");
     return displayedTargets.filter((target) => {
-      const matchesQuery = !query || [
-        target.memberCodeSnapshot,
-        target.memberNameSnapshot,
-      ]
-        .join(" ")
-        .toLocaleLowerCase("ko-KR")
-        .includes(query);
+      const matchesQuery = matchesNormalizedQuery(
+        [target.memberCodeSnapshot, target.memberNameSnapshot],
+        targetQuery,
+      );
       const currentStatus = mode === "rsvp"
         ? target.rsvpStatus
         : target.attendanceStatus;
@@ -237,6 +221,34 @@ export function MeetingRosterModal({
         (statusFilter === "all" || currentStatus === statusFilter);
     });
   }, [displayedTargets, mode, statusFilter, targetQuery]);
+
+  const { adHocCount, rosterSummary } = useMemo(() => {
+    const statusOptions: ReadonlyArray<{
+      status: RsvpStatus | AttendanceStatus;
+      label: string;
+    }> = mode === "rsvp" ? RSVP_STATUS_OPTIONS : ATTENDANCE_STATUS_OPTIONS;
+    const statusCounts = new Map<RsvpStatus | AttendanceStatus, number>();
+    let currentAdHocCount = 0;
+
+    for (const target of displayedTargets) {
+      const currentStatus = mode === "rsvp"
+        ? target.rsvpStatus
+        : target.attendanceStatus;
+      statusCounts.set(currentStatus, (statusCounts.get(currentStatus) ?? 0) + 1);
+      if (target.targetOrigin === "ad_hoc") currentAdHocCount += 1;
+    }
+
+    return {
+      adHocCount: currentAdHocCount,
+      rosterSummary: [
+        { status: "all" as const, label: "전체", count: displayedTargets.length },
+        ...statusOptions.map((item) => ({
+          ...item,
+          count: statusCounts.get(item.status) ?? 0,
+        })),
+      ],
+    };
+  }, [displayedTargets, mode]);
 
   const tabId = `${tabsId}-${mode}-tab`;
   const panelId = `${tabsId}-${mode}-panel`;
@@ -276,7 +288,7 @@ export function MeetingRosterModal({
     tabRefs.current[nextIndex]?.focus();
   }
 
-  function handleRowConfirmed(row: ConfirmedRow) {
+  function handleRowConfirmed(row: SafeMeetingRow) {
     setRowOverrides((current) => ({
       ...current,
       [row.memberId]: {
@@ -383,7 +395,7 @@ export function MeetingRosterModal({
           <strong>{meeting.meetingKind === "lightning" ? "번개" : "정모"}</strong>
           <span>{meeting.meetingDate}</span>
           <span>
-            {formatTime(meeting.startTime)}–{formatTime(meeting.endTime)}
+            {formatMeetingTime(meeting.startTime)}–{formatMeetingTime(meeting.endTime)}
           </span>
           <span>{meeting.location ?? "장소 미정"}</span>
           <span>
@@ -430,17 +442,7 @@ export function MeetingRosterModal({
             className={styles["roster-summary"]}
             role="region"
           >
-            {[
-              { status: "all" as const, label: "전체", count: displayedTargets.length },
-              ...(mode === "rsvp" ? rsvpSummary : attendanceSummary).map((item) => ({
-                ...item,
-                count: displayedTargets.filter((target) =>
-                  mode === "rsvp"
-                    ? target.rsvpStatus === item.status
-                    : target.attendanceStatus === item.status,
-                ).length,
-              })),
-            ].map((item) => {
+            {rosterSummary.map((item) => {
               return (
                 <button
                   aria-label={`${item.label} ${item.count}명 필터`}
@@ -515,9 +517,7 @@ export function MeetingRosterModal({
         {canChangeRoster && onAddAdHocMember ? (
           <details className={styles["ad-hoc-details"]}>
             <summary>
-              임시 대상 추가 {displayedTargets.filter(
-                (target) => target.targetOrigin === "ad_hoc",
-              ).length}명
+              임시 대상 추가 {adHocCount}명
             </summary>
             <section
               aria-label="임시 대상 추가"

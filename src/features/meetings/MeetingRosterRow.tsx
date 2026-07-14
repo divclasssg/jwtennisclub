@@ -14,6 +14,10 @@ import {
   meetingRowMutationResultSchema,
   type SafeMeetingRow,
 } from "./meeting-row-contract";
+import {
+  ATTENDANCE_STATUS_LABELS,
+  RSVP_STATUS_LABELS,
+} from "./meeting-presentation";
 import styles from "./MeetingRoster.module.scss";
 
 type SaveAttempt =
@@ -39,18 +43,6 @@ type MeetingRosterRowProps = {
 
 type RequestState = "idle" | "saving" | "saved" | "error";
 
-const rsvpLabels: Readonly<Record<RsvpStatus, string>> = {
-  unanswered: "미응답",
-  attending: "참석",
-  late: "늦참",
-  declined: "불참",
-};
-const attendanceLabels: Readonly<Record<AttendanceStatus, string>> = {
-  unchecked: "미체크",
-  present: "출석",
-  late: "지각",
-  absent: "결석",
-};
 const genericErrorMessage = "요청을 처리하지 못했습니다. 다시 시도해 주세요.";
 
 function parseMutationResult(value: unknown) {
@@ -284,7 +276,7 @@ export function MeetingRosterRow({
             >
               {RSVP_STATUSES.map((status) => (
                 <option key={status} value={status}>
-                  {rsvpLabels[status]}
+                  {RSVP_STATUS_LABELS[status]}
                 </option>
               ))}
             </SelectInput>
@@ -298,7 +290,7 @@ export function MeetingRosterRow({
             >
               {ATTENDANCE_STATUSES.map((status) => (
                 <option key={status} value={status}>
-                  {attendanceLabels[status]}
+                  {ATTENDANCE_STATUS_LABELS[status]}
                 </option>
               ))}
             </SelectInput>
