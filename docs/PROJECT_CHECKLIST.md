@@ -59,8 +59,13 @@
 - [x] 회원 명부 초기화 자동 테스트, lint, typecheck, 테스트 제외 런타임 개인정보 정적 검사 통과
 - [x] 페이지 이동 성능 개선: 운영자 권한 요청 캐시, 회원 목록 단일 RPC, 로딩 경계, 서울 리전, JWT claims 검증
 - [x] 페이지 이동 성능 개선용 Supabase RPC 마이그레이션 적용
+- [x] 정모 월 명단, 사전 응답, 실제 출석, 생명주기, 일정 통합 코드 구현
+- [x] 정모 기능 전체 테스트, lint, TypeScript, 프로덕션 빌드 통과
 
 ## Next Work
+- [x] Implement `docs/superpowers/plans/2026-07-13-club-meeting-attendance.md`
+- [ ] Supabase에 `202607130002_add_club_meetings.sql` 적용
+- [ ] 적용 후 권한 조합·동시성·월 경계 RPC 및 인증 브라우저 정모 흐름 검증
 - [x] Implement member tabs for separate active, paused, and withdrawn member management
 - [x] Define membership fee payment records
 - [x] Implement fee payment list and monthly filters
