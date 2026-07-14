@@ -61,6 +61,8 @@
 - [x] 페이지 이동 성능 개선용 Supabase RPC 마이그레이션 적용
 - [x] 정모 월 명단, 사전 응답, 실제 출석, 생명주기, 일정 통합 코드 구현
 - [x] 정모 기능 전체 테스트, lint, TypeScript, 프로덕션 빌드 통과
+- [x] 정모 목록 스캔 중심 UI와 접힌 회차 관리 작업 구현
+- [x] 정모 명단 검색·상태 필터·행 단위 자동 저장·모바일 작업면 개선
 
 ## Next Work
 - [x] Implement `docs/superpowers/plans/2026-07-13-club-meeting-attendance.md`
