@@ -96,6 +96,34 @@ describe("MeetingLifecycleControls", () => {
     });
   });
 
+  it("recovers from a rejected lifecycle action with a safe error", async () => {
+    actions.updateClubMeetingLocation.mockRejectedValueOnce(
+      new Error("database detail"),
+    );
+    render(
+      <MeetingLifecycleControls
+        attendanceEnded
+        canManageAttendance
+        canManageMeeting
+        hasActiveLightning={false}
+        hasLightningHistory={false}
+        meeting={meeting}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "7월 첫째 주 정모 장소 저장" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+    );
+    expect(screen.queryByText("database detail")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "7월 첫째 주 정모 장소 저장" }),
+    ).toBeEnabled();
+  });
+
   it("hides close before end or without attendance permission", () => {
     const { rerender } = render(
       <MeetingLifecycleControls

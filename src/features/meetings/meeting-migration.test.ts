@@ -298,13 +298,13 @@ describe("club meeting migration", () => {
   });
 
   it("locks the requested meeting before deriving row and lightning relationships", () => {
-    for (const functionName of [
-      "add_meeting_ad_hoc_member",
-      "remove_meeting_ad_hoc_member",
-      "save_meeting_rsvp",
-      "save_meeting_attendance",
-      "create_lightning_club_meeting",
-    ]) {
+    for (const [functionName, lockClause] of [
+      ["add_meeting_ad_hoc_member", "for update"],
+      ["remove_meeting_ad_hoc_member", "for update"],
+      ["save_meeting_rsvp", "for share"],
+      ["save_meeting_attendance", "for share"],
+      ["create_lightning_club_meeting", "for update"],
+    ] as const) {
       const start = migrationSql.indexOf(
         `create or replace function public.${functionName}`,
       );
@@ -315,7 +315,7 @@ describe("club meeting migration", () => {
       const memberAt = functionSql.indexOf("from public.members");
 
       expect(lockAt, functionName).toBeGreaterThan(-1);
-      expect(functionSql.indexOf("for update", lockAt), functionName).toBeGreaterThan(
+      expect(functionSql.indexOf(lockClause, lockAt), functionName).toBeGreaterThan(
         lockAt,
       );
       if (attendanceAt >= 0) expect(lockAt, functionName).toBeLessThan(attendanceAt);
@@ -401,21 +401,51 @@ describe("club meeting migration", () => {
   });
 
   it("evaluates attendance time windows after acquiring the meeting lock", () => {
-    for (const functionName of [
-      "save_meeting_attendance",
-      "close_club_meeting_attendance",
-    ]) {
+    for (const [functionName, lockClause] of [
+      ["save_meeting_attendance", "for share"],
+      ["close_club_meeting_attendance", "for update"],
+    ] as const) {
       const start = migrationSql.indexOf(
         `create or replace function public.${functionName}`,
       );
       const end = migrationSql.indexOf("$$;", start);
       const functionSql = migrationSql.slice(start, end);
-      const lockPosition = functionSql.indexOf("for update");
+      const lockPosition = functionSql.indexOf(lockClause);
       const timePosition = functionSql.indexOf("kst_now :=", lockPosition);
 
       expect(lockPosition, functionName).toBeGreaterThan(-1);
       expect(timePosition, functionName).toBeGreaterThan(lockPosition);
       expect(functionSql).toContain("kst_now timestamp;");
     }
+  });
+
+  it("allows independent row saves while lifecycle mutations keep exclusive locks", () => {
+    const functionBody = (functionName: string) => {
+      const start = migrationSql.indexOf(
+        `create or replace function public.${functionName}`,
+      );
+      const end = migrationSql.indexOf("$$;", start);
+      return migrationSql.slice(start, end);
+    };
+
+    expect(functionBody("save_meeting_rsvp")).toContain("for share");
+    expect(functionBody("save_meeting_attendance")).toContain("for share");
+    expect(functionBody("cancel_club_meeting")).toContain("for update");
+    expect(functionBody("close_club_meeting_attendance")).toContain("for update");
+  });
+
+  it("does not append a location event for an unchanged value", () => {
+    const start = migrationSql.indexOf(
+      "create or replace function public.update_club_meeting_location",
+    );
+    const end = migrationSql.indexOf("$$;", start);
+    const functionSql = migrationSql.slice(start, end);
+
+    expect(functionSql).toContain(
+      "normalized_location is not distinct from locked_meeting.location",
+    );
+    expect(functionSql.indexOf("is not distinct from")).toBeLessThan(
+      functionSql.indexOf("insert into public.meeting_lifecycle_events"),
+    );
   });
 });

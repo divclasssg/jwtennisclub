@@ -1,67 +1,19 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import {
+  meetingRowMutationRequestSchema,
+  meetingRowMutationResultSchema,
+  type MeetingRowMutationResult,
+} from "./meeting-row-contract";
 
-const uuidSchema = z.string().uuid();
-const timestampSchema = z.string().datetime({ offset: true });
-const requestTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
-const databaseTimeSchema = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?$/);
-
-const rowTargetSchema = z.strictObject({
-  meetingId: uuidSchema,
-  memberId: uuidSchema,
-  expectedUpdatedAt: timestampSchema,
-});
-
-const rsvpMutationSchema = rowTargetSchema.extend({
-  kind: z.literal("rsvp"),
-  rsvpStatus: z.enum(["unanswered", "attending", "late", "declined"]),
-});
-
-const attendanceMutationSchema = rowTargetSchema
-  .extend({
-    kind: z.literal("attendance"),
-    attendanceStatus: z.enum(["unchecked", "present", "late", "absent"]),
-    arrivalTime: z.union([requestTimeSchema, z.null()]),
-  })
-  .superRefine((value, context) => {
-    if (value.attendanceStatus === "late" && value.arrivalTime === null) {
-      context.addIssue({ code: "custom", message: "arrival time required" });
-    }
-    if (value.attendanceStatus !== "late" && value.arrivalTime !== null) {
-      context.addIssue({ code: "custom", message: "arrival time not allowed" });
-    }
-  });
-
-export const meetingRowMutationRequestSchema = z.discriminatedUnion("kind", [
-  rsvpMutationSchema,
-  attendanceMutationSchema,
-]);
-
-const safeMeetingRowSchema = z
-  .object({
-    meetingId: uuidSchema,
-    memberId: uuidSchema,
-    rsvpStatus: z.enum(["unanswered", "attending", "late", "declined"]),
-    attendanceStatus: z.enum(["unchecked", "present", "late", "absent"]),
-    arrivalTime: z.union([databaseTimeSchema, z.null()]),
-    rsvpUpdatedAt: timestampSchema,
-    attendanceUpdatedAt: timestampSchema,
-  })
-  .strip();
-
-export type MeetingRowMutationRequest = z.infer<
-  typeof meetingRowMutationRequestSchema
->;
-export type SafeMeetingRow = z.infer<typeof safeMeetingRowSchema>;
-export type MeetingRowMutationResult =
-  | { status: "saved"; row: SafeMeetingRow }
-  | { status: "conflict"; row: SafeMeetingRow }
-  | { status: "error"; message: string };
+export {
+  meetingRowMutationRequestSchema,
+  type MeetingRowMutationRequest,
+  type MeetingRowMutationResult,
+  type SafeMeetingRow,
+} from "./meeting-row-contract";
 
 const invalidInputResult = {
   status: "error",
@@ -95,19 +47,8 @@ function safeErrorMessage(error: unknown) {
 }
 
 function normalizeRpcResult(data: unknown): MeetingRowMutationResult {
-  if (!data || typeof data !== "object" || !("status" in data)) {
-    return genericErrorResult;
-  }
-
-  const status = String(data.status);
-  const row = "row" in data ? safeMeetingRowSchema.safeParse(data.row) : null;
-  if (status === "saved" && row?.success) {
-    return { status: "saved", row: row.data };
-  }
-  if (status === "conflict" && row?.success) {
-    return { status: "conflict", row: row.data };
-  }
-  return genericErrorResult;
+  const parsed = meetingRowMutationResultSchema.safeParse(data);
+  return parsed.success ? parsed.data : genericErrorResult;
 }
 
 export async function mutateMeetingRow(

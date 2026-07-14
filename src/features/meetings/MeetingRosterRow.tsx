@@ -10,17 +10,11 @@ import {
   type MeetingStatus,
   type RsvpStatus,
 } from "./meeting-model";
+import {
+  meetingRowMutationResultSchema,
+  type SafeMeetingRow,
+} from "./meeting-row-contract";
 import styles from "./MeetingRoster.module.scss";
-
-type SafeMeetingRow = {
-  meetingId: string;
-  memberId: string;
-  rsvpStatus: RsvpStatus;
-  attendanceStatus: AttendanceStatus;
-  arrivalTime: string | null;
-  rsvpUpdatedAt: string;
-  attendanceUpdatedAt: string;
-};
 
 type SaveAttempt =
   | { kind: "rsvp"; rsvpStatus: RsvpStatus }
@@ -59,59 +53,21 @@ const attendanceLabels: Readonly<Record<AttendanceStatus, string>> = {
 };
 const genericErrorMessage = "요청을 처리하지 못했습니다. 다시 시도해 주세요.";
 
-function includesValue<T extends string>(values: readonly T[], value: unknown): value is T {
-  return typeof value === "string" && values.includes(value as T);
-}
-
-function parseSafeRow(value: unknown): SafeMeetingRow | null {
-  if (!value || typeof value !== "object") return null;
-  const row = value as Record<string, unknown>;
-  if (
-    typeof row.meetingId !== "string" ||
-    typeof row.memberId !== "string" ||
-    !includesValue(RSVP_STATUSES, row.rsvpStatus) ||
-    !includesValue(ATTENDANCE_STATUSES, row.attendanceStatus) ||
-    (row.arrivalTime !== null && typeof row.arrivalTime !== "string") ||
-    typeof row.rsvpUpdatedAt !== "string" ||
-    typeof row.attendanceUpdatedAt !== "string"
-  ) {
-    return null;
-  }
-
-  return {
-    meetingId: row.meetingId,
-    memberId: row.memberId,
-    rsvpStatus: row.rsvpStatus,
-    attendanceStatus: row.attendanceStatus,
-    arrivalTime: row.arrivalTime,
-    rsvpUpdatedAt: row.rsvpUpdatedAt,
-    attendanceUpdatedAt: row.attendanceUpdatedAt,
-  };
-}
-
 function parseMutationResult(value: unknown) {
-  if (!value || typeof value !== "object" || !("status" in value)) {
+  const parsed = meetingRowMutationResultSchema.safeParse(value);
+  if (!parsed.success) {
     return { status: "error", message: genericErrorMessage } as const;
   }
-
-  const result = value as Record<string, unknown>;
-  if (result.status === "error" && typeof result.message === "string") {
+  if (parsed.data.status === "error") {
     return {
       status: "error",
-      message: result.message.slice(0, 200),
+      message: parsed.data.message.slice(0, 200),
     } as const;
   }
-
-  const row = parseSafeRow(result.row);
-  if ((result.status === "saved" || result.status === "conflict") && row) {
-    return { status: result.status, row } as
-      | { status: "saved"; row: SafeMeetingRow }
-      | { status: "conflict"; row: SafeMeetingRow };
-  }
-  return { status: "error", message: genericErrorMessage } as const;
+  return parsed.data;
 }
 
-function MeetingRosterRowStateful({
+export function MeetingRosterRow({
   attendanceStarted = false,
   canManage,
   meetingEndTime,
@@ -135,16 +91,13 @@ function MeetingRosterRowStateful({
   const [requestState, setRequestState] = useState<RequestState>("idle");
   const [message, setMessage] = useState("");
   const [retryAttempt, setRetryAttempt] = useState<SaveAttempt | null>(null);
-  const [hasRecordedState, setHasRecordedState] = useState(
-    target.hasRecordedState,
-  );
 
   const isScheduled = meetingStatus === "scheduled";
   const editable =
     canManage &&
     isScheduled &&
     (mode === "rsvp" || attendanceStarted);
-  const recordedState = hasRecordedState || target.hasRecordedState;
+  const recordedState = confirmed.hasRecordedState || target.hasRecordedState;
   const canRemove =
     target.targetOrigin === "ad_hoc" &&
     !recordedState &&
@@ -162,6 +115,7 @@ function MeetingRosterRowStateful({
       arrivalTime: row.arrivalTime,
       rsvpUpdatedAt: row.rsvpUpdatedAt,
       attendanceUpdatedAt: row.attendanceUpdatedAt,
+      hasRecordedState: true,
     }));
     setRsvpDraft(row.rsvpStatus);
     setAttendanceDraft(row.attendanceStatus);
@@ -211,7 +165,6 @@ function MeetingRosterRowStateful({
 
       if (response.ok && result.status === "saved") {
         applyServerRow(result.row);
-        setHasRecordedState(true);
         setRequestState("saved");
         setMessage(`${target.memberNameSnapshot} 저장됨`);
         return;
@@ -219,7 +172,6 @@ function MeetingRosterRowStateful({
 
       if (response.ok && result.status === "conflict") {
         applyServerRow(result.row);
-        setHasRecordedState(true);
         setRetryAttempt(attempt);
         setRequestState("error");
         setMessage(
@@ -407,8 +359,4 @@ function MeetingRosterRowStateful({
       </p>
     </article>
   );
-}
-
-export function MeetingRosterRow(props: MeetingRosterRowProps) {
-  return <MeetingRosterRowStateful {...props} />;
 }

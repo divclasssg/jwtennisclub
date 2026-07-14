@@ -1,7 +1,5 @@
-import {
-  meetingRowMutationRequestSchema,
-  mutateMeetingRow,
-} from "@/features/meetings/meeting-row-mutation";
+import { meetingRowMutationRequestSchema } from "@/features/meetings/meeting-row-contract";
+import { mutateMeetingRow } from "@/features/meetings/meeting-row-mutation";
 
 const MAX_BODY_BYTES = 16_384;
 const invalidInputResult = {

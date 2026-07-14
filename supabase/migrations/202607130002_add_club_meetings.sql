@@ -571,6 +571,9 @@ begin
   if locked_meeting.attendance_closed_at is not null then
     raise exception 'meeting attendance is closed' using errcode = '55000';
   end if;
+  if normalized_location is not distinct from locked_meeting.location then
+    return pg_catalog.jsonb_build_object('status', 'saved');
+  end if;
 
   update public.club_meetings as meetings
   set location = normalized_location,
@@ -801,7 +804,7 @@ begin
   into locked_meeting
   from public.club_meetings as meetings
   where meetings.id = requested_meeting_id
-  for update;
+  for share;
 
   if not found then
     raise exception 'meeting not found' using errcode = 'P0002';
@@ -873,7 +876,7 @@ begin
   into locked_meeting
   from public.club_meetings as meetings
   where meetings.id = requested_meeting_id
-  for update;
+  for share;
 
   if not found then
     raise exception 'meeting not found' using errcode = 'P0002';
@@ -2140,6 +2143,9 @@ declare
   actor_profile_id uuid;
   kst_today date := public.meeting_kst_today();
   current_period_month date := pg_catalog.date_trunc('month', kst_today)::date;
+  last_automatic_period_month date := (
+    current_period_month + pg_catalog.make_interval(months => 2)
+  )::date;
 begin
   if requested_period_month is null
     or requested_period_month <> normalized_period_month
@@ -2156,7 +2162,9 @@ begin
     false
   );
 
-  if normalized_period_month >= current_period_month then
+  if normalized_period_month between current_period_month
+    and last_automatic_period_month
+  then
     perform public.lock_meeting_period_months(array[normalized_period_month]);
     perform public.lock_meeting_automation_rows(array[normalized_period_month]);
     perform public.ensure_regular_club_meetings(

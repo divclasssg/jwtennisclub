@@ -66,4 +66,28 @@ describe("meeting schedule loader", () => {
       loadMeetingScheduleRecords({ start: "2026-07-01", end: "2026-08-01" }),
     ).rejects.toThrow("정모 일정을 불러오지 못했습니다.");
   });
+
+  it("rejects malformed meeting rows at the source boundary", async () => {
+    query.order.mockReset();
+    query.order.mockReturnValueOnce(query).mockResolvedValueOnce({
+      data: [
+        {
+          id: "not-a-uuid",
+          meeting_kind: "practice",
+          period_month: "2026-07-01",
+          meeting_date: "2026-07-04",
+          start_time: "18:00:00",
+          title: "잘못된 회차",
+          location: null,
+          cancelled_at: null,
+          attendance_closed_at: null,
+        },
+      ],
+      error: null,
+    });
+
+    await expect(
+      loadMeetingScheduleRecords({ start: "2026-07-01", end: "2026-08-01" }),
+    ).rejects.toThrow("정모 일정을 불러오지 못했습니다.");
+  });
 });

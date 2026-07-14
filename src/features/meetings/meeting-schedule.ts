@@ -2,10 +2,16 @@ import "server-only";
 
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import {
+  getMeetingStatus,
+  MEETING_KINDS,
+  type MeetingKind,
+  type MeetingStatus,
+} from "./meeting-model";
 
 const rowSchema = z.object({
   id: z.string().uuid(),
-  meeting_kind: z.enum(["regular", "lightning"]),
+  meeting_kind: z.enum(MEETING_KINDS),
   period_month: z.string().date(),
   meeting_date: z.string().date(),
   start_time: z.string(),
@@ -17,13 +23,13 @@ const rowSchema = z.object({
 
 export type MeetingScheduleRecord = {
   id: string;
-  meetingKind: "regular" | "lightning";
+  meetingKind: MeetingKind;
   periodMonth: string;
   meetingDate: string;
   startTime: string;
   title: string;
   location: string | null;
-  status: "scheduled" | "cancelled" | "completed";
+  status: MeetingStatus;
 };
 
 export async function loadMeetingScheduleRecords(input: {
@@ -53,10 +59,9 @@ export async function loadMeetingScheduleRecords(input: {
     startTime: row.start_time.slice(0, 5),
     title: row.title,
     location: row.location,
-    status: row.cancelled_at
-      ? "cancelled"
-      : row.attendance_closed_at
-        ? "completed"
-        : "scheduled",
+    status: getMeetingStatus({
+      cancelledAt: row.cancelled_at,
+      attendanceClosedAt: row.attendance_closed_at,
+    }),
   }));
 }

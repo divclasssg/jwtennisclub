@@ -2,10 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import {
-  mutateMeetingRow,
-  type SafeMeetingRow,
-} from "@/features/meetings/meeting-row-mutation";
 import { createClient } from "@/lib/supabase/server";
 
 const uuidSchema = z.string().uuid();
@@ -33,8 +29,7 @@ const lightningSchema = z
   });
 
 export type MeetingActionResult =
-  | { status: "saved"; row?: SafeMeetingRow }
-  | { status: "conflict"; row: SafeMeetingRow }
+  | { status: "saved" }
   | { status: "error"; message: string };
 
 const invalidInputResult = {
@@ -143,20 +138,6 @@ export async function removeMeetingAdHocMember(input: unknown) {
   return invokeMeetingRpc("remove_meeting_ad_hoc_member", {
     requested_meeting_id: parsed.data.meetingId,
     requested_member_id: parsed.data.memberId,
-  });
-}
-
-export async function saveMeetingRsvp(input: unknown) {
-  return mutateMeetingRow({
-    ...(input && typeof input === "object" ? input : {}),
-    kind: "rsvp",
-  });
-}
-
-export async function saveMeetingAttendance(input: unknown) {
-  return mutateMeetingRow({
-    ...(input && typeof input === "object" ? input : {}),
-    kind: "attendance",
   });
 }
 

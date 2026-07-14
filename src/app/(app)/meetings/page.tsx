@@ -16,6 +16,7 @@ import {
   type MeetingMonthRosterSummary,
 } from "@/features/meetings/meeting-directory";
 import { MeetingMobileList } from "@/features/meetings/MeetingMobileList";
+import { getKstPeriodMonth } from "@/features/meetings/meeting-calendar";
 import type { MeetingDirectoryRow } from "@/features/meetings/meeting-model";
 import { MeetingRosterModal } from "@/features/meetings/MeetingRosterModal";
 import {
@@ -45,19 +46,8 @@ function firstSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function getKstDateParts(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
-}
-
 function getCurrentKstMonth() {
-  const parts = getKstDateParts(new Date());
-  return `${parts.year}-${parts.month}`;
+  return getKstPeriodMonth().slice(0, 7);
 }
 
 function normalizeMonth(value: string | undefined) {
@@ -172,31 +162,47 @@ function getMeetingLink(meeting: MeetingDirectoryRow) {
   return `/meetings?month=${meeting.periodMonth.slice(0, 7)}&meeting=${meeting.id}`;
 }
 
-function getLifecycleControlProps(
+function getLifecycleControlPropsByMeetingId(
   directory: MeetingDirectoryPage,
-  meeting: MeetingDirectoryRow,
   now: number,
 ) {
-  const linkedMeetings = directory.meetings.filter(
-    (candidate) => candidate.linkedRegularMeetingId === meeting.id,
+  const lightningByRegularMeeting = new Map<
+    string,
+    { hasActiveLightning: boolean; hasLightningHistory: boolean }
+  >();
+  for (const meeting of directory.meetings) {
+    if (!meeting.linkedRegularMeetingId) continue;
+    const current = lightningByRegularMeeting.get(meeting.linkedRegularMeetingId);
+    lightningByRegularMeeting.set(meeting.linkedRegularMeetingId, {
+      hasActiveLightning:
+        current?.hasActiveLightning || meeting.status !== "cancelled",
+      hasLightningHistory: true,
+    });
+  }
+
+  return new Map(
+    directory.meetings.map((meeting) => {
+      const lightning = lightningByRegularMeeting.get(meeting.id);
+      return [
+        meeting.id,
+        {
+          attendanceEnded: isMeetingEnded(meeting, now),
+          canManageAttendance: directory.canManageAttendance,
+          canManageMeeting: directory.canManageMeeting,
+          hasActiveLightning: lightning?.hasActiveLightning ?? false,
+          hasLightningHistory: lightning?.hasLightningHistory ?? false,
+        },
+      ];
+    }),
   );
-  return {
-    attendanceEnded: isMeetingEnded(meeting, now),
-    canManageAttendance: directory.canManageAttendance,
-    canManageMeeting: directory.canManageMeeting,
-    hasActiveLightning: linkedMeetings.some(
-      (linked) => linked.status !== "cancelled",
-    ),
-    hasLightningHistory: linkedMeetings.length > 0,
-  };
 }
 
 function MeetingDirectoryTable({
   directory,
-  now,
+  lifecycleProps,
 }: {
   directory: MeetingDirectoryPage;
-  now: number;
+  lifecycleProps: ReturnType<typeof getLifecycleControlPropsByMeetingId>;
 }) {
   return (
     <DataTable>
@@ -235,7 +241,7 @@ function MeetingDirectoryTable({
                   명단
                 </ActionLink>
                 <MeetingLifecycleControls
-                  {...getLifecycleControlProps(directory, meeting, now)}
+                  {...lifecycleProps.get(meeting.id)!}
                   meeting={meeting}
                 />
               </div>
@@ -266,6 +272,7 @@ export default async function MeetingsPage({ searchParams }: MeetingsPageProps) 
     firstSearchParam(params.returnTo),
   ) ?? fallbackCloseHref;
   const now = new Date().getTime();
+  const lifecycleProps = getLifecycleControlPropsByMeetingId(directory, now);
   const selection = directory.selectedMeeting;
 
   return (
@@ -310,14 +317,17 @@ export default async function MeetingsPage({ searchParams }: MeetingsPageProps) 
               {directory.meetings.length ? (
                 <>
                   <div className={styles["meetings-table-view"]}>
-                    <MeetingDirectoryTable directory={directory} now={now} />
+                    <MeetingDirectoryTable
+                      directory={directory}
+                      lifecycleProps={lifecycleProps}
+                    />
                   </div>
                   <div className={styles["meetings-mobile-list-view"]}>
                     <MeetingMobileList
                       meetings={directory.meetings}
                       renderActions={(meeting) => (
                         <MeetingLifecycleControls
-                          {...getLifecycleControlProps(directory, meeting, now)}
+                          {...lifecycleProps.get(meeting.id)!}
                           meeting={meeting}
                         />
                       )}

@@ -121,6 +121,32 @@ function safeMutationMessage(result: MeetingRosterMutationResult) {
     : genericMutationMessage;
 }
 
+function getRosterGuidance({
+  attendanceStarted,
+  canManageAttendance,
+  meetingStatus,
+  mode,
+}: {
+  attendanceStarted: boolean;
+  canManageAttendance: boolean;
+  meetingStatus: MeetingDirectoryRow["status"];
+  mode: RosterMode;
+}) {
+  if (meetingStatus === "cancelled") {
+    return "취소된 회차로 명단을 조회만 할 수 있습니다.";
+  }
+  if (meetingStatus === "completed") {
+    return "출석이 마감된 회차로 명단을 조회만 할 수 있습니다.";
+  }
+  if (!canManageAttendance) {
+    return "출석 관리 권한이 없어 명단을 조회만 할 수 있습니다.";
+  }
+  if (mode === "attendance" && !attendanceStarted) {
+    return "정모 시작 이후에 출석을 입력할 수 있습니다.";
+  }
+  return null;
+}
+
 export function MeetingRosterModal({
   adHocCandidates,
   attendanceStarted,
@@ -149,14 +175,16 @@ export function MeetingRosterModal({
   const [candidateMessage, setCandidateMessage] = useState("");
 
   const displayedTargets = useMemo(() => {
+    const targetMemberIds = new Set(targets.map((target) => target.memberId));
+    const removedMemberIds = new Set(removedTargetIds);
     const source = [
       ...targets,
       ...addedTargets.filter(
-        (added) => !targets.some((target) => target.memberId === added.memberId),
+        (added) => !targetMemberIds.has(added.memberId),
       ),
     ];
     return source
-      .filter((target) => !removedTargetIds.includes(target.memberId))
+      .filter((target) => !removedMemberIds.has(target.memberId))
       .map((target) => ({
         ...target,
         ...rowOverrides[target.memberId],
@@ -165,10 +193,14 @@ export function MeetingRosterModal({
 
   const availableCandidates = useMemo(() => {
     const normalizedQuery = candidateQuery.trim().toLocaleLowerCase("ko-KR");
+    const displayedMemberIds = new Set(
+      displayedTargets.map((target) => target.memberId),
+    );
+    const hiddenMemberIds = new Set(hiddenCandidateIds);
     return adHocCandidates.filter((candidate) => {
       if (
-        hiddenCandidateIds.includes(candidate.id) ||
-        displayedTargets.some((target) => target.memberId === candidate.id)
+        hiddenMemberIds.has(candidate.id) ||
+        displayedMemberIds.has(candidate.id)
       ) {
         return false;
       }
@@ -299,16 +331,12 @@ export function MeetingRosterModal({
     setCandidateMessage(safeMutationMessage(result));
   }
 
-  const guidance =
-    meeting.status === "cancelled"
-      ? "취소된 회차로 명단을 조회만 할 수 있습니다."
-      : meeting.status === "completed"
-        ? "출석이 마감된 회차로 명단을 조회만 할 수 있습니다."
-        : !canManageAttendance
-          ? "출석 관리 권한이 없어 명단을 조회만 할 수 있습니다."
-          : mode === "attendance" && !attendanceStarted
-            ? "정모 시작 이후에 출석을 입력할 수 있습니다."
-            : null;
+  const guidance = getRosterGuidance({
+    attendanceStarted,
+    canManageAttendance,
+    meetingStatus: meeting.status,
+    mode,
+  });
 
   return (
     <ModalDialog

@@ -415,8 +415,9 @@ describe("meeting directory SQL boundary", () => {
     expect(prepareBody).toContain(
       "public.ensure_regular_club_meetings(\n      normalized_period_month,\n      actor_profile_id",
     );
+    expect(prepareBody).toContain("last_automatic_period_month");
     expect(prepareBody).toContain(
-      "normalized_period_month >= current_period_month",
+      "normalized_period_month between current_period_month\n    and last_automatic_period_month",
     );
     expect(readBody).toContain("stable");
     expect(readBody).toContain("public.require_meeting_operator(array[]::text[])");

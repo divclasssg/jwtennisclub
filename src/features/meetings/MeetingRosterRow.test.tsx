@@ -329,6 +329,39 @@ describe("MeetingRosterRow", () => {
     ).toBeEnabled();
   });
 
+  it("restores the last confirmed value after a network failure", async () => {
+    const target = createTarget(
+      "22222222-2222-4222-8222-222222222222",
+      "김하나",
+    );
+    fetchMock.mockRejectedValueOnce(new Error("network detail"));
+
+    render(
+      <MeetingRosterRow
+        canManage
+        meetingId={meetingId}
+        meetingStatus="scheduled"
+        mode="rsvp"
+        target={target}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("김하나 사전 참석"), {
+      target: { value: "declined" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "김하나 사전 참석 저장" }));
+
+    expect(
+      await screen.findByText("요청을 처리하지 못했습니다. 다시 시도해 주세요."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("network detail")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("김하나 사전 참석")).toHaveValue(
+      "unanswered",
+    );
+    expect(
+      screen.getByRole("button", { name: "김하나 사전 참석 재시도" }),
+    ).toBeEnabled();
+  });
+
   it("requires and describes the named member arrival time only for actual late", async () => {
     const target = createTarget(
       "22222222-2222-4222-8222-222222222222",
