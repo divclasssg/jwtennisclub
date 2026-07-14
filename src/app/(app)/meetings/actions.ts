@@ -61,6 +61,10 @@ const domainErrorMessages: Readonly<Record<string, string>> = {
   "ad hoc target has recorded state":
     "응답이나 출석이 기록된 임시 대상은 제거할 수 없습니다.",
   "member is not active": "활동 중인 회원만 추가할 수 있습니다.",
+  "meeting roster is not locked":
+    "월 명단 확정 후 임시 대상을 추가할 수 있습니다.",
+  "member already belongs to monthly roster":
+    "월 명단 대상 회원은 임시 대상으로 추가할 수 없습니다.",
 };
 
 function safeErrorMessage(error: unknown) {

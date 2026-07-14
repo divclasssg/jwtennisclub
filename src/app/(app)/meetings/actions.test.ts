@@ -161,6 +161,27 @@ describe("meeting server actions", () => {
     });
   });
 
+  it.each([
+    [
+      "meeting roster is not locked",
+      "월 명단 확정 후 임시 대상을 추가할 수 있습니다.",
+    ],
+    [
+      "member already belongs to monthly roster",
+      "월 명단 대상 회원은 임시 대상으로 추가할 수 없습니다.",
+    ],
+  ])("maps the ad-hoc domain error %s", async (databaseMessage, safeMessage) => {
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { message: databaseMessage, code: "55000" },
+    });
+
+    await expect(addMeetingAdHocMember({ meetingId, memberId })).resolves.toEqual({
+      status: "error",
+      message: safeMessage,
+    });
+  });
+
   it("rejects a row save response that omits the confirmed server row", async () => {
     await expect(
       saveMeetingRsvp({

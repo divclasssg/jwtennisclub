@@ -69,6 +69,20 @@ describe("club meeting migration", () => {
     );
   });
 
+  it("seeds the locked monthly roster into regular and same-month lightning meetings", () => {
+    const start = migrationSql.indexOf(
+      "create or replace function public.seed_monthly_meeting_attendance",
+    );
+    const end = migrationSql.indexOf("$$;", start);
+    const functionSql = migrationSql.slice(start, end);
+
+    expect(start).toBeGreaterThan(-1);
+    expect(functionSql).toContain(
+      "meetings.meeting_kind in ('regular', 'lightning')",
+    );
+    expect(functionSql).not.toContain("meetings.meeting_kind = 'regular'");
+  });
+
   it("validates immutable attendance references without reversing automation locks", () => {
     const start = migrationSql.indexOf(
       "create or replace function public.validate_meeting_attendance_invariants()",
@@ -358,6 +372,31 @@ describe("club meeting migration", () => {
     );
     expect(functionBody("save_meeting_attendance")).toContain(
       "attendance_updated_by = actor_profile_id",
+    );
+  });
+
+  it("offers and adds ad-hoc targets only after the monthly roster is locked", () => {
+    const functionBody = (functionName: string) => {
+      const start = migrationSql.indexOf(
+        `create or replace function public.${functionName}`,
+      );
+      const end = migrationSql.indexOf("$$;", start);
+      return migrationSql.slice(start, end);
+    };
+
+    const addFunction = functionBody("add_meeting_ad_hoc_member");
+    const directoryFunction = functionBody("get_club_meeting_directory_page");
+
+    expect(addFunction).toContain("meeting roster is not locked");
+    expect(addFunction).toContain("member already belongs to monthly roster");
+    expect(addFunction).toContain(
+      "from public.meeting_month_roster_members as roster_members",
+    );
+    expect(directoryFunction).toContain(
+      "if can_manage_attendance and month_roster_status = 'locked' then",
+    );
+    expect(directoryFunction).toContain(
+      "from public.meeting_month_roster_members as candidate_roster_members",
     );
   });
 

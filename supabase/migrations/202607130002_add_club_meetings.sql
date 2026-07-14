@@ -612,6 +612,7 @@ declare
     array['meetings.attendance.manage']
   );
   locked_meeting public.club_meetings%rowtype;
+  locked_roster_id uuid;
   target_member record;
 begin
   select meetings.*
@@ -628,6 +629,26 @@ begin
   end if;
   if locked_meeting.attendance_closed_at is not null then
     raise exception 'meeting attendance is closed' using errcode = '55000';
+  end if;
+
+  select rosters.id
+  into locked_roster_id
+  from public.meeting_month_rosters as rosters
+  where rosters.period_month = locked_meeting.period_month
+    and rosters.status = 'locked';
+
+  if locked_roster_id is null then
+    raise exception 'meeting roster is not locked' using errcode = '55000';
+  end if;
+
+  if exists (
+    select 1
+    from public.meeting_month_roster_members as roster_members
+    where roster_members.roster_id = locked_roster_id
+      and roster_members.member_id = requested_member_id
+  ) then
+    raise exception 'member already belongs to monthly roster'
+      using errcode = '55000';
   end if;
 
   select members.id, members.member_code, members.name, member_groups.code
@@ -1375,11 +1396,6 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  perform members.id
-  from public.members as members
-  order by members.id
-  for share;
-
   perform rosters.id
   from public.meeting_month_rosters as rosters
   where rosters.period_month = any(period_months)
@@ -1545,7 +1561,7 @@ as $$
     on roster_members.roster_id = rosters.id
   inner join public.club_meetings as meetings
     on meetings.period_month = rosters.period_month
-   and meetings.meeting_kind = 'regular'
+   and meetings.meeting_kind in ('regular', 'lightning')
   where rosters.period_month = requested_period_month
     and rosters.status = 'locked'
   on conflict (meeting_id, member_id) do nothing;
@@ -2174,6 +2190,7 @@ declare
     requested_period_month
   )::date;
   month_roster_status public.meeting_roster_status;
+  month_roster_id uuid;
   roster_json jsonb;
   meetings_json jsonb;
   summary_json jsonb;
@@ -2201,13 +2218,14 @@ begin
   );
 
   select
+    rosters.id,
     rosters.status,
     pg_catalog.jsonb_build_object(
       'status', rosters.status,
       'roster_origin', rosters.roster_origin,
       'statistics_eligible', rosters.statistics_eligible
     )
-  into month_roster_status, roster_json
+  into month_roster_id, month_roster_status, roster_json
   from public.meeting_month_rosters as rosters
   where rosters.period_month = normalized_period_month;
 
@@ -2374,7 +2392,7 @@ begin
       from public.meeting_attendance as attendance
       where attendance.meeting_id = selected_meeting_id;
 
-      if can_manage_attendance then
+      if can_manage_attendance and month_roster_status = 'locked' then
         select coalesce(
           pg_catalog.jsonb_agg(
             pg_catalog.jsonb_build_object(
@@ -2397,6 +2415,12 @@ begin
             from public.meeting_attendance as existing_attendance
             where existing_attendance.meeting_id = selected_meeting_id
               and existing_attendance.member_id = members.id
+          )
+          and not exists (
+            select 1
+            from public.meeting_month_roster_members as candidate_roster_members
+            where candidate_roster_members.roster_id = month_roster_id
+              and candidate_roster_members.member_id = members.id
           );
       else
         ad_hoc_candidates_json := '[]'::jsonb;

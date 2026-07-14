@@ -402,6 +402,18 @@ describe("member roster finalization migration", () => {
 });
 
 describe("meeting roster member-write integration", () => {
+  it("does not share-lock every member row before an authenticated member write", () => {
+    const lockStart = meetingMigrationSql.indexOf(
+      "create or replace function public.lock_meeting_automation_rows",
+    );
+    const lockEnd = meetingMigrationSql.indexOf("$$;", lockStart);
+    const lockFunction = meetingMigrationSql.slice(lockStart, lockEnd);
+
+    expect(lockStart).toBeGreaterThan(-1);
+    expect(lockFunction).not.toContain("from public.members as members");
+    expect(lockFunction).not.toContain("for share");
+  });
+
   it("defines idempotent KST meeting and roster automation with a single bootstrap", () => {
     expect(meetingMigrationSql).toContain("at time zone 'asia/seoul'");
     expect(meetingMigrationSql).toContain("order by period_month");
@@ -497,5 +509,18 @@ describe("meeting roster member-write integration", () => {
     expect(meetingRecoverySql).toContain("set search_path = ''");
     expect(meetingRecoverySql).not.toContain("drop table");
     expect(meetingRecoverySql).not.toContain("delete from public.meeting_");
+  });
+
+  it("restores all three member integration functions atomically", () => {
+    const transactionBegin = meetingRecoverySql.indexOf("begin;");
+    const firstFunction = meetingRecoverySql.indexOf(
+      "create or replace function public.save_member_with_contact",
+    );
+    const lastContractChange = meetingRecoverySql.lastIndexOf("revoke execute");
+    const transactionCommit = meetingRecoverySql.lastIndexOf("commit;");
+
+    expect(transactionBegin).toBeGreaterThan(-1);
+    expect(transactionBegin).toBeLessThan(firstFunction);
+    expect(transactionCommit).toBeGreaterThan(lastContractChange);
   });
 });

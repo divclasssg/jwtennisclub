@@ -4,6 +4,8 @@
 -- This intentionally restores only the three pre-meeting member functions.
 -- Meeting, roster, attendance, and lifecycle data remain intact.
 
+begin;
+
 create or replace function public.save_member_with_contact(
   member_id uuid,
   member_data jsonb,
@@ -289,3 +291,5 @@ $$;
 
 revoke execute on function public.sync_operator_member_name()
 from public, anon, authenticated, service_role;
+
+commit;
