@@ -184,4 +184,199 @@ describe("club meeting migration", () => {
       /perform public\.ensure_regular_club_meetings\(\s*target_period_month,\s*actor_profile_id\s*\)/,
     );
   });
+
+  it("defines one authenticated RPC per meeting mutation with precise grants", () => {
+    const rpcSignatures = [
+      "update_club_meeting_location(uuid, text)",
+      "add_meeting_ad_hoc_member(uuid, uuid)",
+      "remove_meeting_ad_hoc_member(uuid, uuid)",
+      "save_meeting_rsvp(uuid, uuid, meeting_rsvp_status, timestamptz)",
+      "save_meeting_attendance(uuid, uuid, meeting_attendance_status, time, timestamptz)",
+      "cancel_club_meeting(uuid, text)",
+      "restore_club_meeting(uuid)",
+      "close_club_meeting_attendance(uuid)",
+      "reopen_club_meeting_attendance(uuid)",
+      "create_lightning_club_meeting(uuid, date, time, time, text)",
+    ];
+
+    for (const signature of rpcSignatures) {
+      expect(migrationSql).toContain(
+        `revoke execute on function public.${signature} from public, anon`,
+      );
+      expect(migrationSql).toContain(
+        `grant execute on function public.${signature} to authenticated`,
+      );
+    }
+  });
+
+  it("keeps RPC authentication, permission checks, locks and audit data inside the database", () => {
+    expect(migrationSql).toMatch(
+      /create or replace function public\.require_meeting_operator\(\s*required_permissions text\[\]\s*\)/,
+    );
+    expect(migrationSql).toContain("profiles.id = auth.uid()");
+    expect(migrationSql).toContain("profiles.status = 'active'");
+    expect(migrationSql).toContain("meetings.view permission required");
+    expect(migrationSql).toContain("for update");
+    expect(migrationSql).toContain("actor_profile_id");
+    expect(migrationSql).toContain("pg_catalog.clock_timestamp()");
+
+    for (const functionName of [
+      "require_meeting_operator",
+      "update_club_meeting_location",
+      "add_meeting_ad_hoc_member",
+      "remove_meeting_ad_hoc_member",
+      "save_meeting_rsvp",
+      "save_meeting_attendance",
+      "cancel_club_meeting",
+      "restore_club_meeting",
+      "close_club_meeting_attendance",
+      "reopen_club_meeting_attendance",
+      "create_lightning_club_meeting",
+    ]) {
+      const start = migrationSql.indexOf(
+        `create or replace function public.${functionName}`,
+      );
+      const end = migrationSql.indexOf("$$;", start);
+      const functionSql = migrationSql.slice(start, end);
+      expect(start, functionName).toBeGreaterThan(-1);
+      expect(functionSql).toContain("security definer");
+      expect(functionSql).toContain("set search_path = ''");
+    }
+  });
+
+  it("requires the exact split permission combinations for every write boundary", () => {
+    const functionBody = (functionName: string) => {
+      const start = migrationSql.indexOf(
+        `create or replace function public.${functionName}`,
+      );
+      const end = migrationSql.indexOf("$$;", start);
+      return migrationSql.slice(start, end);
+    };
+
+    for (const functionName of [
+      "update_club_meeting_location",
+      "cancel_club_meeting",
+      "restore_club_meeting",
+      "create_lightning_club_meeting",
+    ]) {
+      expect(functionBody(functionName)).toContain("array['meetings.manage']");
+    }
+
+    for (const functionName of [
+      "add_meeting_ad_hoc_member",
+      "remove_meeting_ad_hoc_member",
+      "save_meeting_rsvp",
+      "save_meeting_attendance",
+    ]) {
+      expect(functionBody(functionName)).toContain(
+        "array['meetings.attendance.manage']",
+      );
+    }
+
+    for (const functionName of [
+      "close_club_meeting_attendance",
+      "reopen_club_meeting_attendance",
+    ]) {
+      expect(functionBody(functionName)).toContain(
+        "array['meetings.manage', 'meetings.attendance.manage']",
+      );
+    }
+  });
+
+  it("locks the requested meeting before deriving row and lightning relationships", () => {
+    for (const functionName of [
+      "add_meeting_ad_hoc_member",
+      "remove_meeting_ad_hoc_member",
+      "save_meeting_rsvp",
+      "save_meeting_attendance",
+      "create_lightning_club_meeting",
+    ]) {
+      const start = migrationSql.indexOf(
+        `create or replace function public.${functionName}`,
+      );
+      const end = migrationSql.indexOf("$$;", start);
+      const functionSql = migrationSql.slice(start, end);
+      const lockAt = functionSql.indexOf("from public.club_meetings as meetings");
+      const attendanceAt = functionSql.indexOf("from public.meeting_attendance");
+      const memberAt = functionSql.indexOf("from public.members");
+
+      expect(lockAt, functionName).toBeGreaterThan(-1);
+      expect(functionSql.indexOf("for update", lockAt), functionName).toBeGreaterThan(
+        lockAt,
+      );
+      if (attendanceAt >= 0) expect(lockAt, functionName).toBeLessThan(attendanceAt);
+      if (memberAt >= 0) expect(lockAt, functionName).toBeLessThan(memberAt);
+    }
+  });
+
+  it("implements independent optimistic concurrency without leaking unrelated rows", () => {
+    expect(migrationSql).toContain(
+      "rsvp_updated_at = expected_rsvp_updated_at",
+    );
+    expect(migrationSql).toContain(
+      "attendance_updated_at = expected_attendance_updated_at",
+    );
+    expect(migrationSql).toContain("'status', 'saved'");
+    expect(migrationSql).toContain("'status', 'conflict'");
+    expect(migrationSql).toContain("'row', public.meeting_attendance_safe_json");
+    expect(migrationSql).toContain("where attendance.meeting_id = locked_meeting.id");
+    expect(migrationSql).toContain("and attendance.member_id = requested_member_id");
+    expect(migrationSql).not.toContain("expected_updated_by");
+    expect(migrationSql).not.toContain("requested_actor_profile_id");
+    expect(migrationSql).not.toContain("requested_details");
+  });
+
+  it("enforces KST state windows, close-default reopen and lightning lifetime rules", () => {
+    expect(migrationSql).toContain("at time zone 'asia/seoul'");
+    expect(migrationSql).toContain("meeting has not started");
+    expect(migrationSql).toContain("meeting has not ended");
+    expect(migrationSql).toContain("attendance_origin = 'close_default'");
+    expect(migrationSql).toContain("attendance_origin = 'manual'");
+    expect(migrationSql).toContain("active lightning meeting blocks restore");
+    expect(migrationSql).toContain("lightning meeting already exists");
+    expect(migrationSql).toContain("ad hoc target has recorded state");
+    expect(migrationSql).toContain("member is not active");
+    expect(migrationSql).toContain("arrival time outside meeting window");
+  });
+
+  it("never removes an ad-hoc target after any RSVP or attendance write", () => {
+    const functionBody = (functionName: string) => {
+      const start = migrationSql.indexOf(
+        `create or replace function public.${functionName}`,
+      );
+      const end = migrationSql.indexOf("$$;", start);
+      return migrationSql.slice(start, end);
+    };
+
+    const removalFunction = functionBody("remove_meeting_ad_hoc_member");
+    expect(removalFunction).toContain("target_attendance.rsvp_updated_by is not null");
+    expect(removalFunction).toContain(
+      "target_attendance.attendance_updated_by is not null",
+    );
+    expect(functionBody("save_meeting_rsvp")).toContain(
+      "rsvp_updated_by = actor_profile_id",
+    );
+    expect(functionBody("save_meeting_attendance")).toContain(
+      "attendance_updated_by = actor_profile_id",
+    );
+  });
+
+  it("evaluates attendance time windows after acquiring the meeting lock", () => {
+    for (const functionName of [
+      "save_meeting_attendance",
+      "close_club_meeting_attendance",
+    ]) {
+      const start = migrationSql.indexOf(
+        `create or replace function public.${functionName}`,
+      );
+      const end = migrationSql.indexOf("$$;", start);
+      const functionSql = migrationSql.slice(start, end);
+      const lockPosition = functionSql.indexOf("for update");
+      const timePosition = functionSql.indexOf("kst_now :=", lockPosition);
+
+      expect(lockPosition, functionName).toBeGreaterThan(-1);
+      expect(timePosition, functionName).toBeGreaterThan(lockPosition);
+      expect(functionSql).toContain("kst_now timestamp;");
+    }
+  });
 });

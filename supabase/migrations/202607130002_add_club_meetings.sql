@@ -213,12 +213,10 @@ create table public.meeting_attendance (
     or (attendance_status = 'absent' and attendance_origin in ('manual', 'close_default'))
   ),
   constraint meeting_attendance_rsvp_actor_matches_status check (
-    (rsvp_status = 'unanswered' and rsvp_updated_by is null)
-    or (rsvp_status <> 'unanswered' and rsvp_updated_by is not null)
+    rsvp_status = 'unanswered' or rsvp_updated_by is not null
   ),
   constraint meeting_attendance_actor_matches_status check (
-    (attendance_status = 'unchecked' and attendance_updated_by is null)
-    or (attendance_status <> 'unchecked' and attendance_updated_by is not null)
+    attendance_status = 'unchecked' or attendance_updated_by is not null
   )
 );
 
@@ -470,6 +468,850 @@ set search_path = ''
 as $$
   select (pg_catalog.statement_timestamp() at time zone 'Asia/Seoul')::date;
 $$;
+
+create or replace function public.require_meeting_operator(
+  required_permissions text[]
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid;
+  required_permission text;
+begin
+  select profiles.id
+  into actor_profile_id
+  from public.profiles as profiles
+  where profiles.id = auth.uid()
+    and profiles.status = 'active';
+
+  if actor_profile_id is null then
+    raise exception 'active operator required'
+      using errcode = '42501';
+  end if;
+
+  if not public.has_permission('meetings.view') then
+    raise exception 'meetings.view permission required'
+      using errcode = '42501';
+  end if;
+
+  foreach required_permission in array required_permissions
+  loop
+    if not public.has_permission(required_permission) then
+      raise exception '% permission required', required_permission
+        using errcode = '42501';
+    end if;
+  end loop;
+
+  return actor_profile_id;
+end;
+$$;
+
+create or replace function public.meeting_attendance_safe_json(
+  attendance public.meeting_attendance
+)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select pg_catalog.jsonb_build_object(
+    'meetingId', attendance.meeting_id,
+    'memberId', attendance.member_id,
+    'rsvpStatus', attendance.rsvp_status,
+    'attendanceStatus', attendance.attendance_status,
+    'arrivalTime', attendance.arrival_time,
+    'rsvpUpdatedAt', attendance.rsvp_updated_at,
+    'attendanceUpdatedAt', attendance.attendance_updated_at
+  );
+$$;
+
+create or replace function public.update_club_meeting_location(
+  requested_meeting_id uuid,
+  requested_location text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid := public.require_meeting_operator(
+    array['meetings.manage']
+  );
+  locked_meeting public.club_meetings%rowtype;
+  normalized_location text := nullif(pg_catalog.btrim(requested_location), '');
+begin
+  if normalized_location is not null
+    and pg_catalog.length(normalized_location) > 200
+  then
+    raise exception 'invalid meeting location'
+      using errcode = '22023';
+  end if;
+
+  select meetings.*
+  into locked_meeting
+  from public.club_meetings as meetings
+  where meetings.id = requested_meeting_id
+  for update;
+
+  if not found then
+    raise exception 'meeting not found' using errcode = 'P0002';
+  end if;
+  if locked_meeting.meeting_kind <> 'regular' then
+    raise exception 'only regular meeting location can be updated'
+      using errcode = '22023';
+  end if;
+  if locked_meeting.cancelled_at is not null then
+    raise exception 'meeting is cancelled' using errcode = '55000';
+  end if;
+  if locked_meeting.attendance_closed_at is not null then
+    raise exception 'meeting attendance is closed' using errcode = '55000';
+  end if;
+
+  update public.club_meetings as meetings
+  set location = normalized_location,
+      updated_by = actor_profile_id,
+      updated_at = pg_catalog.clock_timestamp()
+  where meetings.id = locked_meeting.id;
+
+  insert into public.meeting_lifecycle_events (
+    meeting_id,
+    event_type,
+    actor_profile_id,
+    details
+  )
+  values (
+    locked_meeting.id,
+    'location_updated',
+    actor_profile_id,
+    pg_catalog.jsonb_build_object(
+      'before', locked_meeting.location,
+      'after', normalized_location
+    )
+  );
+
+  return pg_catalog.jsonb_build_object('status', 'saved');
+end;
+$$;
+
+create or replace function public.add_meeting_ad_hoc_member(
+  requested_meeting_id uuid,
+  requested_member_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid := public.require_meeting_operator(
+    array['meetings.attendance.manage']
+  );
+  locked_meeting public.club_meetings%rowtype;
+  target_member record;
+begin
+  select meetings.*
+  into locked_meeting
+  from public.club_meetings as meetings
+  where meetings.id = requested_meeting_id
+  for update;
+
+  if not found then
+    raise exception 'meeting not found' using errcode = 'P0002';
+  end if;
+  if locked_meeting.cancelled_at is not null then
+    raise exception 'meeting is cancelled' using errcode = '55000';
+  end if;
+  if locked_meeting.attendance_closed_at is not null then
+    raise exception 'meeting attendance is closed' using errcode = '55000';
+  end if;
+
+  select members.id, members.member_code, members.name, member_groups.code
+  into target_member
+  from public.members as members
+  left join public.member_groups as member_groups
+    on member_groups.id = members.group_id
+  where members.id = requested_member_id
+    and members.status = 'active'
+  for share of members;
+
+  if not found then
+    raise exception 'member is not active' using errcode = '22023';
+  end if;
+  if exists (
+    select 1
+    from public.meeting_attendance as attendance
+    where attendance.meeting_id = locked_meeting.id
+      and attendance.member_id = target_member.id
+  ) then
+    raise exception 'meeting target already exists' using errcode = '23505';
+  end if;
+
+  insert into public.meeting_attendance (
+    meeting_id,
+    member_id,
+    roster_member_id,
+    target_origin,
+    member_code_snapshot,
+    member_name_snapshot,
+    group_code_snapshot
+  )
+  values (
+    locked_meeting.id,
+    target_member.id,
+    null,
+    'ad_hoc',
+    target_member.member_code,
+    target_member.name,
+    target_member.code
+  );
+
+  insert into public.meeting_lifecycle_events (
+    meeting_id,
+    event_type,
+    actor_profile_id,
+    details
+  )
+  values (
+    locked_meeting.id,
+    'ad_hoc_added',
+    actor_profile_id,
+    pg_catalog.jsonb_build_object('memberId', target_member.id)
+  );
+
+  return pg_catalog.jsonb_build_object('status', 'saved');
+end;
+$$;
+
+create or replace function public.remove_meeting_ad_hoc_member(
+  requested_meeting_id uuid,
+  requested_member_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid := public.require_meeting_operator(
+    array['meetings.attendance.manage']
+  );
+  locked_meeting public.club_meetings%rowtype;
+  target_attendance public.meeting_attendance%rowtype;
+begin
+  select meetings.*
+  into locked_meeting
+  from public.club_meetings as meetings
+  where meetings.id = requested_meeting_id
+  for update;
+
+  if not found then
+    raise exception 'meeting not found' using errcode = 'P0002';
+  end if;
+  if locked_meeting.cancelled_at is not null then
+    raise exception 'meeting is cancelled' using errcode = '55000';
+  end if;
+  if locked_meeting.attendance_closed_at is not null then
+    raise exception 'meeting attendance is closed' using errcode = '55000';
+  end if;
+
+  select attendance.*
+  into target_attendance
+  from public.meeting_attendance as attendance
+  where attendance.meeting_id = locked_meeting.id
+    and attendance.member_id = requested_member_id
+  for update;
+
+  if not found or target_attendance.target_origin <> 'ad_hoc' then
+    raise exception 'meeting target not found' using errcode = 'P0002';
+  end if;
+  if target_attendance.rsvp_status <> 'unanswered'
+    or target_attendance.attendance_status <> 'unchecked'
+    or target_attendance.rsvp_updated_by is not null
+    or target_attendance.attendance_updated_by is not null
+  then
+    raise exception 'ad hoc target has recorded state' using errcode = '55000';
+  end if;
+
+  insert into public.meeting_lifecycle_events (
+    meeting_id,
+    event_type,
+    actor_profile_id,
+    details
+  )
+  values (
+    locked_meeting.id,
+    'ad_hoc_removed',
+    actor_profile_id,
+    pg_catalog.jsonb_build_object('memberId', target_attendance.member_id)
+  );
+
+  delete from public.meeting_attendance as attendance
+  where attendance.meeting_id = locked_meeting.id
+    and attendance.member_id = requested_member_id;
+
+  return pg_catalog.jsonb_build_object('status', 'saved');
+end;
+$$;
+
+create or replace function public.save_meeting_rsvp(
+  requested_meeting_id uuid,
+  requested_member_id uuid,
+  requested_rsvp_status public.meeting_rsvp_status,
+  expected_rsvp_updated_at timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid := public.require_meeting_operator(
+    array['meetings.attendance.manage']
+  );
+  locked_meeting public.club_meetings%rowtype;
+  saved_attendance public.meeting_attendance%rowtype;
+begin
+  select meetings.*
+  into locked_meeting
+  from public.club_meetings as meetings
+  where meetings.id = requested_meeting_id
+  for update;
+
+  if not found then
+    raise exception 'meeting not found' using errcode = 'P0002';
+  end if;
+  if locked_meeting.cancelled_at is not null then
+    raise exception 'meeting is cancelled' using errcode = '55000';
+  end if;
+  if locked_meeting.attendance_closed_at is not null then
+    raise exception 'meeting attendance is closed' using errcode = '55000';
+  end if;
+
+  update public.meeting_attendance as attendance
+  set rsvp_status = requested_rsvp_status,
+      rsvp_updated_by = actor_profile_id,
+      rsvp_updated_at = greatest(
+        pg_catalog.clock_timestamp(),
+        attendance.rsvp_updated_at + interval '1 microsecond'
+      )
+  where attendance.meeting_id = locked_meeting.id
+    and attendance.member_id = requested_member_id
+    and attendance.rsvp_updated_at = expected_rsvp_updated_at
+  returning attendance.* into saved_attendance;
+
+  if found then
+    return pg_catalog.jsonb_build_object(
+      'status', 'saved',
+      'row', public.meeting_attendance_safe_json(saved_attendance)
+    );
+  end if;
+
+  select attendance.*
+  into saved_attendance
+  from public.meeting_attendance as attendance
+  where attendance.meeting_id = locked_meeting.id
+    and attendance.member_id = requested_member_id;
+
+  if not found then
+    raise exception 'meeting target not found' using errcode = 'P0002';
+  end if;
+
+  return pg_catalog.jsonb_build_object(
+    'status', 'conflict',
+    'row', public.meeting_attendance_safe_json(saved_attendance)
+  );
+end;
+$$;
+
+create or replace function public.save_meeting_attendance(
+  requested_meeting_id uuid,
+  requested_member_id uuid,
+  requested_attendance_status public.meeting_attendance_status,
+  requested_arrival_time time,
+  expected_attendance_updated_at timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid := public.require_meeting_operator(
+    array['meetings.attendance.manage']
+  );
+  locked_meeting public.club_meetings%rowtype;
+  saved_attendance public.meeting_attendance%rowtype;
+  kst_now timestamp;
+begin
+  select meetings.*
+  into locked_meeting
+  from public.club_meetings as meetings
+  where meetings.id = requested_meeting_id
+  for update;
+
+  if not found then
+    raise exception 'meeting not found' using errcode = 'P0002';
+  end if;
+  kst_now := pg_catalog.clock_timestamp() at time zone 'Asia/Seoul';
+  if locked_meeting.cancelled_at is not null then
+    raise exception 'meeting is cancelled' using errcode = '55000';
+  end if;
+  if locked_meeting.attendance_closed_at is not null then
+    raise exception 'meeting attendance is closed' using errcode = '55000';
+  end if;
+  if kst_now < locked_meeting.meeting_date + locked_meeting.start_time then
+    raise exception 'meeting has not started' using errcode = '55000';
+  end if;
+  if (requested_attendance_status = 'late') <> (requested_arrival_time is not null) then
+    raise exception 'invalid arrival time' using errcode = '22023';
+  end if;
+  if requested_attendance_status = 'late'
+    and (
+      requested_arrival_time <= locked_meeting.start_time
+      or requested_arrival_time > locked_meeting.end_time
+    )
+  then
+    raise exception 'arrival time outside meeting window' using errcode = '22023';
+  end if;
+
+  update public.meeting_attendance as attendance
+  set attendance_status = requested_attendance_status,
+      arrival_time = requested_arrival_time,
+      attendance_origin = case
+        when requested_attendance_status = 'unchecked' then null
+        else 'manual'::public.meeting_attendance_origin
+      end,
+      attendance_updated_by = actor_profile_id,
+      attendance_updated_at = greatest(
+        pg_catalog.clock_timestamp(),
+        attendance.attendance_updated_at + interval '1 microsecond'
+      )
+  where attendance.meeting_id = locked_meeting.id
+    and attendance.member_id = requested_member_id
+    and attendance.attendance_updated_at = expected_attendance_updated_at
+  returning attendance.* into saved_attendance;
+
+  if found then
+    return pg_catalog.jsonb_build_object(
+      'status', 'saved',
+      'row', public.meeting_attendance_safe_json(saved_attendance)
+    );
+  end if;
+
+  select attendance.*
+  into saved_attendance
+  from public.meeting_attendance as attendance
+  where attendance.meeting_id = locked_meeting.id
+    and attendance.member_id = requested_member_id;
+
+  if not found then
+    raise exception 'meeting target not found' using errcode = 'P0002';
+  end if;
+
+  return pg_catalog.jsonb_build_object(
+    'status', 'conflict',
+    'row', public.meeting_attendance_safe_json(saved_attendance)
+  );
+end;
+$$;
+
+create or replace function public.cancel_club_meeting(
+  requested_meeting_id uuid,
+  requested_reason text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid := public.require_meeting_operator(
+    array['meetings.manage']
+  );
+  locked_meeting public.club_meetings%rowtype;
+  normalized_reason text := pg_catalog.btrim(requested_reason);
+  occurred_at timestamptz := pg_catalog.clock_timestamp();
+begin
+  if normalized_reason is null
+    or pg_catalog.length(normalized_reason) not between 1 and 500
+  then
+    raise exception 'invalid cancellation reason' using errcode = '22023';
+  end if;
+
+  select meetings.*
+  into locked_meeting
+  from public.club_meetings as meetings
+  where meetings.id = requested_meeting_id
+  for update;
+
+  if not found then
+    raise exception 'meeting not found' using errcode = 'P0002';
+  end if;
+  if locked_meeting.cancelled_at is not null then
+    raise exception 'meeting is cancelled' using errcode = '55000';
+  end if;
+  if locked_meeting.attendance_closed_at is not null then
+    raise exception 'meeting attendance is closed' using errcode = '55000';
+  end if;
+
+  update public.club_meetings as meetings
+  set cancelled_at = occurred_at,
+      cancelled_by = actor_profile_id,
+      cancellation_reason = normalized_reason,
+      updated_by = actor_profile_id,
+      updated_at = occurred_at
+  where meetings.id = locked_meeting.id;
+
+  insert into public.meeting_lifecycle_events (
+    meeting_id, event_type, actor_profile_id, occurred_at, reason
+  )
+  values (
+    locked_meeting.id, 'cancelled', actor_profile_id, occurred_at, normalized_reason
+  );
+
+  return pg_catalog.jsonb_build_object('status', 'saved');
+end;
+$$;
+
+create or replace function public.restore_club_meeting(
+  requested_meeting_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid := public.require_meeting_operator(
+    array['meetings.manage']
+  );
+  locked_meeting public.club_meetings%rowtype;
+  occurred_at timestamptz := pg_catalog.clock_timestamp();
+begin
+  select meetings.*
+  into locked_meeting
+  from public.club_meetings as meetings
+  where meetings.id = requested_meeting_id
+  for update;
+
+  if not found then
+    raise exception 'meeting not found' using errcode = 'P0002';
+  end if;
+  if locked_meeting.meeting_kind <> 'regular' then
+    raise exception 'lightning meetings cannot be restored' using errcode = '55000';
+  end if;
+  if locked_meeting.cancelled_at is null then
+    raise exception 'meeting is not cancelled' using errcode = '55000';
+  end if;
+  if exists (
+    select 1
+    from public.club_meetings as lightning_meetings
+    where lightning_meetings.linked_regular_meeting_id = locked_meeting.id
+      and lightning_meetings.cancelled_at is null
+  ) then
+    raise exception 'active lightning meeting blocks restore' using errcode = '55000';
+  end if;
+
+  update public.club_meetings as meetings
+  set cancelled_at = null,
+      cancelled_by = null,
+      cancellation_reason = null,
+      updated_by = actor_profile_id,
+      updated_at = occurred_at
+  where meetings.id = locked_meeting.id;
+
+  insert into public.meeting_lifecycle_events (
+    meeting_id, event_type, actor_profile_id, occurred_at
+  )
+  values (locked_meeting.id, 'restored', actor_profile_id, occurred_at);
+
+  return pg_catalog.jsonb_build_object('status', 'saved');
+end;
+$$;
+
+create or replace function public.close_club_meeting_attendance(
+  requested_meeting_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid := public.require_meeting_operator(
+    array['meetings.manage', 'meetings.attendance.manage']
+  );
+  locked_meeting public.club_meetings%rowtype;
+  occurred_at timestamptz;
+  kst_now timestamp;
+begin
+  select meetings.*
+  into locked_meeting
+  from public.club_meetings as meetings
+  where meetings.id = requested_meeting_id
+  for update;
+
+  if not found then
+    raise exception 'meeting not found' using errcode = 'P0002';
+  end if;
+  occurred_at := pg_catalog.clock_timestamp();
+  kst_now := occurred_at at time zone 'Asia/Seoul';
+  if locked_meeting.cancelled_at is not null then
+    raise exception 'meeting is cancelled' using errcode = '55000';
+  end if;
+  if locked_meeting.attendance_closed_at is not null then
+    raise exception 'meeting attendance is closed' using errcode = '55000';
+  end if;
+  if kst_now < locked_meeting.meeting_date + locked_meeting.end_time then
+    raise exception 'meeting has not ended' using errcode = '55000';
+  end if;
+
+  update public.meeting_attendance as attendance
+  set attendance_status = 'absent',
+      attendance_origin = 'close_default',
+      attendance_updated_by = actor_profile_id,
+      attendance_updated_at = greatest(
+        occurred_at,
+        attendance.attendance_updated_at + interval '1 microsecond'
+      )
+  where attendance.meeting_id = locked_meeting.id
+    and attendance.attendance_status = 'unchecked';
+
+  update public.club_meetings as meetings
+  set attendance_closed_at = occurred_at,
+      attendance_closed_by = actor_profile_id,
+      updated_by = actor_profile_id,
+      updated_at = occurred_at
+  where meetings.id = locked_meeting.id;
+
+  insert into public.meeting_lifecycle_events (
+    meeting_id, event_type, actor_profile_id, occurred_at
+  )
+  values (locked_meeting.id, 'attendance_closed', actor_profile_id, occurred_at);
+
+  return pg_catalog.jsonb_build_object('status', 'saved');
+end;
+$$;
+
+create or replace function public.reopen_club_meeting_attendance(
+  requested_meeting_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid := public.require_meeting_operator(
+    array['meetings.manage', 'meetings.attendance.manage']
+  );
+  locked_meeting public.club_meetings%rowtype;
+  occurred_at timestamptz := pg_catalog.clock_timestamp();
+begin
+  select meetings.*
+  into locked_meeting
+  from public.club_meetings as meetings
+  where meetings.id = requested_meeting_id
+  for update;
+
+  if not found then
+    raise exception 'meeting not found' using errcode = 'P0002';
+  end if;
+  if locked_meeting.cancelled_at is not null then
+    raise exception 'meeting is cancelled' using errcode = '55000';
+  end if;
+  if locked_meeting.attendance_closed_at is null then
+    raise exception 'meeting attendance is not closed' using errcode = '55000';
+  end if;
+
+  update public.meeting_attendance as attendance
+  set attendance_status = 'unchecked',
+      arrival_time = null,
+      attendance_origin = null,
+      attendance_updated_by = actor_profile_id,
+      attendance_updated_at = greatest(
+        occurred_at,
+        attendance.attendance_updated_at + interval '1 microsecond'
+      )
+  where attendance.meeting_id = locked_meeting.id
+    and attendance.attendance_status = 'absent'
+    and attendance.attendance_origin = 'close_default';
+
+  update public.club_meetings as meetings
+  set attendance_closed_at = null,
+      attendance_closed_by = null,
+      updated_by = actor_profile_id,
+      updated_at = occurred_at
+  where meetings.id = locked_meeting.id;
+
+  insert into public.meeting_lifecycle_events (
+    meeting_id, event_type, actor_profile_id, occurred_at
+  )
+  values (locked_meeting.id, 'attendance_reopened', actor_profile_id, occurred_at);
+
+  return pg_catalog.jsonb_build_object('status', 'saved');
+end;
+$$;
+
+create or replace function public.create_lightning_club_meeting(
+  requested_linked_regular_meeting_id uuid,
+  requested_meeting_date date,
+  requested_start_time time,
+  requested_end_time time,
+  requested_location text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid := public.require_meeting_operator(
+    array['meetings.manage']
+  );
+  locked_regular_meeting public.club_meetings%rowtype;
+  created_lightning_meeting_id uuid;
+  normalized_location text := nullif(pg_catalog.btrim(requested_location), '');
+  derived_title text;
+begin
+  if requested_meeting_date is null
+    or requested_start_time is null
+    or requested_end_time is null
+    or requested_end_time <= requested_start_time
+  then
+    raise exception 'invalid lightning meeting date or time' using errcode = '22023';
+  end if;
+  if normalized_location is not null
+    and pg_catalog.length(normalized_location) > 200
+  then
+    raise exception 'invalid meeting location' using errcode = '22023';
+  end if;
+
+  select meetings.*
+  into locked_regular_meeting
+  from public.club_meetings as meetings
+  where meetings.id = requested_linked_regular_meeting_id
+  for update;
+
+  if not found or locked_regular_meeting.meeting_kind <> 'regular' then
+    raise exception 'regular meeting not found' using errcode = 'P0002';
+  end if;
+  if locked_regular_meeting.cancelled_at is null then
+    raise exception 'linked regular meeting must be cancelled' using errcode = '55000';
+  end if;
+  if exists (
+    select 1
+    from public.club_meetings as lightning_meetings
+    where lightning_meetings.linked_regular_meeting_id = locked_regular_meeting.id
+  ) then
+    raise exception 'lightning meeting already exists' using errcode = '23505';
+  end if;
+
+  derived_title := extract(month from locked_regular_meeting.period_month)::integer::text
+    || '월 '
+    || locked_regular_meeting.regular_occurrence::text
+    || '차 정모 대체 번개';
+
+  insert into public.club_meetings (
+    meeting_kind,
+    period_month,
+    regular_occurrence,
+    meeting_date,
+    start_time,
+    end_time,
+    title,
+    location,
+    linked_regular_meeting_id,
+    created_by,
+    updated_by
+  )
+  values (
+    'lightning',
+    locked_regular_meeting.period_month,
+    null,
+    requested_meeting_date,
+    requested_start_time,
+    requested_end_time,
+    derived_title,
+    normalized_location,
+    locked_regular_meeting.id,
+    actor_profile_id,
+    actor_profile_id
+  )
+  returning id into created_lightning_meeting_id;
+
+  insert into public.meeting_attendance (
+    meeting_id,
+    member_id,
+    roster_member_id,
+    target_origin,
+    member_code_snapshot,
+    member_name_snapshot,
+    group_code_snapshot
+  )
+  select
+    created_lightning_meeting_id,
+    source_attendance.member_id,
+    source_attendance.roster_member_id,
+    source_attendance.target_origin,
+    source_attendance.member_code_snapshot,
+    source_attendance.member_name_snapshot,
+    source_attendance.group_code_snapshot
+  from public.meeting_attendance as source_attendance
+  where source_attendance.meeting_id = locked_regular_meeting.id;
+
+  insert into public.meeting_lifecycle_events (
+    meeting_id,
+    event_type,
+    actor_profile_id,
+    details
+  )
+  values (
+    created_lightning_meeting_id,
+    'lightning_created',
+    actor_profile_id,
+    pg_catalog.jsonb_build_object(
+      'linkedRegularMeetingId', locked_regular_meeting.id
+    )
+  );
+
+  return pg_catalog.jsonb_build_object(
+    'status', 'saved',
+    'meetingId', created_lightning_meeting_id
+  );
+end;
+$$;
+
+revoke execute on function public.require_meeting_operator(text[])
+from public, anon, authenticated, service_role;
+revoke execute on function public.meeting_attendance_safe_json(public.meeting_attendance)
+from public, anon, authenticated, service_role;
+
+revoke execute on function public.update_club_meeting_location(uuid, text) from public, anon;
+grant execute on function public.update_club_meeting_location(uuid, text) to authenticated;
+revoke execute on function public.add_meeting_ad_hoc_member(uuid, uuid) from public, anon;
+grant execute on function public.add_meeting_ad_hoc_member(uuid, uuid) to authenticated;
+revoke execute on function public.remove_meeting_ad_hoc_member(uuid, uuid) from public, anon;
+grant execute on function public.remove_meeting_ad_hoc_member(uuid, uuid) to authenticated;
+revoke execute on function public.save_meeting_rsvp(uuid, uuid, meeting_rsvp_status, timestamptz) from public, anon;
+grant execute on function public.save_meeting_rsvp(uuid, uuid, meeting_rsvp_status, timestamptz) to authenticated;
+revoke execute on function public.save_meeting_attendance(uuid, uuid, meeting_attendance_status, time, timestamptz) from public, anon;
+grant execute on function public.save_meeting_attendance(uuid, uuid, meeting_attendance_status, time, timestamptz) to authenticated;
+revoke execute on function public.cancel_club_meeting(uuid, text) from public, anon;
+grant execute on function public.cancel_club_meeting(uuid, text) to authenticated;
+revoke execute on function public.restore_club_meeting(uuid) from public, anon;
+grant execute on function public.restore_club_meeting(uuid) to authenticated;
+revoke execute on function public.close_club_meeting_attendance(uuid) from public, anon;
+grant execute on function public.close_club_meeting_attendance(uuid) to authenticated;
+revoke execute on function public.reopen_club_meeting_attendance(uuid) from public, anon;
+grant execute on function public.reopen_club_meeting_attendance(uuid) to authenticated;
+revoke execute on function public.create_lightning_club_meeting(uuid, date, time, time, text) from public, anon;
+grant execute on function public.create_lightning_club_meeting(uuid, date, time, time, text) to authenticated;
 
 create or replace function public.meeting_regular_date(
   period_month date,
