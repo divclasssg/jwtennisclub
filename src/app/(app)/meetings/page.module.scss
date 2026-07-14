@@ -24,6 +24,17 @@
   gap: var(--spacing-xs);
 }
 
+.meeting-management-disclosure {
+  display: grid;
+  gap: var(--spacing-xs);
+}
+
+.meeting-management-panel {
+  min-width: var(--members-status-filter-width);
+  padding-top: var(--spacing-xs);
+  border-top: var(--hairline-width) solid var(--divider-soft);
+}
+
 .meetings-table-view {
   display: block;
   height: 100%;

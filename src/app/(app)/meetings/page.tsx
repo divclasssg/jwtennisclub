@@ -24,6 +24,7 @@ import {
   removeMeetingAdHocMember,
 } from "./actions";
 import { MeetingLifecycleControls } from "./MeetingLifecycleControls";
+import { MeetingManagementDisclosure } from "./MeetingManagementDisclosure";
 import styles from "./page.module.scss";
 
 type MeetingSearchParams = {
@@ -240,10 +241,14 @@ function MeetingDirectoryTable({
                 >
                   명단
                 </ActionLink>
-                <MeetingLifecycleControls
-                  {...lifecycleProps.get(meeting.id)!}
-                  meeting={meeting}
-                />
+                {directory.canManageMeeting ? (
+                  <MeetingManagementDisclosure meetingTitle={meeting.title}>
+                    <MeetingLifecycleControls
+                      {...lifecycleProps.get(meeting.id)!}
+                      meeting={meeting}
+                    />
+                  </MeetingManagementDisclosure>
+                ) : null}
               </div>
             </td>
           </tr>
@@ -325,12 +330,14 @@ export default async function MeetingsPage({ searchParams }: MeetingsPageProps) 
                   <div className={styles["meetings-mobile-list-view"]}>
                     <MeetingMobileList
                       meetings={directory.meetings}
-                      renderActions={(meeting) => (
-                        <MeetingLifecycleControls
-                          {...lifecycleProps.get(meeting.id)!}
-                          meeting={meeting}
-                        />
-                      )}
+                      renderActions={(meeting) => directory.canManageMeeting ? (
+                        <MeetingManagementDisclosure meetingTitle={meeting.title}>
+                          <MeetingLifecycleControls
+                            {...lifecycleProps.get(meeting.id)!}
+                            meeting={meeting}
+                          />
+                        </MeetingManagementDisclosure>
+                      ) : null}
                     />
                   </div>
                 </>

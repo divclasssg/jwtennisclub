@@ -183,16 +183,20 @@ describe("MeetingsPage", () => {
       "7월 셋째 주 정모",
       "대체 번개",
     ]);
-    expect(
-      within(mobileList).getByRole("group", {
-        name: "7월 첫째 주 정모 회차 관리",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(mobileList).getByRole("group", {
-        name: "7월 셋째 주 정모 회차 관리",
-      }),
-    ).toBeInTheDocument();
+    const mobileManagementToggle = within(mobileList).getByRole("button", {
+      name: "7월 첫째 주 정모 관리 열기",
+    });
+    expect(mobileManagementToggle).toHaveAttribute("aria-expanded", "false");
+    expect(within(mobileList).queryByRole("region", {
+      name: "7월 첫째 주 정모 회차 관리",
+    })).not.toBeInTheDocument();
+
+    fireEvent.click(mobileManagementToggle);
+
+    expect(mobileManagementToggle).toHaveAttribute("aria-expanded", "true");
+    expect(within(mobileList).getByRole("region", {
+      name: "7월 첫째 주 정모 회차 관리",
+    })).toBeInTheDocument();
     expect(
       within(table).getByRole("link", { name: "7월 첫째 주 정모 명단 보기" }),
     ).toHaveAttribute(
@@ -201,6 +205,25 @@ describe("MeetingsPage", () => {
     );
     expect(within(table).getAllByText("참석 3 · 늦참 1 · 불참 2 · 미응답 1"))
       .toHaveLength(3);
+  });
+
+  it("keeps roster access but omits management disclosures without meeting permission", async () => {
+    mocks.loadMeetingDirectoryPage.mockResolvedValueOnce(
+      cloneDirectoryPage({ canManageMeeting: false }),
+    );
+
+    render(await MeetingsPage({ searchParams: Promise.resolve({ month: "2026-07" }) }));
+
+    const table = screen.getByRole("table");
+    const mobileList = screen.getByRole("list", { name: "모바일 정모 목록" });
+    expect(within(table).getByRole("link", {
+      name: "7월 첫째 주 정모 명단 보기",
+    })).toBeInTheDocument();
+    expect(within(mobileList).getByRole("link", {
+      name: "7월 첫째 주 정모 명단 보기",
+    })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /관리 열기/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("조회 전용")).not.toBeInTheDocument();
   });
 
   it("falls back from an invalid month and exposes preparing and unavailable roster states", async () => {
