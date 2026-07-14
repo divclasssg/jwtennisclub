@@ -424,52 +424,54 @@ export function MeetingRosterModal({
           })}
         </div>
 
-        <section
-          aria-label={mode === "rsvp" ? "사전 참석 요약" : "출석 체크 요약"}
-          className={styles["roster-summary"]}
-          role="region"
-        >
-          {[
-            { status: "all" as const, label: "전체", count: displayedTargets.length },
-            ...(mode === "rsvp" ? rsvpSummary : attendanceSummary).map((item) => ({
-              ...item,
-              count: displayedTargets.filter((target) =>
-                mode === "rsvp"
-                  ? target.rsvpStatus === item.status
-                  : target.attendanceStatus === item.status,
-              ).length,
-            })),
-          ].map((item) => {
-            return (
-              <button
-                aria-label={`${item.label} ${item.count}명 필터`}
-                aria-pressed={statusFilter === item.status}
-                className={styles["roster-summary-filter"]}
-                key={item.status}
-                onClick={() => setStatusFilter(item.status)}
-                type="button"
-              >
-                <span>{item.label}</span>
-                <strong>{item.count}명</strong>
-              </button>
-            );
-          })}
-        </section>
+        <div className={styles["roster-toolbar"]}>
+          <section
+            aria-label={mode === "rsvp" ? "사전 참석 요약" : "출석 체크 요약"}
+            className={styles["roster-summary"]}
+            role="region"
+          >
+            {[
+              { status: "all" as const, label: "전체", count: displayedTargets.length },
+              ...(mode === "rsvp" ? rsvpSummary : attendanceSummary).map((item) => ({
+                ...item,
+                count: displayedTargets.filter((target) =>
+                  mode === "rsvp"
+                    ? target.rsvpStatus === item.status
+                    : target.attendanceStatus === item.status,
+                ).length,
+              })),
+            ].map((item) => {
+              return (
+                <button
+                  aria-label={`${item.label} ${item.count}명 필터`}
+                  aria-pressed={statusFilter === item.status}
+                  className={styles["roster-summary-filter"]}
+                  key={item.status}
+                  onClick={() => setStatusFilter(item.status)}
+                  type="button"
+                >
+                  <span>{item.label}</span>
+                  <strong>{item.count}명</strong>
+                </button>
+              );
+            })}
+          </section>
 
-        <div className={styles["roster-search-toolbar"]}>
-          <TextInput
-            aria-label="명단 회원 검색"
-            className={styles["roster-search-input"]}
-            onChange={(event) => setTargetQuery(event.target.value)}
-            placeholder="이름 또는 회원번호"
-            type="search"
-            value={targetQuery}
-          />
+          <div className={styles["roster-search-toolbar"]}>
+            <TextInput
+              aria-label="명단 회원 검색"
+              className={styles["roster-search-input"]}
+              onChange={(event) => setTargetQuery(event.target.value)}
+              placeholder="이름 또는 회원번호"
+              type="search"
+              value={targetQuery}
+            />
+          </div>
+
+          {guidance ? (
+            <p className={styles["roster-guidance"]}>{guidance}</p>
+          ) : null}
         </div>
-
-        {guidance ? (
-          <p className={styles["roster-guidance"]}>{guidance}</p>
-        ) : null}
 
         <div
           aria-labelledby={tabId}

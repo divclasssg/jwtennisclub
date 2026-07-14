@@ -2,8 +2,11 @@
 
 .roster-modal {
   display: grid;
-  gap: var(--spacing-md);
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+  gap: var(--spacing-sm);
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .meeting-summary {
@@ -29,6 +32,16 @@
   display: flex;
   background: var(--canvas);
   border-bottom: var(--hairline-width) solid var(--hairline);
+}
+
+.roster-toolbar {
+  position: sticky;
+  top: var(--button-icon-size);
+  z-index: var(--modal-z-index);
+  display: grid;
+  gap: var(--spacing-sm);
+  min-height: 0;
+  background: var(--canvas);
 }
 
 .roster-tab {
@@ -141,6 +154,8 @@
 
 .roster-target-list {
   min-height: 0;
+  overflow-y: auto;
+  scroll-padding-top: var(--button-icon-size);
 }
 
 .empty-roster {
@@ -248,12 +263,27 @@
 }
 
 @media (max-width: bp.$breakpoint-phone) {
+  .roster-modal {
+    gap: var(--spacing-xs);
+  }
+
+  .meeting-summary {
+    gap: var(--spacing-xxs) var(--spacing-sm);
+    padding-bottom: var(--spacing-sm);
+  }
+
+  .roster-toolbar {
+    gap: var(--spacing-xs);
+  }
+
   .candidate-controls {
     grid-template-columns: 1fr;
   }
 
   .roster-row {
     grid-template-columns: 1fr;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) 0;
   }
 
   .row-form {
@@ -264,5 +294,12 @@
     button {
       min-height: var(--button-icon-size);
     }
+  }
+
+  .row-field select,
+  .row-field input,
+  .roster-search-input,
+  .roster-summary-filter {
+    min-height: var(--button-icon-size);
   }
 }

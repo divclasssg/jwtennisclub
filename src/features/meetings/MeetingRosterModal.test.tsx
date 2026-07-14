@@ -117,6 +117,26 @@ describe("MeetingRosterModal", () => {
     expect(replace).toHaveBeenCalledWith("/meetings?month=2026-07");
   });
 
+  it("keeps summary, tabs, filters, search, and members in workflow order", () => {
+    renderModal({ onAddAdHocMember: vi.fn() });
+
+    const dialog = screen.getByRole("dialog", { name: "7월 셋째 주 정모 명단" });
+    const meetingSummary = within(dialog).getByRole("region", { name: "회차 요약" });
+    const tabs = within(dialog).getByRole("tablist", { name: "명단 관리" });
+    const filters = within(dialog).getByRole("region", { name: "사전 참석 요약" });
+    const search = within(dialog).getByRole("searchbox", { name: "명단 회원 검색" });
+    const firstRow = within(dialog).getByLabelText("김하나 사전 참석 행");
+    const adHoc = within(dialog).getByText("임시 대상 추가 0명");
+    const ordered = [meetingSummary, tabs, filters, search, firstRow, adHoc];
+
+    ordered.slice(0, -1).forEach((element, index) => {
+      expect(
+        element.compareDocumentPosition(ordered[index + 1]) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+  });
+
   it("connects ARIA tabs and moves selection and focus with arrow, Home, and End", () => {
     renderModal();
 
