@@ -199,6 +199,23 @@ describe("club meeting migration", () => {
     );
   });
 
+  it("keeps the normalized month variable distinct from conflict-target columns", () => {
+    const start = migrationSql.indexOf(
+      "create or replace function public.ensure_regular_club_meetings",
+    );
+    const end = migrationSql.indexOf("$$;", start);
+    const functionSql = migrationSql.slice(start, end);
+
+    expect(start).toBeGreaterThan(-1);
+    expect(functionSql).toContain(
+      "normalized_period_month date := pg_catalog.date_trunc",
+    );
+    expect(functionSql).not.toContain("\n  period_month date :=");
+    expect(functionSql).toContain(
+      "on conflict (period_month, regular_occurrence)",
+    );
+  });
+
   it("defines one authenticated RPC per meeting mutation with precise grants", () => {
     const rpcSignatures = [
       "update_club_meeting_location(uuid, text)",

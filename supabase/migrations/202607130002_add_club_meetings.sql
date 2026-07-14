@@ -1433,10 +1433,13 @@ security definer
 set search_path = ''
 as $$
 declare
-  period_month date := pg_catalog.date_trunc('month', requested_period_month)::date;
+  normalized_period_month date := pg_catalog.date_trunc(
+    'month',
+    requested_period_month
+  )::date;
   occurrence smallint;
 begin
-  if requested_period_month <> period_month then
+  if requested_period_month <> normalized_period_month then
     raise exception 'period month must be the first day'
       using errcode = '22023';
   end if;
@@ -1456,12 +1459,12 @@ begin
     )
     values (
       'regular',
-      period_month,
+      normalized_period_month,
       occurrence,
-      public.meeting_regular_date(period_month, occurrence),
+      public.meeting_regular_date(normalized_period_month, occurrence),
       '18:00'::time,
       '22:00'::time,
-      extract(month from period_month)::integer::text
+      extract(month from normalized_period_month)::integer::text
         || '월 '
         || occurrence::text
         || '차 정모',
