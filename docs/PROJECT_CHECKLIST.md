@@ -64,8 +64,9 @@
 
 ## Next Work
 - [x] Implement `docs/superpowers/plans/2026-07-13-club-meeting-attendance.md`
-- [ ] Supabase에 `202607130002_add_club_meetings.sql` 적용
-- [ ] 적용 후 권한 조합·동시성·월 경계 RPC 및 인증 브라우저 정모 흐름 검증
+- [x] Supabase에 `202607130002_add_club_meetings.sql` 적용
+- [x] 적용 후 admin 인증 흐름·낙관적 동시성·월 경계·일정 왕복·모바일 정모 흐름 검증
+- [x] 실제 operator 및 분리 권한 조합으로 정모 권한 경계 검증
 - [x] Implement member tabs for separate active, paused, and withdrawn member management
 - [x] Define membership fee payment records
 - [x] Implement fee payment list and monthly filters

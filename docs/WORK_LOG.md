@@ -1,5 +1,29 @@
 # JW Tennis Club SaaS Work Log
 
+## 2026-07-14
+
+### Completed
+- Supabase Management API를 통해 `202607130002_add_club_meetings.sql`을 운영 DB에 단일 트랜잭션으로 적용했다.
+- 정모 마이그레이션 부트스트랩에서 `period_month` PL/pgSQL 변수와 충돌 대상 컬럼이 모호해지는 오류를 재현하고, 내부 변수를 `normalized_period_month`로 구분해 수정했다.
+- 적용이 확인된 `202607130001_optimize_navigation_queries.sql`과 `202607130002_add_club_meetings.sql`을 `supabase_migrations.schema_migrations` 이력과 동기화했다.
+
+### Verification Evidence
+- 최초 적용 실패 후 트랜잭션 롤백을 확인해 정모 테이블이 0개인 상태에서 수정본을 재적용했다.
+- 운영 DB에 정모 테이블 5개, RLS 정책 5개, 권한 종류 3개와 admin/operator 권한 행 6개가 생성됐다.
+- 부트스트랩 결과 정모 6개, 월 명단 1개, 명단 회원 20명, 출석 대상 40개가 생성됐고 중복 정기 정모는 0개다.
+- `authenticated`와 `anon`의 정모 테이블 직접 쓰기는 차단됐으며, `prepare_club_meeting_month(date)` 실행 권한은 `authenticated`에만 부여됐다.
+- PL/pgSQL 변수 충돌 회귀 테스트를 RED→GREEN으로 검증했고 정모 마이그레이션 집중 테스트 23개가 통과했다.
+- 인증된 admin 브라우저에서 7월 정모 목록과 명단 20명, 미래 회차 사전 참석 편집, 시작 전 출석 입력 20건 비활성화를 확인했다.
+- 같은 행을 두 탭에서 저장해 첫 요청은 저장되고 오래된 두 번째 요청은 충돌 메시지와 최신 서버 값으로 복원되는 낙관적 동시성 흐름을 확인한 뒤 사전 참석을 미응답으로 복구했다.
+- 8월 정모가 1일·15일, 9월 정모가 5일·19일로 생성됐고 7월 말~8월 초 주간 일정에 8월 1차 정모가 표시되며 `month=2026-08`와 검증된 일정 복귀 URL을 유지했다.
+- 일정 딥링크로 연 정모 모달이 닫힐 때 `/schedule?view=week&date=2026-08-01`로 복귀했고, 비인증 `/meetings` 접근은 `/login?next=%2Fmeetings`로 리디렉션됐다.
+- 375×812 모바일 화면에서 문서 너비와 viewport가 모두 375px였고 정모 카드 목록에 가로 넘침이 없었다.
+- 브라우저 콘솔 오류와 실패한 확인 대상 네트워크 요청은 없었다.
+- QA 종료 후 운영 DB는 정모 6개, 마감 0개, 사전 응답 40건 전부 미응답, 출석 40건 전부 미확인으로 복구됐다. QA 중 의도치 않은 마감과 즉시 재개로 append-only 생명주기 이력에 `attendance_closed`, `attendance_reopened`가 각각 1건 남았다.
+- 임시 operator 계정으로 전체 권한, 조회 전용, 회차 관리 전용, 출석 관리 전용, 조회 권한 없음의 다섯 조합을 실제 인증 RPC와 RLS에서 검증했다.
+- 조회 전용은 정모 조회만 허용하고 회차 변경을 거부했으며, 회차 관리·출석 관리 조합은 각 DTO 플래그와 전용 RPC 경계만 허용했다. 조회 권한이 없으면 디렉터리 RPC가 거부되고 RLS 조회 결과도 0건이었다.
+- 검증 후 임시 Auth 사용자, operator 프로필, 자동 생성 회원이 모두 0건임을 확인했고 operator의 정모 권한 3개를 복원했다. 운영 사전 응답 40건은 전부 미응답, 출석 40건은 전부 미확인 상태를 유지했다.
+
 ## 2026-07-13
 
 ### Completed
