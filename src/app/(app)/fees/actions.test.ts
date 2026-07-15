@@ -8,8 +8,7 @@ const mocks = vi.hoisted(() => {
     delete: vi.fn(() => deleteQuery),
     insert: vi.fn(async () => ({ error: null })),
   };
-  const membersQuery = {
-    select: vi.fn(() => membersQuery),
+  const importMembersQuery = {
     eq: vi.fn(async () => ({
       data: [
         {
@@ -19,6 +18,34 @@ const mocks = vi.hoisted(() => {
       ],
       error: null,
     })),
+  };
+  const targetMemberQuery = {
+    eq: vi.fn(() => targetMemberQuery),
+    neq: vi.fn(() => targetMemberQuery),
+    lte: vi.fn(() => targetMemberQuery),
+    maybeSingle: vi.fn(async () => ({ data: { id: "member-1" }, error: null })),
+  };
+  const membersTable = {
+    select: vi.fn((columns: string) =>
+      columns === "id" ? targetMemberQuery : importMembersQuery,
+    ),
+  };
+  const existingNoteQuery = {
+    eq: vi.fn(() => existingNoteQuery),
+    maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+  };
+  const noteUpdateQuery = {
+    eq: vi.fn(async () => ({ error: null })),
+  };
+  const noteDeleteQuery = {
+    eq: vi.fn(() => noteDeleteQuery),
+    then: vi.fn((resolve) => resolve({ error: null })),
+  };
+  const noteTable = {
+    select: vi.fn(() => existingNoteQuery),
+    insert: vi.fn(async () => ({ error: null })),
+    update: vi.fn(() => noteUpdateQuery),
+    delete: vi.fn(() => noteDeleteQuery),
   };
   const supabase = {
     auth: {
@@ -33,7 +60,11 @@ const mocks = vi.hoisted(() => {
       }
 
       if (table === "members") {
-        return membersQuery;
+        return membersTable;
+      }
+
+      if (table === "fee_monthly_notes") {
+        return noteTable;
       }
 
         throw new Error(`Unexpected table: ${table}`);
@@ -43,7 +74,14 @@ const mocks = vi.hoisted(() => {
   return {
     deleteQuery,
     feePaymentsTable,
-    membersQuery,
+    importMembersQuery,
+    targetMemberQuery,
+    membersTable,
+    existingNoteQuery,
+    noteUpdateQuery,
+    noteDeleteQuery,
+    noteTable,
+    currentOperatorHasPermission: vi.fn(async () => true),
     revalidatePath: vi.fn(),
     redirect: vi.fn((path: string) => {
       throw new Error(`redirect:${path}`);
@@ -64,7 +102,15 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => mocks.supabase),
 }));
 
-import { cancelFeePayment, importFeePaymentsCsv } from "./actions";
+vi.mock("@/features/auth/operator-context", () => ({
+  currentOperatorHasPermission: mocks.currentOperatorHasPermission,
+}));
+
+import {
+  cancelFeePayment,
+  importFeePaymentsCsv,
+  saveFeeMonthlyNote,
+} from "./actions";
 
 describe("fee payment actions", () => {
   beforeEach(() => {
@@ -74,8 +120,30 @@ describe("fee payment actions", () => {
     mocks.supabase.from.mockClear();
     mocks.feePaymentsTable.delete.mockClear();
     mocks.feePaymentsTable.insert.mockClear();
-    mocks.membersQuery.select.mockClear();
-    mocks.membersQuery.eq.mockClear();
+    mocks.membersTable.select.mockClear();
+    mocks.importMembersQuery.eq.mockClear();
+    mocks.targetMemberQuery.eq.mockClear();
+    mocks.targetMemberQuery.neq.mockClear();
+    mocks.targetMemberQuery.lte.mockClear();
+    mocks.targetMemberQuery.maybeSingle.mockReset();
+    mocks.targetMemberQuery.maybeSingle.mockResolvedValue({
+      data: { id: "member-1" },
+      error: null,
+    });
+    mocks.existingNoteQuery.eq.mockClear();
+    mocks.existingNoteQuery.maybeSingle.mockReset();
+    mocks.existingNoteQuery.maybeSingle.mockResolvedValue({ data: null, error: null });
+    mocks.noteUpdateQuery.eq.mockClear();
+    mocks.noteDeleteQuery.eq.mockClear();
+    mocks.noteDeleteQuery.then.mockClear();
+    mocks.noteDeleteQuery.then.mockImplementation((resolve) => resolve({ error: null }));
+    mocks.noteTable.select.mockClear();
+    mocks.noteTable.insert.mockClear();
+    mocks.noteTable.update.mockClear();
+    mocks.noteTable.delete.mockClear();
+    mocks.noteTable.insert.mockResolvedValue({ error: null });
+    mocks.currentOperatorHasPermission.mockReset();
+    mocks.currentOperatorHasPermission.mockResolvedValue(true);
     mocks.deleteQuery.eq.mockClear();
     mocks.deleteQuery.eq.mockResolvedValue({ error: null });
     mocks.feePaymentsTable.insert.mockResolvedValue({ error: null });
@@ -117,8 +185,8 @@ describe("fee payment actions", () => {
     );
 
     expect(mocks.supabase.from).toHaveBeenCalledWith("members");
-    expect(mocks.membersQuery.select).toHaveBeenCalledWith("id, member_code");
-    expect(mocks.membersQuery.eq).toHaveBeenCalledWith("status", "active");
+    expect(mocks.membersTable.select).toHaveBeenCalledWith("id, member_code");
+    expect(mocks.importMembersQuery.eq).toHaveBeenCalledWith("status", "active");
     expect(mocks.feePaymentsTable.insert).toHaveBeenCalledWith([
       {
         member_id: "member-1",
@@ -134,7 +202,7 @@ describe("fee payment actions", () => {
   });
 
   it("redirects a missing member with the original CSV line after blank rows", async () => {
-    mocks.membersQuery.eq.mockResolvedValueOnce({ data: [], error: null });
+    mocks.importMembersQuery.eq.mockResolvedValueOnce({ data: [], error: null });
     const formData = new FormData();
     formData.set(
       "csvFile",
@@ -181,4 +249,99 @@ describe("fee payment actions", () => {
     );
     expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
   });
+
+  it("creates a trimmed monthly note and preserves list state", async () => {
+    const formData = buildNoteFormData("  다음 달 합산  ");
+
+    await expect(saveFeeMonthlyNote(formData)).rejects.toThrow(
+      "redirect:/fees?month=2026-07&q=%EA%B9%80&sort=memo&direction=desc&status=note-saved",
+    );
+
+    expect(mocks.noteTable.insert).toHaveBeenCalledWith({
+      member_id: "member-1",
+      period_month: "2026-07-01",
+      memo: "다음 달 합산",
+      created_by: "operator-id",
+      updated_by: "operator-id",
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
+  });
+
+  it("updates a note without replacing its creator", async () => {
+    mocks.existingNoteQuery.maybeSingle.mockResolvedValueOnce({
+      data: { id: "note-1" },
+      error: null,
+    });
+
+    await expect(saveFeeMonthlyNote(buildNoteFormData("수정 메모"))).rejects.toThrow(
+      "status=note-saved",
+    );
+
+    expect(mocks.noteTable.update).toHaveBeenCalledWith({
+      memo: "수정 메모",
+      updated_by: "operator-id",
+      updated_at: expect.any(String),
+    });
+    expect(mocks.noteUpdateQuery.eq).toHaveBeenCalledWith("id", "note-1");
+  });
+
+  it("deletes the independent note when the saved value is blank", async () => {
+    await expect(saveFeeMonthlyNote(buildNoteFormData("   "))).rejects.toThrow(
+      "status=note-saved",
+    );
+
+    expect(mocks.noteTable.delete).toHaveBeenCalled();
+    expect(mocks.noteDeleteQuery.eq).toHaveBeenNthCalledWith(1, "member_id", "member-1");
+    expect(mocks.noteDeleteQuery.eq).toHaveBeenNthCalledWith(
+      2,
+      "period_month",
+      "2026-07-01",
+    );
+  });
+
+  it("rejects an overlong note without writing", async () => {
+    await expect(
+      saveFeeMonthlyNote(buildNoteFormData("가".repeat(501))),
+    ).rejects.toThrow(
+      "redirect:/fees?month=2026-07&q=%EA%B9%80&sort=memo&direction=desc&note=member-1&noteError=too-long",
+    );
+
+    expect(mocks.noteTable.insert).not.toHaveBeenCalled();
+    expect(mocks.noteTable.update).not.toHaveBeenCalled();
+    expect(mocks.noteTable.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejects note mutation without create or update permission", async () => {
+    mocks.currentOperatorHasPermission.mockResolvedValue(false);
+
+    await expect(saveFeeMonthlyNote(buildNoteFormData("권한 없음"))).rejects.toThrow(
+      "noteError=forbidden",
+    );
+
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("fee_monthly_notes");
+  });
+
+  it("rejects a member outside the monthly fee targets", async () => {
+    mocks.targetMemberQuery.maybeSingle.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+
+    await expect(saveFeeMonthlyNote(buildNoteFormData("대상 아님"))).rejects.toThrow(
+      "noteError=invalid-member",
+    );
+
+    expect(mocks.noteTable.insert).not.toHaveBeenCalled();
+  });
 });
+
+function buildNoteFormData(memo: string) {
+  const formData = new FormData();
+  formData.set("memberId", "member-1");
+  formData.set("periodMonth", "2026-07");
+  formData.set("query", "김");
+  formData.set("sort", "memo");
+  formData.set("direction", "desc");
+  formData.set("memo", memo);
+  return formData;
+}

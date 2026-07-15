@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { currentOperatorHasPermission } from "@/features/auth/operator-context";
 import {
   parseFeePaymentsCsv,
   parseFeePaymentFormData,
@@ -10,7 +11,13 @@ import {
   validateFeePaymentForm,
 } from "@/features/fees/fee-form";
 import {
+  buildFeesHref,
+  normalizeFeeNoteInput,
+} from "@/features/fees/fee-note";
+import {
+  FEE_EXEMPT_MEMBER_CODE,
   getCurrentPeriodMonth,
+  getPeriodMonthEnd,
   normalizePeriodMonth,
 } from "@/features/fees/fee-model";
 
@@ -31,6 +38,11 @@ function buildRedirect(path: string, params: Record<string, string | number>) {
   }
 
   return `${path}?${searchParams.toString()}`;
+}
+
+function readFormString(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
 }
 
 function firstValidationCode(errors: string[]) {
@@ -118,6 +130,111 @@ export async function cancelFeePayment(formData: FormData) {
 
   revalidatePath(feesPath);
   redirect(buildRedirect(feesPath, { status: "cancelled", month }));
+}
+
+export async function saveFeeMonthlyNote(formData: FormData) {
+  const memberId = readFormString(formData, "memberId");
+  const rawPeriodMonth = readFormString(formData, "periodMonth");
+  const periodMonth = normalizePeriodMonth(rawPeriodMonth);
+  const listState = {
+    month: rawPeriodMonth,
+    q: readFormString(formData, "query"),
+    sort: readFormString(formData, "sort"),
+    direction: readFormString(formData, "direction"),
+  };
+  const note = normalizeFeeNoteInput(formData.get("memo"));
+
+  if (!memberId || !periodMonth || !note.ok) {
+    redirect(
+      buildFeesHref(listState, {
+        note: memberId || undefined,
+        noteError: note.ok ? "invalid-input" : note.error,
+      }),
+    );
+  }
+
+  const canCreate = await currentOperatorHasPermission("fees.payments.create");
+  const canUpdate = canCreate
+    ? false
+    : await currentOperatorHasPermission("fees.payments.update");
+
+  if (!canCreate && !canUpdate) {
+    redirect(
+      buildFeesHref(listState, { note: memberId, noteError: "forbidden" }),
+    );
+  }
+
+  const { supabase, userId } = await getAuthenticatedUserId();
+  const { data: member, error: memberError } = await supabase
+    .from("members")
+    .select("id")
+    .eq("id", memberId)
+    .eq("status", "active")
+    .neq("member_code", FEE_EXEMPT_MEMBER_CODE)
+    .lte("joined_date", getPeriodMonthEnd(periodMonth))
+    .maybeSingle();
+
+  if (memberError || !member) {
+    redirect(
+      buildFeesHref(listState, {
+        note: memberId,
+        noteError: "invalid-member",
+      }),
+    );
+  }
+
+  let mutationError: { message?: string } | null = null;
+
+  if (!note.memo) {
+    const { error } = await supabase
+      .from("fee_monthly_notes")
+      .delete()
+      .eq("member_id", memberId)
+      .eq("period_month", periodMonth);
+    mutationError = error;
+  } else {
+    const { data: existingNote, error: existingNoteError } = await supabase
+      .from("fee_monthly_notes")
+      .select("id")
+      .eq("member_id", memberId)
+      .eq("period_month", periodMonth)
+      .maybeSingle();
+
+    if (existingNoteError) {
+      mutationError = existingNoteError;
+    } else if (existingNote) {
+      const { error } = await supabase
+        .from("fee_monthly_notes")
+        .update({
+          memo: note.memo,
+          updated_by: userId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingNote.id);
+      mutationError = error;
+    } else {
+      const { error } = await supabase.from("fee_monthly_notes").insert({
+        member_id: memberId,
+        period_month: periodMonth,
+        memo: note.memo,
+        created_by: userId,
+        updated_by: userId,
+      });
+      mutationError = error;
+    }
+  }
+
+  if (mutationError) {
+    redirect(
+      buildFeesHref(listState, {
+        note: memberId,
+        noteError: "save-failed",
+      }),
+    );
+  }
+
+  revalidatePath(feesPath);
+  redirect(buildFeesHref(listState, { status: "note-saved" }));
 }
 
 export async function importFeePaymentsCsv(formData: FormData) {
