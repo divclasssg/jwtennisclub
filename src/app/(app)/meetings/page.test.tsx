@@ -70,7 +70,7 @@ const regularMeeting: MeetingDirectoryRow = {
   title: "1차 정모",
   location: "센터 코트",
   linkedRegularMeetingId: null,
-  status: "scheduled",
+  status: "cancelled",
   counts: {
     total: 7,
     rsvpUnanswered: 1,
@@ -84,25 +84,16 @@ const regularMeeting: MeetingDirectoryRow = {
   },
 };
 
-const cancelledMeeting: MeetingDirectoryRow = {
-  ...regularMeeting,
-  id: "22222222-2222-4222-8222-222222222222",
-  regularOccurrence: 3,
-  meetingDate: "2026-07-19",
-  title: "취소된 1차 정모",
-  status: "cancelled",
-};
-
 const completedLightning: MeetingDirectoryRow = {
   ...regularMeeting,
-  id: "33333333-3333-4333-8333-333333333333",
+  id: "22222222-2222-4222-8222-222222222222",
   meetingKind: "lightning",
   regularOccurrence: null,
   meetingNumber: null,
   linkedRegularMeetingNumber: 1,
-  meetingDate: "2026-07-20",
+  meetingDate: "2026-07-19",
   title: "1차 정모 번개",
-  linkedRegularMeetingId: cancelledMeeting.id,
+  linkedRegularMeetingId: regularMeeting.id,
   status: "completed",
 };
 
@@ -115,8 +106,8 @@ const directoryPage: MeetingDirectoryPage = {
     rosterOrigin: "bootstrap",
     statisticsEligible: false,
   },
-  summary: { total: 3, scheduled: 1, completed: 1, cancelled: 1 },
-  meetings: [regularMeeting, cancelledMeeting, completedLightning],
+  summary: { total: 2, scheduled: 0, completed: 1, cancelled: 1 },
+  meetings: [regularMeeting, completedLightning],
   selectedMeeting: null,
   modalError: null,
 };
@@ -171,8 +162,8 @@ describe("MeetingsPage", () => {
     expect(screen.getByLabelText("조회 월")).toHaveValue("2026-07");
     expect(screen.getByText("조회 월").className).not.toContain("form-field-label-visible");
     const summary = screen.getByRole("region", { name: "정모 요약" });
-    expect(within(summary).getByText("전체").nextSibling).toHaveTextContent("3회");
-    expect(within(summary).getByText("예정").nextSibling).toHaveTextContent("1회");
+    expect(within(summary).getByText("전체").nextSibling).toHaveTextContent("2회");
+    expect(within(summary).getByText("예정").nextSibling).toHaveTextContent("0회");
     expect(within(summary).getByText("완료").nextSibling).toHaveTextContent("1회");
     expect(within(summary).getByText("취소").nextSibling).toHaveTextContent("1회");
     expect(screen.getByText("최초 배포 월 · 통계 제외")).toBeInTheDocument();
@@ -181,13 +172,12 @@ describe("MeetingsPage", () => {
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent))
       .toEqual(["회차", "일시", "장소", "상태", "사전 참석", "출석", "명단", "관리"]);
     const rowHeaders = within(table).getAllByRole("rowheader");
-    ["1차 정모", "취소된 1차 정모", "1차 정모 번개"].forEach(
+    ["1차 정모", "1차 정모 번개"].forEach(
       (title, index) => expect(rowHeaders[index]).toHaveTextContent(title),
     );
     const mobileList = screen.getByRole("list", { name: "모바일 정모 목록" });
     expect(within(mobileList).getAllByRole("heading").map((heading) => heading.textContent)).toEqual([
       "1차 정모",
-      "취소된 1차 정모",
       "1차 정모 번개",
     ]);
     const mobileManagementToggle = within(mobileList).getByRole("button", {
@@ -211,7 +201,7 @@ describe("MeetingsPage", () => {
       `/meetings?month=2026-07&meeting=${regularMeeting.id}`,
     );
     expect(within(table).getAllByText("참석 3 · 늦참 1 · 불참 2 · 미응답 1"))
-      .toHaveLength(3);
+      .toHaveLength(2);
   });
 
   it("keeps roster access but omits management disclosures without meeting permission", async () => {
@@ -266,7 +256,7 @@ describe("MeetingsPage", () => {
     mocks.loadMeetingDirectoryPage.mockResolvedValueOnce(
       cloneDirectoryPage({
         meetings: [unavailableMeeting],
-        summary: { total: 1, scheduled: 1, completed: 0, cancelled: 0 },
+        summary: { total: 1, scheduled: 0, completed: 0, cancelled: 1 },
       }),
     );
 

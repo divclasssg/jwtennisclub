@@ -95,7 +95,16 @@ describe("MeetingMobileList", () => {
     expect(within(items[1]).getByText("완료")).toBeInTheDocument();
     expect(within(items[1]).getByText("정기 정모 연결됨")).toBeInTheDocument();
     expect(within(items[1]).getByText("장소 미정")).toBeInTheDocument();
+  });
 
+  it("shows the cancelled status for a cancelled regular meeting", () => {
+    render(
+      <MeetingMobileList
+        meetings={[{ ...regularMeeting, status: "cancelled" }]}
+      />,
+    );
+
+    expect(screen.getByText("취소")).toBeInTheDocument();
   });
 
   it("shows RSVP and attendance counts or a preparation state", () => {
