@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { ActionLink, Badge, Button, TextInput } from "@/components/atoms";
+import { ActionLink, Button, TextInput } from "@/components/atoms";
 import {
   EmptyState,
   FilterBar,
@@ -21,6 +21,7 @@ import type { MeetingDirectoryRow } from "@/features/meetings/meeting-model";
 import {
   formatMeetingTime,
   getMeetingKindPresentation,
+  getMeetingRowNumberLabel,
   getMeetingStatusPresentation,
 } from "@/features/meetings/meeting-presentation";
 import { canonicalizeScheduleReturnTo } from "@/features/meetings/meeting-return-path";
@@ -62,16 +63,6 @@ function normalizeMonth(value: string | undefined) {
 function formatPeriodMonth(periodMonth: string) {
   const [year, month] = periodMonth.split("-");
   return `${year}년 ${Number(month)}월`;
-}
-
-function formatRsvpCounts(meeting: MeetingDirectoryRow) {
-  if (!meeting.counts) return "명단 준비 전";
-  return `참석 ${meeting.counts.rsvpAttending} · 늦참 ${meeting.counts.rsvpLate} · 불참 ${meeting.counts.rsvpDeclined} · 미응답 ${meeting.counts.rsvpUnanswered}`;
-}
-
-function formatAttendanceCounts(meeting: MeetingDirectoryRow) {
-  if (!meeting.counts) return "명단 준비 전";
-  return `출석 ${meeting.counts.attendancePresent} · 지각 ${meeting.counts.attendanceLate} · 결석 ${meeting.counts.attendanceAbsent} · 미확인 ${meeting.counts.attendanceUnchecked}`;
 }
 
 function formatRosterStatus(roster: MeetingMonthRosterSummary | null) {
@@ -143,73 +134,100 @@ function MeetingDirectoryTable({
   lifecycleProps: ReturnType<typeof getLifecycleControlPropsByMeetingId>;
 }) {
   return (
-    <DataTable>
+    <DataTable className={styles["meetings-directory-table"]}>
       <thead>
         <tr>
-          <th scope="col">회차</th>
-          <th scope="col">일시</th>
-          <th scope="col">장소</th>
-          <th scope="col">상태</th>
-          <th scope="col">사전 참석</th>
+          <th rowSpan={2} scope="col">회차</th>
+          <th rowSpan={2} scope="col">구분</th>
+          <th rowSpan={2} scope="col">날짜</th>
+          <th rowSpan={2} scope="col">시간</th>
+          <th rowSpan={2} scope="col">장소</th>
+          <th rowSpan={2} scope="col">상태</th>
+          <th colSpan={4} scope="colgroup">사전 참석</th>
+          <th colSpan={4} scope="colgroup">출석</th>
+          <th rowSpan={2} scope="col">명단</th>
+          <th rowSpan={2} scope="col">관리</th>
+        </tr>
+        <tr>
+          <th scope="col">참석</th>
+          <th scope="col">늦참</th>
+          <th scope="col">불참</th>
+          <th scope="col">미응답</th>
           <th scope="col">출석</th>
-          <th scope="col">명단</th>
-          <th scope="col">관리</th>
+          <th scope="col">지각</th>
+          <th scope="col">결석</th>
+          <th scope="col">미확인</th>
         </tr>
       </thead>
       <tbody>
-        {directory.meetings.map((meeting) => (
-          <tr key={meeting.id}>
-            <th scope="row">
-              <span className={styles["meeting-title-cell"]}>
-                <span>{meeting.title}</span>
-                <Badge tone={getMeetingKindPresentation(meeting.meetingKind).tone}>
-                  {getMeetingKindPresentation(meeting.meetingKind).label}
-                </Badge>
-              </span>
-            </th>
-            <td>
-              <span className={styles["meeting-datetime-cell"]}>
-                <span>{meeting.meetingDate}</span>
-                <span>{formatMeetingTime(meeting.startTime)}–{formatMeetingTime(meeting.endTime)}</span>
-              </span>
-            </td>
-            <td>{meeting.location ?? "미정"}</td>
-            <td>
-              <Badge tone={getMeetingStatusPresentation(meeting.status).tone}>
-                {getMeetingStatusPresentation(meeting.status).label}
-              </Badge>
-            </td>
-            <td>{formatRsvpCounts(meeting)}</td>
-            <td>{formatAttendanceCounts(meeting)}</td>
-            <td>
-              {meeting.counts ? (
-                <ActionLink
-                  aria-label={`${meeting.title} 명단 보기`}
-                  href={getMeetingLink(meeting)}
-                  size="compact"
-                  variant="secondary"
+        {directory.meetings.map((meeting) => {
+          const kind = getMeetingKindPresentation(meeting.meetingKind);
+          const status = getMeetingStatusPresentation(meeting.status);
+          const counts = meeting.counts;
+
+          return (
+            <tr key={meeting.id}>
+              <th scope="row">{getMeetingRowNumberLabel(meeting)}</th>
+              <td>
+                <span
+                  className={styles["meeting-presentation-text"]}
+                  data-tone={kind.tone}
                 >
-                  명단
-                </ActionLink>
-              ) : (
-                <span className={styles["meeting-roster-unavailable"]}>
-                  <strong>명단 준비 전</strong>
-                  <span>전월 마지막 7일에 준비</span>
+                  {kind.label}
                 </span>
-              )}
-            </td>
-            <td>
-              {directory.canManageMeeting ? (
-                <MeetingManagementDisclosure meetingTitle={meeting.title}>
-                  <MeetingLifecycleControls
-                    {...lifecycleProps.get(meeting.id)!}
-                    meeting={meeting}
-                  />
-                </MeetingManagementDisclosure>
-              ) : null}
-            </td>
-          </tr>
-        ))}
+              </td>
+              <td>{meeting.meetingDate}</td>
+              <td>
+                {formatMeetingTime(meeting.startTime)}–
+                {formatMeetingTime(meeting.endTime)}
+              </td>
+              <td>{meeting.location ?? "미정"}</td>
+              <td>
+                <span
+                  className={styles["meeting-presentation-text"]}
+                  data-tone={status.tone}
+                >
+                  {status.label}
+                </span>
+              </td>
+              <td>{counts ? counts.rsvpAttending : "명단 준비 전"}</td>
+              <td>{counts ? counts.rsvpLate : "-"}</td>
+              <td>{counts ? counts.rsvpDeclined : "-"}</td>
+              <td>{counts ? counts.rsvpUnanswered : "-"}</td>
+              <td>{counts ? counts.attendancePresent : "-"}</td>
+              <td>{counts ? counts.attendanceLate : "-"}</td>
+              <td>{counts ? counts.attendanceAbsent : "-"}</td>
+              <td>{counts ? counts.attendanceUnchecked : "-"}</td>
+              <td>
+                {counts ? (
+                  <ActionLink
+                    aria-label={`${meeting.title} 명단 보기`}
+                    href={getMeetingLink(meeting)}
+                    size="compact"
+                    variant="secondary"
+                  >
+                    명단
+                  </ActionLink>
+                ) : (
+                  <span className={styles["meeting-roster-unavailable"]}>
+                    <strong>명단 준비 전</strong>
+                    <span>전월 마지막 7일에 준비</span>
+                  </span>
+                )}
+              </td>
+              <td>
+                {directory.canManageMeeting ? (
+                  <MeetingManagementDisclosure meetingTitle={meeting.title}>
+                    <MeetingLifecycleControls
+                      {...lifecycleProps.get(meeting.id)!}
+                      meeting={meeting}
+                    />
+                  </MeetingManagementDisclosure>
+                ) : null}
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </DataTable>
   );

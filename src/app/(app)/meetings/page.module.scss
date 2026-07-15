@@ -19,23 +19,40 @@
   letter-spacing: var(--letter-spacing-caption);
 }
 
-.meeting-title-cell,
-.meeting-datetime-cell,
 .meeting-roster-unavailable {
   display: grid;
   gap: var(--spacing-xxs);
 }
 
-.meeting-title-cell {
-  justify-items: start;
+.meetings-directory-table thead tr:nth-child(2) th {
+  top: var(--table-header-row-height);
 }
 
-.meeting-datetime-cell,
 .meeting-roster-unavailable {
   color: var(--ink-muted-80);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   letter-spacing: var(--letter-spacing-caption);
+}
+
+.meeting-presentation-text {
+  font-weight: var(--font-weight-semibold);
+}
+
+.meeting-presentation-text[data-tone="info"] {
+  color: var(--action-blue);
+}
+
+.meeting-presentation-text[data-tone="success"] {
+  color: var(--success-text);
+}
+
+.meeting-presentation-text[data-tone="danger"] {
+  color: var(--error-text);
+}
+
+.meeting-presentation-text[data-tone="muted"] {
+  color: var(--ink-muted-48);
 }
 
 .meeting-roster-unavailable span {

@@ -2,22 +2,23 @@ import {
   ATTENDANCE_STATUSES,
   RSVP_STATUSES,
   type AttendanceStatus,
+  type MeetingDirectoryRow,
   type MeetingKind,
   type MeetingStatus,
   type RsvpStatus,
 } from "./meeting-model";
 
-type BadgeTone = "danger" | "info" | "muted" | "success";
+type MeetingTone = "danger" | "info" | "muted" | "success";
 
 const meetingKindPresentation: Readonly<
-  Record<MeetingKind, { label: string; tone: BadgeTone }>
+  Record<MeetingKind, { label: string; tone: MeetingTone }>
 > = {
   regular: { label: "정기", tone: "info" },
   lightning: { label: "번개", tone: "muted" },
 };
 
 const meetingStatusPresentation: Readonly<
-  Record<MeetingStatus, { label: string; tone: BadgeTone }>
+  Record<MeetingStatus, { label: string; tone: MeetingTone }>
 > = {
   scheduled: { label: "예정", tone: "info" },
   completed: { label: "완료", tone: "success" },
@@ -56,6 +57,22 @@ export function getMeetingKindPresentation(kind: MeetingKind) {
 
 export function getMeetingStatusPresentation(status: MeetingStatus) {
   return meetingStatusPresentation[status];
+}
+
+export function getMeetingRowNumberLabel(meeting: MeetingDirectoryRow) {
+  if (meeting.meetingNumber !== null) return String(meeting.meetingNumber);
+  if (meeting.linkedRegularMeetingNumber !== null) {
+    return `${meeting.linkedRegularMeetingNumber} 대체`;
+  }
+  return "-";
+}
+
+export function getMeetingCardNumberLabel(meeting: MeetingDirectoryRow) {
+  if (meeting.meetingNumber !== null) return `${meeting.meetingNumber}회`;
+  if (meeting.linkedRegularMeetingNumber !== null) {
+    return `${meeting.linkedRegularMeetingNumber}회 대체`;
+  }
+  return "회차 없음";
 }
 
 export function formatMeetingTime(value: string) {

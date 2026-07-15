@@ -92,6 +92,8 @@ const completedLightning: MeetingDirectoryRow = {
   meetingNumber: null,
   linkedRegularMeetingNumber: 1,
   meetingDate: "2026-07-19",
+  startTime: "19:00:00",
+  endTime: "21:00:00",
   title: "1차 정모 번개",
   linkedRegularMeetingId: regularMeeting.id,
   status: "completed",
@@ -152,6 +154,12 @@ describe("MeetingsPage", () => {
   });
 
   it("uses the KST current month, shares ordered rows across table and mobile, and shows summary and bootstrap state", async () => {
+    mocks.loadMeetingDirectoryPage.mockResolvedValueOnce(
+      cloneDirectoryPage({
+        meetings: [{ ...regularMeeting, status: "scheduled" }, completedLightning],
+      }),
+    );
+
     render(await MeetingsPage({ searchParams: Promise.resolve({}) }));
 
     expect(mocks.loadMeetingDirectoryPage).toHaveBeenCalledWith({
@@ -170,11 +178,26 @@ describe("MeetingsPage", () => {
 
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent))
-      .toEqual(["회차", "일시", "장소", "상태", "사전 참석", "출석", "명단", "관리"]);
-    const rowHeaders = within(table).getAllByRole("rowheader");
-    ["1차 정모", "1차 정모 번개"].forEach(
-      (title, index) => expect(rowHeaders[index]).toHaveTextContent(title),
-    );
+      .toEqual([
+        "회차", "구분", "날짜", "시간", "장소", "상태",
+        "사전 참석", "출석", "명단", "관리",
+        "참석", "늦참", "불참", "미응답",
+        "출석", "지각", "결석", "미확인",
+      ]);
+    expect(within(table).getByRole("rowheader", { name: "1" }))
+      .toBeInTheDocument();
+    expect(within(table).getByText("2026-07-18")).toBeInTheDocument();
+    expect(within(table).getByText("18:00–22:00")).toBeInTheDocument();
+    expect(within(table).getAllByText("3").length).toBeGreaterThan(0);
+    expect(within(table).queryByTestId("meeting-badge")).not.toBeInTheDocument();
+    const kind = within(table).getByText("정기");
+    const status = within(table).getByText("예정");
+    expect(kind.className).toContain("meeting-presentation-text");
+    expect(kind.className).not.toContain("badge");
+    expect(kind).toHaveAttribute("data-tone", "info");
+    expect(status.className).toContain("meeting-presentation-text");
+    expect(status.className).not.toContain("badge");
+    expect(status).toHaveAttribute("data-tone", "info");
     const mobileList = screen.getByRole("list", { name: "모바일 정모 목록" });
     expect(within(mobileList).getAllByRole("heading").map((heading) => heading.textContent)).toEqual([
       "1차 정모",
@@ -200,8 +223,6 @@ describe("MeetingsPage", () => {
       "href",
       `/meetings?month=2026-07&meeting=${regularMeeting.id}`,
     );
-    expect(within(table).getAllByText("참석 3 · 늦참 1 · 불참 2 · 미응답 1"))
-      .toHaveLength(2);
   });
 
   it("keeps roster access but omits management disclosures without meeting permission", async () => {
@@ -268,6 +289,10 @@ describe("MeetingsPage", () => {
       name: "1차 정모 명단 보기",
     })).not.toBeInTheDocument();
     expect(within(table).getByText("전월 마지막 7일에 준비")).toBeInTheDocument();
+    const row = within(table).getByRole("rowheader", { name: "1" }).closest("tr");
+    expect(row).not.toBeNull();
+    expect(row?.children).toHaveLength(16);
+    expect(within(row as HTMLTableRowElement).getAllByText("-")).toHaveLength(7);
     expect(within(mobileList).queryByRole("link", {
       name: "1차 정모 명단 보기",
     })).not.toBeInTheDocument();

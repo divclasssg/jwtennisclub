@@ -34,7 +34,7 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    height: 48px;
+    height: var(--table-header-row-height);
     background: var(--canvas);
     color: var(--ink);
     font-size: var(--text-body-size);
