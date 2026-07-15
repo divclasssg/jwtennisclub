@@ -33,10 +33,10 @@
 - 운영 DB에서 `meeting_number` 컬럼이 생성된 것을 확인했고 7월 4일 정모 0건, 누락·중복 회차 0건을 확인했다. 7월 18일은 1차, 8월 1일은 2차, 8월 15일은 3차 정모로 저장됐다.
 - Supabase 읽기 요청 3회를 비교한 결과 순차 호출은 898~1,893ms, 병렬 호출은 345~923ms로 측정돼 데이터 양보다 원격 왕복 누적이 정모 페이지 병목임을 확인했다.
 - 단일 정모 디렉터리 RPC와 구버전 DB 호환 경로를 RED→GREEN으로 검증했고 전체 테스트 88개 파일, 496개 테스트와 ESLint, TypeScript, `git diff --check`가 통과했다.
-- `202607150003_optimize_meeting_directory_load.sql`은 코드에 포함했으며 운영 Supabase 적용과 인증된 페이지 재측정은 대기 중이다.
+- Supabase SQL Editor에서 `202607150003_optimize_meeting_directory_load.sql`을 먼저 실행해 성공을 확인한 뒤 `202607150004_default_meeting_location.sql`을 적용했다. `202607150004` 최초 시도는 편집기 SQL 연결로 인한 구문 오류로 실행되지 않았고, 편집기를 비운 뒤 해당 마이그레이션만 다시 실행해 성공을 확인했다.
 - 정모 기본 장소 변경의 로컬 검증 게이트에서 전체 테스트 89개 파일, 501개 테스트와 ESLint, TypeScript, `git diff --check`가 통과했다.
-- 운영 Supabase의 service-role HEAD/count 조회에서 정모 5건 모두 장소가 null이고 `용마테니스장`인 행은 0건임을 확인했으며, PostgREST OpenAPI에도 `load_club_meeting_directory_page` RPC가 없어 `202607150003`과 `202607150004`는 아직 적용되지 않은 상태다.
-- 운영 DB 직접 주소는 IPv6만 해석되고 실행 환경에 IPv6 경로가 없어 연결할 수 없었으며, 지역별 Supabase pooler는 프로젝트 tenant를 찾지 못했고 Supabase CLI용 access token도 없어 마이그레이션 적용을 수행하지 않았다. 범위를 Supabase 프로젝트 SQL Editor로 한정한 브라우저 접근도 `Welcome back / Sign in to your account` 로그인 화면으로 이동해 SQL을 실행하지 못했으며, 해당 탭은 사용자 인증 handoff를 위해 유지했다. 따라서 인증된 정모·일정 화면 QA도 성공으로 처리하지 않았다.
+- 운영 DB 검증 SQL에서 장소 null 0건, `용마테니스장` 5건, 장소 기본값 `'용마테니스장'::text`, `is_nullable = NO`, `load_club_meeting_directory_page` 존재를 확인했다. 2026년 7월 18일부터 9월 19일까지 실제 정기 정모 5건은 누적 회차 1~5와 장소 `용마테니스장`으로 조회됐다.
+- 루트 `.env.local`을 사용한 로컬 앱에서 `/meetings` 접근이 `/login?next=/meetings`로 이동하는 것까지 확인했다. 인증된 로컬 앱 세션이나 로그인 자격 증명이 없어 정모 목록의 fallback 미사용, 빈 장소 저장, 일정 화면 동기화, 콘솔·네트워크 오류 검증은 아직 수행하지 않았으며 브라우저 QA 성공으로 처리하지 않았다.
 - 운영 DB에 `fee_monthly_notes` 테이블, RLS 정책 4개, `fee_payments_sync_monthly_note` 트리거와 `202607150001` 마이그레이션 이력이 존재함을 확인했다.
 - 마이그레이션 직후 월간 메모 0건, `(member_id, period_month)` 중복 그룹 0건이었다.
 - 1440×900에서 미납 회원 메모 입력·수정, 459자 요약의 320px 말줄임, 납부 처리 후 메모 유지, 납부 취소 후 미납 복구를 확인했다.
