@@ -3,7 +3,7 @@ import { loadCurrentOperatorContext } from "@/features/auth/operator-context";
 
 type AppLayoutProps = {
   children: React.ReactNode;
-  modal?: React.ReactNode;
+  modal: React.ReactNode;
 };
 
 export default async function AppLayout({ children, modal }: AppLayoutProps) {
