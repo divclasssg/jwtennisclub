@@ -1,9 +1,11 @@
 const KST_TIME_ZONE = "Asia/Seoul";
 const PERIOD_MONTH_PATTERN = /^(\d{4})-(\d{2})-01$/;
+const REGULAR_MEETING_START_MONTH = "2026-07-01";
 
 export type RegularMeetingDate = {
   occurrence: 1 | 3;
   meetingDate: string;
+  meetingNumber: number;
 };
 
 function parsePeriodMonth(periodMonth: string) {
@@ -38,14 +40,37 @@ export function getRegularMeetingDates(
   const firstDay = new Date(Date.UTC(year, month - 1, 1));
   const firstSaturdayDay = 1 + ((6 - firstDay.getUTCDay() + 7) % 7);
 
-  return ([1, 3] as const).map((occurrence) => ({
-    occurrence,
-    meetingDate: formatDateKey(
-      year,
-      month,
-      firstSaturdayDay + (occurrence - 1) * 7,
-    ),
-  }));
+  return ([1, 3] as const).flatMap((occurrence) => {
+    const meetingNumber = getRegularMeetingNumber(periodMonth, occurrence);
+    return meetingNumber === null
+      ? []
+      : [
+          {
+            occurrence,
+            meetingDate: formatDateKey(
+              year,
+              month,
+              firstSaturdayDay + (occurrence - 1) * 7,
+            ),
+            meetingNumber,
+          },
+        ];
+  });
+}
+
+export function getRegularMeetingNumber(
+  periodMonth: string,
+  occurrence: 1 | 3,
+) {
+  const { year, month } = parsePeriodMonth(periodMonth);
+  const start = parsePeriodMonth(REGULAR_MEETING_START_MONTH);
+  const monthOffset = (year - start.year) * 12 + (month - start.month);
+
+  if (monthOffset < 0 || (monthOffset === 0 && occurrence === 1)) {
+    return null;
+  }
+
+  return monthOffset * 2 + (occurrence === 1 ? 0 : 1);
 }
 
 export function getRequiredMeetingMonths(periodMonth: string) {

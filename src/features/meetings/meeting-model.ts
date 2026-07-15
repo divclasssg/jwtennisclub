@@ -42,6 +42,7 @@ export type ClubMeetingRecord = {
   meetingKind: MeetingKind;
   periodMonth: string;
   regularOccurrence: 1 | 3 | null;
+  meetingNumber: number | null;
   meetingDate: string;
   startTime: string;
   endTime: string;
@@ -127,6 +128,7 @@ export type MeetingDirectoryRow = Pick<
   | "meetingKind"
   | "periodMonth"
   | "regularOccurrence"
+  | "meetingNumber"
   | "meetingDate"
   | "startTime"
   | "endTime"
@@ -134,6 +136,7 @@ export type MeetingDirectoryRow = Pick<
   | "location"
   | "linkedRegularMeetingId"
 > & {
+  linkedRegularMeetingNumber: number | null;
   status: MeetingStatus;
   counts: MeetingAttendanceCounts | null;
 };

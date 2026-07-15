@@ -3,19 +3,22 @@ import {
   getKstDateKey,
   getKstPeriodMonth,
   getRegularMeetingDates,
+  getRegularMeetingNumber,
   getRequiredMeetingMonths,
 } from "./meeting-calendar";
 
 describe("meeting calendar", () => {
-  it("calculates the first and third Saturday for ordinary and leap-year months", () => {
+  it("calculates launch-aware regular meeting dates and cumulative numbers", () => {
+    expect(getRegularMeetingDates("2026-06-01")).toEqual([]);
     expect(getRegularMeetingDates("2026-07-01")).toEqual([
-      { occurrence: 1, meetingDate: "2026-07-04" },
-      { occurrence: 3, meetingDate: "2026-07-18" },
+      { occurrence: 3, meetingDate: "2026-07-18", meetingNumber: 1 },
     ]);
-    expect(getRegularMeetingDates("2028-02-01")).toEqual([
-      { occurrence: 1, meetingDate: "2028-02-05" },
-      { occurrence: 3, meetingDate: "2028-02-19" },
+    expect(getRegularMeetingDates("2026-08-01")).toEqual([
+      { occurrence: 1, meetingDate: "2026-08-01", meetingNumber: 2 },
+      { occurrence: 3, meetingDate: "2026-08-15", meetingNumber: 3 },
     ]);
+    expect(getRegularMeetingNumber("2027-01-01", 1)).toBe(12);
+    expect(getRegularMeetingNumber("2027-01-01", 3)).toBe(13);
   });
 
   it("returns the current month and next two months across a year boundary", () => {

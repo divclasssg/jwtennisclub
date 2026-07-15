@@ -11,6 +11,7 @@ import {
   TARGET_ORIGINS,
   type ClubMeetingRecord,
   type MeetingAttendanceRecord,
+  type MeetingDirectoryRow,
 } from "./meeting-model";
 
 describe("meeting model", () => {
@@ -87,6 +88,7 @@ describe("meeting model", () => {
       meetingKind: "regular",
       periodMonth: "2026-07-01",
       regularOccurrence: 1,
+      meetingNumber: 1,
       meetingDate: "2026-07-04",
       startTime: "18:00",
       endTime: "22:00",
@@ -106,5 +108,27 @@ describe("meeting model", () => {
 
     expect(meeting.regularOccurrence).toBe(1);
     expect(meeting).not.toHaveProperty("status");
+  });
+
+  it("models cumulative meeting numbers in directory rows", () => {
+    const meeting: MeetingDirectoryRow = {
+      id: "meeting-id",
+      meetingKind: "regular",
+      periodMonth: "2026-07-01",
+      regularOccurrence: 3,
+      meetingNumber: 1,
+      meetingDate: "2026-07-18",
+      startTime: "18:00",
+      endTime: "22:00",
+      title: "제1회 정모",
+      location: null,
+      linkedRegularMeetingId: null,
+      linkedRegularMeetingNumber: null,
+      status: "scheduled",
+      counts: null,
+    };
+
+    expect(meeting.meetingNumber).toBe(1);
+    expect(meeting.linkedRegularMeetingNumber).toBeNull();
   });
 });
