@@ -87,9 +87,9 @@ describe("meeting model", () => {
       id: "meeting-id",
       meetingKind: "regular",
       periodMonth: "2026-07-01",
-      regularOccurrence: 1,
+      regularOccurrence: 3,
       meetingNumber: 1,
-      meetingDate: "2026-07-04",
+      meetingDate: "2026-07-18",
       startTime: "18:00",
       endTime: "22:00",
       title: "7월 첫째 정모",
@@ -106,7 +106,7 @@ describe("meeting model", () => {
       updatedAt: "2026-07-01T00:00:00Z",
     };
 
-    expect(meeting.regularOccurrence).toBe(1);
+    expect(meeting.regularOccurrence).toBe(3);
     expect(meeting).not.toHaveProperty("status");
   });
 
