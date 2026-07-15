@@ -2,7 +2,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MeetingDirectoryPage } from "@/features/meetings/meeting-directory";
 import type { MeetingDirectoryRow } from "@/features/meetings/meeting-model";
-import MeetingsPage, { canonicalizeScheduleReturnTo } from "./page";
+import { canonicalizeScheduleReturnTo } from "@/features/meetings/meeting-return-path";
+import MeetingsPage from "./page";
 
 const mocks = vi.hoisted(() => ({
   addMeetingAdHocMember: vi.fn(),
