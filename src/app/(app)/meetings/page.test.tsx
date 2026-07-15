@@ -165,6 +165,7 @@ describe("MeetingsPage", () => {
     });
     expect(screen.getByRole("heading", { name: "정모 관리" })).toBeInTheDocument();
     expect(screen.getByLabelText("조회 월")).toHaveValue("2026-07");
+    expect(screen.getByText("조회 월").className).not.toContain("form-field-label-visible");
     const summary = screen.getByRole("region", { name: "정모 요약" });
     expect(within(summary).getByText("전체").nextSibling).toHaveTextContent("3회");
     expect(within(summary).getByText("예정").nextSibling).toHaveTextContent("1회");

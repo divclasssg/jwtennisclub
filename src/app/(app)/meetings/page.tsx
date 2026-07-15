@@ -242,7 +242,7 @@ export default async function MeetingsPage({ searchParams }: MeetingsPageProps) 
       <ManagementPageTemplate
         filters={
           <FilterBar aria-label="정모 월 필터" layout="single-control">
-            <FormField label="조회 월" labelVisible>
+            <FormField label="조회 월">
               <TextInput
                 defaultValue={directory.periodMonth.slice(0, 7)}
                 name="month"
