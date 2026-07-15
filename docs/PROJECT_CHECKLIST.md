@@ -22,6 +22,7 @@
 - [x] Member management screen flow verified
 - [x] Member management feature implemented
 - [x] Membership fee management feature implemented
+- [x] 미납·납부 상태와 독립된 회원별 월간 회비 메모 입력·수정 구현
 - [x] Expense management feature implemented
 - [x] Execute Supabase expense receipt metadata query
 - [x] Configure Cloudflare R2 receipt bucket credentials in `.env.local`

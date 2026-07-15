@@ -1,5 +1,27 @@
 # JW Tennis Club SaaS Work Log
 
+## 2026-07-15
+
+### Completed
+- 회비 납부 여부와 독립된 `fee_monthly_notes` 테이블을 추가하고 회원·기준 월 복합 유일 제약, 1~500자 검증, 조회·생성·수정·삭제 RLS 정책을 적용했다.
+- 기존 `fee_payments.memo`는 CSV 호환을 위해 유지하고, 기존 메모 이관과 이후 CSV 메모를 월간 메모로 동기화하는 트리거를 추가했다.
+- 회비 보드의 데스크톱 메모 컬럼과 모바일 카드에 회원별 `메모 입력`·`수정` 버튼을 추가하고, 같은 모달에서 저장·수정·빈 값 삭제를 지원했다.
+- 미납 회원도 메모를 먼저 기록할 수 있게 했으며, 납부 처리와 납부 취소가 월간 메모를 삭제하거나 변경하지 않도록 분리했다.
+- 메모 조회는 `fees.payments.view`, 저장·수정·삭제는 `fees.payments.create` 또는 `fees.payments.update` 권한으로 제한했다.
+- 실제 QA에서 긴 메모가 데스크톱 표 셀을 과도하게 확장하는 문제를 발견해 전역 최대 너비 토큰과 말줄임 회귀 테스트를 추가했다.
+- Next.js가 생성한 병렬 라우트 타입에 맞춰 앱 레이아웃의 `modal` 슬롯을 필수 속성으로 정리했다.
+- Supabase SQL Editor에서 `202607150001_add_fee_monthly_notes.sql`을 단일 트랜잭션으로 운영 DB에 적용하고 마이그레이션 이력을 등록했다.
+
+### Verification Evidence
+- 운영 DB에 `fee_monthly_notes` 테이블, RLS 정책 4개, `fee_payments_sync_monthly_note` 트리거와 `202607150001` 마이그레이션 이력이 존재함을 확인했다.
+- 마이그레이션 직후 월간 메모 0건, `(member_id, period_month)` 중복 그룹 0건이었다.
+- 1440×900에서 미납 회원 메모 입력·수정, 459자 요약의 320px 말줄임, 납부 처리 후 메모 유지, 납부 취소 후 미납 복구를 확인했다.
+- 375×812에서 모든 회원 카드의 메모 작업, 351×302px 모달 적합성, 문서 너비와 viewport 375px 일치, 가로 넘침 없음과 콘솔 오류 없음·실패한 로컬 요청 없음을 확인했다.
+- QA 종료 후 대상 회원의 2026-07 월간 메모와 납부 기록이 각각 0건임을 Supabase HEAD/count로 확인했다.
+- 전체 테스트: 85개 파일, 479개 테스트 통과.
+- `npm run lint`, `npx tsc --noEmit`, `git diff --check`: 통과.
+- 공개 Supabase 환경 변수만 사용한 Next.js 16.2.10 Webpack 프로덕션 빌드: 컴파일, TypeScript, 26개 정적 페이지 생성과 전체 라우트 빌드 통과.
+
 ## 2026-07-14
 
 ### Completed
