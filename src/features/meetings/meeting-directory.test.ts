@@ -50,11 +50,13 @@ function validDatabasePage(overrides: Record<string, unknown> = {}) {
         id: regularMeetingId,
         meeting_kind: "regular",
         period_month: "2026-07-01",
-        regular_occurrence: 1,
-        meeting_date: "2026-07-04",
+        regular_occurrence: 3,
+        meeting_number: 1,
+        linked_regular_meeting_number: null,
+        meeting_date: "2026-07-18",
         start_time: "18:00:00",
         end_time: "22:00:00",
-        title: "7월 1차 정모",
+        title: "1차 정모",
         location: null,
         linked_regular_meeting_id: null,
         status: "scheduled",
@@ -76,11 +78,13 @@ function validDatabasePage(overrides: Record<string, unknown> = {}) {
         id: regularMeetingId,
         meeting_kind: "regular",
         period_month: "2026-07-01",
-        regular_occurrence: 1,
-        meeting_date: "2026-07-04",
+        regular_occurrence: 3,
+        meeting_number: 1,
+        linked_regular_meeting_number: null,
+        meeting_date: "2026-07-18",
         start_time: "18:00:00",
         end_time: "22:00:00",
-        title: "7월 1차 정모",
+        title: "1차 정모",
         location: null,
         linked_regular_meeting_id: null,
         status: "scheduled",
@@ -169,6 +173,11 @@ describe("meeting directory DTO parser", () => {
     expect(page.meetings.map((meeting) => meeting.id)).toEqual([
       regularMeetingId,
     ]);
+    expect(page.meetings[0]).toMatchObject({
+      regularOccurrence: 3,
+      meetingNumber: 1,
+      linkedRegularMeetingNumber: null,
+    });
     expect(
       page.selectedMeeting?.targets.map((target) => target.memberCodeSnapshot),
     ).toEqual(["JW-000001", "JW-000002"]);
@@ -249,6 +258,31 @@ describe("meeting directory DTO parser", () => {
         validDatabasePage({ modal_error: "selected meeting unavailable" }),
       ),
     ).toThrow("정모 목록 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("rejects a regular row with a zero meeting number", () => {
+    const value = validDatabasePage();
+    value.meetings[0].meeting_number = 0;
+
+    expect(() => parseMeetingDirectoryPage(value)).toThrow(
+      "정모 목록 데이터 형식이 올바르지 않습니다.",
+    );
+  });
+
+  it("rejects a lightning row without its linked regular meeting number", () => {
+    const value = validDatabasePage();
+    Object.assign(value.meetings[0] as Record<string, unknown>, {
+      meeting_kind: "lightning",
+      regular_occurrence: null,
+      meeting_number: null,
+      linked_regular_meeting_number: null,
+      linked_regular_meeting_id: regularMeetingId,
+      title: "1차 정모 번개",
+    });
+
+    expect(() => parseMeetingDirectoryPage(value)).toThrow(
+      "정모 목록 데이터 형식이 올바르지 않습니다.",
+    );
   });
 });
 

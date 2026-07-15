@@ -18,10 +18,12 @@ const meeting: MeetingDirectoryRow = {
   meetingKind: "regular",
   periodMonth: "2026-07-01",
   regularOccurrence: 3,
+  meetingNumber: 1,
+  linkedRegularMeetingNumber: null,
   meetingDate: "2026-07-18",
   startTime: "18:00:00",
   endTime: "22:00:00",
-  title: "7월 셋째 주 정모",
+  title: "1차 정모",
   location: "센터 코트",
   linkedRegularMeetingId: null,
   status: "scheduled",
@@ -107,7 +109,7 @@ describe("MeetingRosterModal", () => {
   it("renders a large modal, meeting summary, and the explicit close destination", () => {
     renderModal();
 
-    const dialog = screen.getByRole("dialog", { name: "7월 셋째 주 정모 명단" });
+    const dialog = screen.getByRole("dialog", { name: "1차 정모 명단" });
     expect(dialog.className).toContain("modal-panel-large");
     expect(within(dialog).getByText("2026-07-18")).toBeInTheDocument();
     expect(within(dialog).getByText("18:00–22:00")).toBeInTheDocument();
@@ -120,7 +122,7 @@ describe("MeetingRosterModal", () => {
   it("keeps summary, tabs, filters, search, and members in workflow order", () => {
     renderModal({ onAddAdHocMember: vi.fn() });
 
-    const dialog = screen.getByRole("dialog", { name: "7월 셋째 주 정모 명단" });
+    const dialog = screen.getByRole("dialog", { name: "1차 정모 명단" });
     const meetingSummary = within(dialog).getByRole("region", { name: "회차 요약" });
     const tabs = within(dialog).getByRole("tablist", { name: "명단 관리" });
     const filters = within(dialog).getByRole("region", { name: "사전 참석 요약" });

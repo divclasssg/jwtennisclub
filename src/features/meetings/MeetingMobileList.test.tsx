@@ -7,11 +7,13 @@ const regularMeeting: MeetingDirectoryRow = {
   id: "11111111-1111-4111-8111-111111111111",
   meetingKind: "regular",
   periodMonth: "2026-07-01",
-  regularOccurrence: 1,
-  meetingDate: "2026-07-04",
+  regularOccurrence: 3,
+  meetingNumber: 1,
+  linkedRegularMeetingNumber: null,
+  meetingDate: "2026-07-18",
   startTime: "18:00:00",
   endTime: "22:00:00",
-  title: "7월 첫째 주 정모",
+  title: "1차 정모",
   location: "센터 코트",
   linkedRegularMeetingId: null,
   status: "scheduled",
@@ -33,22 +35,14 @@ const linkedLightningMeeting: MeetingDirectoryRow = {
   id: "22222222-2222-4222-8222-222222222222",
   meetingKind: "lightning",
   regularOccurrence: null,
-  meetingDate: "2026-07-18",
-  title: "복식 번개",
+  meetingNumber: null,
+  linkedRegularMeetingNumber: 1,
+  meetingDate: "2026-07-19",
+  title: "1차 정모 번개",
   location: null,
   linkedRegularMeetingId: regularMeeting.id,
   status: "completed",
   counts: null,
-};
-
-const independentLightningMeeting: MeetingDirectoryRow = {
-  ...linkedLightningMeeting,
-  id: "33333333-3333-4333-8333-333333333333",
-  periodMonth: "2026-08-01",
-  meetingDate: "2026-08-02",
-  title: "일요일 번개",
-  linkedRegularMeetingId: null,
-  status: "cancelled",
 };
 
 describe("MeetingMobileList", () => {
@@ -58,7 +52,6 @@ describe("MeetingMobileList", () => {
         meetings={[
           linkedLightningMeeting,
           regularMeeting,
-          independentLightningMeeting,
         ]}
       />,
     );
@@ -67,19 +60,16 @@ describe("MeetingMobileList", () => {
     const items = within(list).getAllByRole("listitem");
 
     expect(items.map((item) => within(item).getByRole("heading").textContent)).toEqual([
-      "복식 번개",
-      "7월 첫째 주 정모",
-      "일요일 번개",
+      "1차 정모 번개",
+      "1차 정모",
     ]);
     expect(within(items[1]).getByRole("link", {
-      name: "7월 첫째 주 정모 명단 보기",
+      name: "1차 정모 명단 보기",
     })).toHaveAttribute(
       "href",
       `/meetings?month=2026-07&meeting=${regularMeeting.id}`,
     );
     expect(within(items[0]).queryByRole("link", { name: /명단 보기/ }))
-      .not.toBeInTheDocument();
-    expect(within(items[2]).queryByRole("link", { name: /명단 보기/ }))
       .not.toBeInTheDocument();
   });
 
@@ -89,7 +79,6 @@ describe("MeetingMobileList", () => {
         meetings={[
           regularMeeting,
           linkedLightningMeeting,
-          independentLightningMeeting,
         ]}
       />,
     );
@@ -98,7 +87,7 @@ describe("MeetingMobileList", () => {
 
     expect(within(items[0]).getByText("정기")).toBeInTheDocument();
     expect(within(items[0]).getByText("예정")).toBeInTheDocument();
-    expect(within(items[0]).getByText("날짜 2026-07-04")).toBeInTheDocument();
+    expect(within(items[0]).getByText("날짜 2026-07-18")).toBeInTheDocument();
     expect(within(items[0]).getByText("시간 18:00–22:00")).toBeInTheDocument();
     expect(within(items[0]).getByText("장소 센터 코트")).toBeInTheDocument();
 
@@ -107,8 +96,6 @@ describe("MeetingMobileList", () => {
     expect(within(items[1]).getByText("정기 정모 연결됨")).toBeInTheDocument();
     expect(within(items[1]).getByText("장소 미정")).toBeInTheDocument();
 
-    expect(within(items[2]).getByText("취소")).toBeInTheDocument();
-    expect(within(items[2]).getByText("독립 번개")).toBeInTheDocument();
   });
 
   it("shows RSVP and attendance counts or a preparation state", () => {
@@ -147,11 +134,11 @@ describe("MeetingMobileList", () => {
     const items = screen.getAllByRole("listitem");
     expect(
       within(items[0]).getByRole("group", {
-        name: "7월 첫째 주 정모 모바일 작업",
+        name: "1차 정모 모바일 작업",
       }),
     ).toBeInTheDocument();
     expect(
-      within(items[1]).getByRole("group", { name: "복식 번개 모바일 작업" }),
+      within(items[1]).getByRole("group", { name: "1차 정모 번개 모바일 작업" }),
     ).toBeInTheDocument();
   });
 });

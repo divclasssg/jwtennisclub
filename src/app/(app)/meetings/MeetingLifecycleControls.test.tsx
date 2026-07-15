@@ -18,11 +18,13 @@ const meeting: MeetingDirectoryRow = {
   id: "11111111-1111-4111-8111-111111111111",
   meetingKind: "regular",
   periodMonth: "2026-07-01",
-  regularOccurrence: 1,
-  meetingDate: "2026-07-04",
+  regularOccurrence: 3,
+  meetingNumber: 1,
+  linkedRegularMeetingNumber: null,
+  meetingDate: "2026-07-18",
   startTime: "18:00:00",
   endTime: "22:00:00",
-  title: "7월 첫째 주 정모",
+  title: "1차 정모",
   location: "센터 코트",
   linkedRegularMeetingId: null,
   status: "scheduled",
@@ -65,10 +67,10 @@ describe("MeetingLifecycleControls", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("7월 첫째 주 정모 변경 장소"), {
+    fireEvent.change(screen.getByLabelText("1차 정모 변경 장소"), {
       target: { value: "새 코트" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "7월 첫째 주 정모 장소 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "1차 정모 장소 저장" }));
     await waitFor(() =>
       expect(actions.updateClubMeetingLocation).toHaveBeenCalledWith({
         meetingId: meeting.id,
@@ -77,10 +79,10 @@ describe("MeetingLifecycleControls", () => {
     );
     await screen.findByText("장소를 변경했습니다.");
 
-    fireEvent.change(screen.getByLabelText("7월 첫째 주 정모 취소 사유"), {
+    fireEvent.change(screen.getByLabelText("1차 정모 취소 사유"), {
       target: { value: "우천" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "7월 첫째 주 정모 취소" }));
+    fireEvent.click(screen.getByRole("button", { name: "1차 정모 취소" }));
     await waitFor(() =>
       expect(actions.cancelClubMeeting).toHaveBeenCalledWith({
         meetingId: meeting.id,
@@ -89,7 +91,7 @@ describe("MeetingLifecycleControls", () => {
     );
     await screen.findByText("정모를 취소했습니다.");
 
-    fireEvent.click(screen.getByRole("button", { name: "7월 첫째 주 정모 출석 마감" }));
+    fireEvent.click(screen.getByRole("button", { name: "1차 정모 출석 마감" }));
 
     await waitFor(() => {
       expect(actions.closeClubMeetingAttendance).toHaveBeenCalledWith({ meetingId: meeting.id });
@@ -112,7 +114,7 @@ describe("MeetingLifecycleControls", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "7월 첫째 주 정모 장소 저장" }),
+      screen.getByRole("button", { name: "1차 정모 장소 저장" }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -120,7 +122,7 @@ describe("MeetingLifecycleControls", () => {
     );
     expect(screen.queryByText("database detail")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "7월 첫째 주 정모 장소 저장" }),
+      screen.getByRole("button", { name: "1차 정모 장소 저장" }),
     ).toBeEnabled();
   });
 
@@ -162,15 +164,17 @@ describe("MeetingLifecycleControls", () => {
           ...meeting,
           meetingKind: "lightning",
           regularOccurrence: null,
+          meetingNumber: null,
+          linkedRegularMeetingNumber: 1,
           linkedRegularMeetingId: meeting.id,
-          title: "대체 번개",
+          title: "1차 정모 번개",
         }}
       />,
     );
 
-    expect(screen.queryByLabelText("대체 번개 변경 장소")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "대체 번개 취소" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "대체 번개 출석 마감" }))
+    expect(screen.queryByLabelText("1차 정모 번개 변경 장소")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1차 정모 번개 취소" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1차 정모 번개 출석 마감" }))
       .toBeInTheDocument();
   });
 
@@ -187,7 +191,7 @@ describe("MeetingLifecycleControls", () => {
     );
 
     expect(screen.queryByLabelText(/변경 장소/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "7월 첫째 주 정모 출석 재개" }));
+    fireEvent.click(screen.getByRole("button", { name: "1차 정모 출석 재개" }));
     await waitFor(() =>
       expect(actions.reopenClubMeetingAttendance).toHaveBeenCalledWith({ meetingId: meeting.id }),
     );
@@ -218,7 +222,7 @@ describe("MeetingLifecycleControls", () => {
         meeting={cancelled}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "7월 첫째 주 정모 취소 복구" }));
+    fireEvent.click(screen.getByRole("button", { name: "1차 정모 취소 복구" }));
     await waitFor(() =>
       expect(actions.restoreClubMeeting).toHaveBeenCalledWith({ meetingId: meeting.id }),
     );
@@ -236,19 +240,19 @@ describe("MeetingLifecycleControls", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("7월 첫째 주 정모 번개 날짜"), {
+    fireEvent.change(screen.getByLabelText("1차 정모 번개 날짜"), {
       target: { value: "2026-07-05" },
     });
-    fireEvent.change(screen.getByLabelText("7월 첫째 주 정모 번개 시작 시간"), {
+    fireEvent.change(screen.getByLabelText("1차 정모 번개 시작 시간"), {
       target: { value: "18:00" },
     });
-    fireEvent.change(screen.getByLabelText("7월 첫째 주 정모 번개 종료 시간"), {
+    fireEvent.change(screen.getByLabelText("1차 정모 번개 종료 시간"), {
       target: { value: "20:00" },
     });
-    fireEvent.change(screen.getByLabelText("7월 첫째 주 정모 번개 장소"), {
+    fireEvent.change(screen.getByLabelText("1차 정모 번개 장소"), {
       target: { value: "보조 코트" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "7월 첫째 주 정모 번개 생성" }));
+    fireEvent.click(screen.getByRole("button", { name: "1차 정모 번개 생성" }));
 
     await waitFor(() =>
       expect(actions.createLightningClubMeeting).toHaveBeenCalledWith({
@@ -277,10 +281,10 @@ describe("MeetingLifecycleControls", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("7월 첫째 주 정모 취소 사유"), {
+    fireEvent.change(screen.getByLabelText("1차 정모 취소 사유"), {
       target: { value: "우천" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "7월 첫째 주 정모 취소" }));
+    fireEvent.click(screen.getByRole("button", { name: "1차 정모 취소" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "활성 번개가 있어 처리할 수 없습니다.",

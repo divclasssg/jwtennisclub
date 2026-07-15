@@ -55,6 +55,8 @@ const databaseMeetingSchema = z
     meeting_kind: z.enum(MEETING_KINDS),
     period_month: periodMonthSchema,
     regular_occurrence: z.union([z.literal(1), z.literal(3), z.null()]),
+    meeting_number: z.number().int().positive().nullable(),
+    linked_regular_meeting_number: z.number().int().positive().nullable(),
     meeting_date: dateSchema,
     start_time: databaseTimeSchema,
     end_time: databaseTimeSchema,
@@ -64,7 +66,22 @@ const databaseMeetingSchema = z
     status: z.enum(["scheduled", "cancelled", "completed"]),
     counts: countsSchema.nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const hasValidNumbering =
+      value.meeting_kind === "regular"
+        ? value.meeting_number !== null &&
+          value.linked_regular_meeting_number === null
+        : value.meeting_number === null &&
+          value.linked_regular_meeting_number !== null;
+
+    if (!hasValidNumbering) {
+      context.addIssue({
+        code: "custom",
+        message: "meeting numbering must match meeting kind",
+      });
+    }
+  });
 
 const databaseTargetSchema = z
   .object({
@@ -200,6 +217,8 @@ function mapMeeting(
     meetingKind: value.meeting_kind,
     periodMonth: value.period_month,
     regularOccurrence: value.regular_occurrence,
+    meetingNumber: value.meeting_number,
+    linkedRegularMeetingNumber: value.linked_regular_meeting_number,
     meetingDate: value.meeting_date,
     startTime: value.start_time,
     endTime: value.end_time,

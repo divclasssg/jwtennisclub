@@ -61,11 +61,13 @@ const regularMeeting: MeetingDirectoryRow = {
   id: "11111111-1111-4111-8111-111111111111",
   meetingKind: "regular",
   periodMonth: "2026-07-01",
-  regularOccurrence: 1,
-  meetingDate: "2026-07-04",
+  regularOccurrence: 3,
+  meetingNumber: 1,
+  linkedRegularMeetingNumber: null,
+  meetingDate: "2026-07-18",
   startTime: "18:00:00",
   endTime: "22:00:00",
-  title: "7월 첫째 주 정모",
+  title: "1차 정모",
   location: "센터 코트",
   linkedRegularMeetingId: null,
   status: "scheduled",
@@ -86,8 +88,8 @@ const cancelledMeeting: MeetingDirectoryRow = {
   ...regularMeeting,
   id: "22222222-2222-4222-8222-222222222222",
   regularOccurrence: 3,
-  meetingDate: "2026-07-18",
-  title: "7월 셋째 주 정모",
+  meetingDate: "2026-07-19",
+  title: "취소된 1차 정모",
   status: "cancelled",
 };
 
@@ -96,8 +98,10 @@ const completedLightning: MeetingDirectoryRow = {
   id: "33333333-3333-4333-8333-333333333333",
   meetingKind: "lightning",
   regularOccurrence: null,
-  meetingDate: "2026-07-19",
-  title: "대체 번개",
+  meetingNumber: null,
+  linkedRegularMeetingNumber: 1,
+  meetingDate: "2026-07-20",
+  title: "1차 정모 번개",
   linkedRegularMeetingId: cancelledMeeting.id,
   status: "completed",
 };
@@ -177,31 +181,31 @@ describe("MeetingsPage", () => {
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent))
       .toEqual(["회차", "일시", "장소", "상태", "사전 참석", "출석", "명단", "관리"]);
     const rowHeaders = within(table).getAllByRole("rowheader");
-    ["7월 첫째 주 정모", "7월 셋째 주 정모", "대체 번개"].forEach(
+    ["1차 정모", "취소된 1차 정모", "1차 정모 번개"].forEach(
       (title, index) => expect(rowHeaders[index]).toHaveTextContent(title),
     );
     const mobileList = screen.getByRole("list", { name: "모바일 정모 목록" });
     expect(within(mobileList).getAllByRole("heading").map((heading) => heading.textContent)).toEqual([
-      "7월 첫째 주 정모",
-      "7월 셋째 주 정모",
-      "대체 번개",
+      "1차 정모",
+      "취소된 1차 정모",
+      "1차 정모 번개",
     ]);
     const mobileManagementToggle = within(mobileList).getByRole("button", {
-      name: "7월 첫째 주 정모 관리 열기",
+      name: "1차 정모 관리 열기",
     });
     expect(mobileManagementToggle).toHaveAttribute("aria-expanded", "false");
     expect(within(mobileList).queryByRole("region", {
-      name: "7월 첫째 주 정모 회차 관리",
+      name: "1차 정모 회차 관리",
     })).not.toBeInTheDocument();
 
     fireEvent.click(mobileManagementToggle);
 
     expect(mobileManagementToggle).toHaveAttribute("aria-expanded", "true");
     expect(within(mobileList).getByRole("region", {
-      name: "7월 첫째 주 정모 회차 관리",
+      name: "1차 정모 회차 관리",
     })).toBeInTheDocument();
     expect(
-      within(table).getByRole("link", { name: "7월 첫째 주 정모 명단 보기" }),
+      within(table).getByRole("link", { name: "1차 정모 명단 보기" }),
     ).toHaveAttribute(
       "href",
       `/meetings?month=2026-07&meeting=${regularMeeting.id}`,
@@ -220,10 +224,10 @@ describe("MeetingsPage", () => {
     const table = screen.getByRole("table");
     const mobileList = screen.getByRole("list", { name: "모바일 정모 목록" });
     expect(within(table).getByRole("link", {
-      name: "7월 첫째 주 정모 명단 보기",
+      name: "1차 정모 명단 보기",
     })).toBeInTheDocument();
     expect(within(mobileList).getByRole("link", {
-      name: "7월 첫째 주 정모 명단 보기",
+      name: "1차 정모 명단 보기",
     })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /관리 열기/ })).not.toBeInTheDocument();
     expect(screen.queryByText("조회 전용")).not.toBeInTheDocument();
@@ -271,11 +275,11 @@ describe("MeetingsPage", () => {
     const table = screen.getByRole("table");
     const mobileList = screen.getByRole("list", { name: "모바일 정모 목록" });
     expect(within(table).queryByRole("link", {
-      name: "7월 첫째 주 정모 명단 보기",
+      name: "1차 정모 명단 보기",
     })).not.toBeInTheDocument();
     expect(within(table).getByText("전월 마지막 7일에 준비")).toBeInTheDocument();
     expect(within(mobileList).queryByRole("link", {
-      name: "7월 첫째 주 정모 명단 보기",
+      name: "1차 정모 명단 보기",
     })).not.toBeInTheDocument();
     expect(within(mobileList).getByText("전월 마지막 7일에 명단이 준비됩니다."))
       .toBeInTheDocument();
@@ -299,7 +303,7 @@ describe("MeetingsPage", () => {
           meeting: regularMeeting.id,
           month: "2026-07",
           returnTo:
-            "/schedule?selectedDate=2026-07-04&evil=drop&view=month&month=2026-07",
+            "/schedule?selectedDate=2026-07-18&evil=drop&view=month&month=2026-07",
         }),
       }),
     );
@@ -309,7 +313,7 @@ describe("MeetingsPage", () => {
       month: "2026-07",
     });
     expect(screen.getByText(
-      "닫기 경로 /schedule?view=month&month=2026-07&selectedDate=2026-07-04",
+      "닫기 경로 /schedule?view=month&month=2026-07&selectedDate=2026-07-18",
     )).toBeInTheDocument();
     expect(screen.getByText("출석 시작 false")).toBeInTheDocument();
 
