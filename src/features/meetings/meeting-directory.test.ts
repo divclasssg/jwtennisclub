@@ -57,7 +57,7 @@ function validDatabasePage(overrides: Record<string, unknown> = {}) {
         start_time: "18:00:00",
         end_time: "22:00:00",
         title: "1차 정모",
-        location: null,
+        location: "용마테니스장",
         linked_regular_meeting_id: null,
         status: "scheduled",
         counts: {
@@ -85,7 +85,7 @@ function validDatabasePage(overrides: Record<string, unknown> = {}) {
         start_time: "18:00:00",
         end_time: "22:00:00",
         title: "1차 정모",
-        location: null,
+        location: "용마테니스장",
         linked_regular_meeting_id: null,
         status: "scheduled",
         counts: {

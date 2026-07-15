@@ -80,6 +80,18 @@ describe("meeting server actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/schedule");
   });
 
+  it("passes a blank location to the database for canonical defaulting", async () => {
+    await updateClubMeetingLocation({ meetingId, location: "   " });
+
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "update_club_meeting_location",
+      {
+        requested_meeting_id: meetingId,
+        requested_location: null,
+      },
+    );
+  });
+
   it("returns a stable Korean error instead of a Supabase error payload", async () => {
     mocks.rpc.mockResolvedValue({
       data: null,

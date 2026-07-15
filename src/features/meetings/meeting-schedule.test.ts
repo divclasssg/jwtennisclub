@@ -28,7 +28,7 @@ describe("meeting schedule loader", () => {
           meeting_date: "2026-08-01",
           start_time: "18:00:00",
           title: "대체 번개",
-          location: null,
+          location: "용마테니스장",
           cancelled_at: null,
           attendance_closed_at: null,
         },
@@ -49,6 +49,7 @@ describe("meeting schedule loader", () => {
         periodMonth: "2026-07-01",
         meetingDate: "2026-08-01",
         startTime: "18:00",
+        location: "용마테니스장",
         status: "scheduled",
       }),
     ]);

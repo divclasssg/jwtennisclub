@@ -39,7 +39,7 @@ const linkedLightningMeeting: MeetingDirectoryRow = {
   linkedRegularMeetingNumber: 1,
   meetingDate: "2026-07-19",
   title: "1차 정모 번개",
-  location: null,
+  location: "용마테니스장",
   linkedRegularMeetingId: regularMeeting.id,
   status: "completed",
   counts: null,
@@ -97,7 +97,7 @@ describe("MeetingMobileList", () => {
     expect(within(items[1]).getByText("번개")).toHaveAttribute("data-tone", "muted");
     expect(within(items[1]).getByText("완료")).toHaveAttribute("data-tone", "success");
     expect(within(items[1]).getByText("정기 정모 연결됨")).toBeInTheDocument();
-    expect(within(items[1]).getByText("장소 미정")).toBeInTheDocument();
+    expect(within(items[1]).getByText("장소 용마테니스장")).toBeInTheDocument();
 
     for (const element of within(list).getAllByText(/정기|번개|예정|완료/)) {
       expect(element.className).not.toContain("badge");
