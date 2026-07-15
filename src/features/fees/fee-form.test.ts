@@ -41,6 +41,20 @@ describe("fee payment form validation", () => {
       "납부일을 YYYY-MM-DD 형식으로 입력하세요.",
     ]);
   });
+
+  it("rejects a memo longer than 500 characters", () => {
+    const payment = normalizeFeePaymentInput({
+      memberId: "member-id",
+      periodMonth: "2026-07",
+      amount: "30000",
+      paidDate: "2026-07-03",
+      memo: "가".repeat(501),
+    });
+
+    expect(validateFeePaymentForm(payment)).toContain(
+      "메모는 500자 이하로 입력하세요.",
+    );
+  });
 });
 
 describe("parseFeePaymentsCsv", () => {
@@ -138,6 +152,24 @@ describe("parseFeePaymentsCsv", () => {
     ).toMatchObject({
       ok: false,
       line: 1,
+    });
+  });
+
+  it("500자 메모는 허용하고 501자 메모는 원본 행에서 거부한다", () => {
+    expect(
+      parseFeePaymentsCsv(
+        `회원번호,납부월,금액,납부일,메모\nM0001,2026-07,30000,2026-07-03,${"가".repeat(500)}`,
+      ),
+    ).toMatchObject({ ok: true, sourceLines: [2] });
+
+    expect(
+      parseFeePaymentsCsv(
+        `회원번호,납부월,금액,납부일,메모\nM0001,2026-07,30000,2026-07-03,${"가".repeat(501)}`,
+      ),
+    ).toEqual({
+      ok: false,
+      line: 2,
+      message: "메모는 500자 이하로 입력하세요.",
     });
   });
 });

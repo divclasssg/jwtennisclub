@@ -117,6 +117,18 @@ describe("fee payment list helpers", () => {
         },
       ],
       payments: [],
+      notes: [
+        {
+          id: "note-general",
+          memberId: "general",
+          periodMonth: "2026-07-01",
+          memo: "미납 메모",
+          createdBy: "operator-id",
+          updatedBy: "operator-id",
+          createdAt: "2026-07-15T00:00:00Z",
+          updatedAt: "2026-07-15T00:00:00Z",
+        },
+      ],
     });
 
     expect(rows.map((row) => row.memberId)).toEqual([
@@ -130,5 +142,7 @@ describe("fee payment list helpers", () => {
       "profile-treasurer",
       "profile-president",
     ]);
+    expect(rows[0].payment).toBeNull();
+    expect(rows[0].note?.memo).toBe("미납 메모");
   });
 });

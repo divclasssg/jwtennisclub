@@ -8,12 +8,16 @@ import {
   type FeePaymentRecord,
 } from "./fee-model";
 import { firstSearchParam } from "@/features/members/member-list";
+import type { FeeMonthlyNoteRecord } from "./fee-note";
 
 export type FeeListSearchParams = {
   month?: string | string[];
   q?: string | string[];
   sort?: string | string[];
   direction?: string | string[];
+  note?: string | string[];
+  noteError?: string | string[];
+  status?: string | string[];
 };
 
 export type FeeListFilters = {
@@ -58,6 +62,7 @@ export type FeeBoardMemberRow = {
   memberCode: string;
   operatorProfileId: string | null;
   payment: FeePaymentRecord | null;
+  note: FeeMonthlyNoteRecord | null;
 };
 
 type FeeBoardSourceMember = {
@@ -126,12 +131,16 @@ export function buildFeeListSummary(input: {
 export function buildFeeBoardRows(input: {
   members: FeeBoardSourceMember[];
   payments: FeePaymentRecord[];
+  notes?: FeeMonthlyNoteRecord[];
   query?: string;
 }): FeeBoardMemberRow[] {
   const paymentsByMemberId = new Map(
     input.payments.map((payment) => [payment.memberId, payment]),
   );
   const query = input.query?.toLowerCase() ?? "";
+  const notesByMemberId = new Map(
+    (input.notes ?? []).map((note) => [note.memberId, note]),
+  );
 
   return input.members
     .filter((member) => member.memberCode !== FEE_EXEMPT_MEMBER_CODE)
@@ -144,6 +153,7 @@ export function buildFeeBoardRows(input: {
       memberCode: member.memberCode,
       operatorProfileId: member.operatorProfileId,
       payment: paymentsByMemberId.get(member.id) ?? null,
+      note: notesByMemberId.get(member.id) ?? null,
     }))
     .filter((row) => {
       if (!query) {
