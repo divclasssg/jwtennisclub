@@ -40,10 +40,44 @@
   overflow-wrap: anywhere;
 }
 
-.meeting-mobile-badges {
+.meeting-mobile-meta {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-xs);
+}
+
+.meeting-mobile-number,
+.meeting-mobile-presentation,
+.meeting-mobile-linkage {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-caption);
+}
+
+.meeting-mobile-number {
+  color: var(--ink-muted-80);
+  font-weight: var(--font-weight-semibold);
+}
+
+.meeting-mobile-presentation {
+  font-weight: var(--font-weight-semibold);
+}
+
+.meeting-mobile-presentation[data-tone="info"] {
+  color: var(--action-blue);
+}
+
+.meeting-mobile-presentation[data-tone="success"] {
+  color: var(--success-text);
+}
+
+.meeting-mobile-presentation[data-tone="danger"] {
+  color: var(--error-text);
+}
+
+.meeting-mobile-presentation[data-tone="muted"],
+.meeting-mobile-linkage {
+  color: var(--ink-muted-48);
 }
 
 .meeting-mobile-roster-link,

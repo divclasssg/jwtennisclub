@@ -83,18 +83,25 @@ describe("MeetingMobileList", () => {
       />,
     );
 
-    const items = screen.getAllByRole("listitem");
+    const list = screen.getByRole("list", { name: "모바일 정모 목록" });
+    const items = within(list).getAllByRole("listitem");
 
-    expect(within(items[0]).getByText("정기")).toBeInTheDocument();
-    expect(within(items[0]).getByText("예정")).toBeInTheDocument();
+    expect(within(items[0]).getByText("1회")).toBeInTheDocument();
+    expect(within(items[0]).getByText("정기")).toHaveAttribute("data-tone", "info");
+    expect(within(items[0]).getByText("예정")).toHaveAttribute("data-tone", "info");
     expect(within(items[0]).getByText("날짜 2026-07-18")).toBeInTheDocument();
     expect(within(items[0]).getByText("시간 18:00–22:00")).toBeInTheDocument();
     expect(within(items[0]).getByText("장소 센터 코트")).toBeInTheDocument();
 
-    expect(within(items[1]).getByText("번개")).toBeInTheDocument();
-    expect(within(items[1]).getByText("완료")).toBeInTheDocument();
+    expect(within(items[1]).getByText("1회 대체")).toBeInTheDocument();
+    expect(within(items[1]).getByText("번개")).toHaveAttribute("data-tone", "muted");
+    expect(within(items[1]).getByText("완료")).toHaveAttribute("data-tone", "success");
     expect(within(items[1]).getByText("정기 정모 연결됨")).toBeInTheDocument();
     expect(within(items[1]).getByText("장소 미정")).toBeInTheDocument();
+
+    for (const element of within(list).getAllByText(/정기|번개|예정|완료/)) {
+      expect(element.className).not.toContain("badge");
+    }
   });
 
   it("shows the cancelled status for a cancelled regular meeting", () => {
@@ -104,7 +111,7 @@ describe("MeetingMobileList", () => {
       />,
     );
 
-    expect(screen.getByText("취소")).toBeInTheDocument();
+    expect(screen.getByText("취소")).toHaveAttribute("data-tone", "danger");
   });
 
   it("shows RSVP and attendance counts or a preparation state", () => {

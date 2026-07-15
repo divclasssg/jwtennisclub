@@ -1,9 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Badge } from "@/components/atoms";
 import type { MeetingDirectoryRow } from "./meeting-model";
 import {
   formatMeetingTime,
+  getMeetingCardNumberLabel,
   getMeetingKindPresentation,
   getMeetingStatusPresentation,
 } from "./meeting-presentation";
@@ -49,22 +49,34 @@ export function MeetingMobileList({ meetings, renderActions }: MeetingMobileList
     <ul aria-label="모바일 정모 목록" className={styles["meeting-mobile-list"]}>
       {meetings.map((meeting) => {
         const actions = renderActions?.(meeting);
+        const kind = getMeetingKindPresentation(meeting.meetingKind);
+        const status = getMeetingStatusPresentation(meeting.status);
+
         return (
           <li className={styles["meeting-mobile-item"]} key={meeting.id}>
             <div className={styles["meeting-mobile-header"]}>
               <div className={styles["meeting-mobile-title"]}>
                 <h3 className={styles["meeting-mobile-name"]}>{meeting.title}</h3>
-                <div className={styles["meeting-mobile-badges"]}>
-                  <Badge tone={getMeetingKindPresentation(meeting.meetingKind).tone}>
-                    {getMeetingKindPresentation(meeting.meetingKind).label}
-                  </Badge>
-                  <Badge tone={getMeetingStatusPresentation(meeting.status).tone}>
-                    {getMeetingStatusPresentation(meeting.status).label}
-                  </Badge>
+                <div className={styles["meeting-mobile-meta"]}>
+                  <span className={styles["meeting-mobile-number"]}>
+                    {getMeetingCardNumberLabel(meeting)}
+                  </span>
+                  <span
+                    className={styles["meeting-mobile-presentation"]}
+                    data-tone={kind.tone}
+                  >
+                    {kind.label}
+                  </span>
+                  <span
+                    className={styles["meeting-mobile-presentation"]}
+                    data-tone={status.tone}
+                  >
+                    {status.label}
+                  </span>
                   {meeting.meetingKind === "lightning" ? (
-                    <Badge tone={meeting.linkedRegularMeetingId ? "info" : "muted"}>
-                      {meeting.linkedRegularMeetingId ? "정기 정모 연결됨" : "독립 번개"}
-                    </Badge>
+                    <span className={styles["meeting-mobile-linkage"]}>
+                      정기 정모 연결됨
+                    </span>
                   ) : null}
                 </div>
               </div>
