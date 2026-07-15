@@ -339,24 +339,36 @@ export async function loadMeetingDirectoryPage(input: {
 }): Promise<MeetingDirectoryPage> {
   const periodMonth = normalizePeriodMonth(input.month);
   const supabase = await createClient();
-  const prepareResult = await supabase.rpc("prepare_club_meeting_month", {
-    requested_period_month: periodMonth,
-  });
-
-  if (
-    prepareResult.error ||
-    !prepareAcknowledgementSchema.safeParse(prepareResult.data).success
-  ) {
-    throw new Error("정모 월을 준비하지 못했습니다.");
-  }
-
-  const { data, error } = await supabase.rpc(
-    "get_club_meeting_directory_page",
+  const combinedResult = await supabase.rpc(
+    "load_club_meeting_directory_page",
     {
       requested_period_month: periodMonth,
       requested_selected_meeting_id: input.meetingId?.trim() || null,
     },
   );
+  let { data, error } = combinedResult;
+
+  if (error?.code === "PGRST202") {
+    const prepareResult = await supabase.rpc("prepare_club_meeting_month", {
+      requested_period_month: periodMonth,
+    });
+    if (
+      prepareResult.error ||
+      !prepareAcknowledgementSchema.safeParse(prepareResult.data).success
+    ) {
+      throw new Error("정모 목록을 불러오지 못했습니다.");
+    }
+
+    const legacyResult = await supabase.rpc(
+      "get_club_meeting_directory_page",
+      {
+        requested_period_month: periodMonth,
+        requested_selected_meeting_id: input.meetingId?.trim() || null,
+      },
+    );
+    data = legacyResult.data;
+    error = legacyResult.error;
+  }
 
   if (error) {
     throw new Error("정모 목록을 불러오지 못했습니다.");

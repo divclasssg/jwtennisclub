@@ -291,13 +291,10 @@ describe("meeting directory command/query boundary", () => {
     mocks.createClient.mockReset();
   });
 
-  it("runs the explicit prepare command before the single pure page query", async () => {
-    const calls: string[] = [];
-    const rpc = vi.fn(async (name: string) => {
-      calls.push(name);
-      return name === "prepare_club_meeting_month"
-        ? { data: { status: "prepared" }, error: null }
-        : { data: validDatabasePage(), error: null };
+  it("loads the prepared directory through one database round trip", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: validDatabasePage(),
+      error: null,
     });
     mocks.createClient.mockResolvedValue({ rpc });
 
@@ -307,24 +304,14 @@ describe("meeting directory command/query boundary", () => {
         meetingId: regularMeetingId,
       }),
     ).resolves.toMatchObject({ periodMonth: "2026-07-01" });
-    expect(calls).toEqual([
-      "prepare_club_meeting_month",
-      "get_club_meeting_directory_page",
-    ]);
-    expect(rpc).toHaveBeenNthCalledWith(1, "prepare_club_meeting_month", {
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("load_club_meeting_directory_page", {
       requested_period_month: "2026-07-01",
+      requested_selected_meeting_id: regularMeetingId,
     });
-    expect(rpc).toHaveBeenNthCalledWith(
-      2,
-      "get_club_meeting_directory_page",
-      {
-        requested_period_month: "2026-07-01",
-        requested_selected_meeting_id: regularMeetingId,
-      },
-    );
   });
 
-  it("does not run the read query after prepare fails", async () => {
+  it("returns one stable page error when the combined RPC fails", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: null,
       error: new Error("internal bootstrap table leaked"),
@@ -336,26 +323,37 @@ describe("meeting directory command/query boundary", () => {
       (reason: unknown) => reason,
     );
 
-    expect(error).toEqual(new Error("정모 월을 준비하지 못했습니다."));
+    expect(error).toEqual(new Error("정모 목록을 불러오지 못했습니다."));
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(String(error)).not.toContain("bootstrap table");
   });
 
-  it("does not run the read query after an invalid prepare acknowledgement", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: { status: "partial" }, error: null });
+  it("temporarily falls back to the two legacy RPCs until the migration is applied", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: null,
+        error: { code: "PGRST202", message: "function not found" },
+      })
+      .mockResolvedValueOnce({ data: { status: "prepared" }, error: null })
+      .mockResolvedValueOnce({ data: validDatabasePage(), error: null });
     mocks.createClient.mockResolvedValue({ rpc });
 
     await expect(
       loadMeetingDirectoryPage({ month: "2026-07" }),
-    ).rejects.toThrow("정모 월을 준비하지 못했습니다.");
-    expect(rpc).toHaveBeenCalledTimes(1);
+    ).resolves.toMatchObject({ periodMonth: "2026-07-01" });
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual([
+      "load_club_meeting_directory_page",
+      "prepare_club_meeting_month",
+      "get_club_meeting_directory_page",
+    ]);
   });
 
-  it("returns one stable page error when the pure query or DTO parsing fails", async () => {
-    const rpc = vi
-      .fn()
-      .mockResolvedValueOnce({ data: { status: "prepared" }, error: null })
-      .mockResolvedValueOnce({ data: { raw: "private database payload" }, error: null });
+  it("returns one stable page error when the combined response is invalid", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { raw: "private database payload" },
+      error: null,
+    });
     mocks.createClient.mockResolvedValue({ rpc });
 
     await expect(
