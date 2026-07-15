@@ -34,6 +34,9 @@
 - Supabase 읽기 요청 3회를 비교한 결과 순차 호출은 898~1,893ms, 병렬 호출은 345~923ms로 측정돼 데이터 양보다 원격 왕복 누적이 정모 페이지 병목임을 확인했다.
 - 단일 정모 디렉터리 RPC와 구버전 DB 호환 경로를 RED→GREEN으로 검증했고 전체 테스트 88개 파일, 496개 테스트와 ESLint, TypeScript, `git diff --check`가 통과했다.
 - `202607150003_optimize_meeting_directory_load.sql`은 코드에 포함했으며 운영 Supabase 적용과 인증된 페이지 재측정은 대기 중이다.
+- 정모 기본 장소 변경의 로컬 검증 게이트에서 전체 테스트 89개 파일, 501개 테스트와 ESLint, TypeScript, `git diff --check`가 통과했다.
+- 운영 Supabase의 service-role HEAD/count 조회에서 정모 5건 모두 장소가 null이고 `용마테니스장`인 행은 0건임을 확인했으며, PostgREST OpenAPI에도 `load_club_meeting_directory_page` RPC가 없어 `202607150003`과 `202607150004`는 아직 적용되지 않은 상태다.
+- 운영 DB 직접 주소는 IPv6만 해석되고 실행 환경에 IPv6 경로가 없어 연결할 수 없었으며, 지역별 Supabase pooler는 프로젝트 tenant를 찾지 못했고 Supabase CLI용 access token도 없어 마이그레이션 적용을 수행하지 않았다. 기존 브라우저 탭 확인은 명시적 승인 없이 관련 없는 세션 정보를 노출할 수 있어 사용하지 않았고, 따라서 인증된 정모·일정 화면 QA도 성공으로 처리하지 않았다.
 - 운영 DB에 `fee_monthly_notes` 테이블, RLS 정책 4개, `fee_payments_sync_monthly_note` 트리거와 `202607150001` 마이그레이션 이력이 존재함을 확인했다.
 - 마이그레이션 직후 월간 메모 0건, `(member_id, period_month)` 중복 그룹 0건이었다.
 - 1440×900에서 미납 회원 메모 입력·수정, 459자 요약의 320px 말줄임, 납부 처리 후 메모 유지, 납부 취소 후 미납 복구를 확인했다.
