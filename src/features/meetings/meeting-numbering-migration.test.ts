@@ -56,6 +56,34 @@ describe("meeting numbering migration", () => {
     );
   });
 
+  it("temporarily disables only the lifecycle append-only trigger around cleanup", () => {
+    const lifecycleCleanupSql =
+      "alter table public.meeting_lifecycle_events\n" +
+      "  disable trigger meeting_lifecycle_events_prevent_mutation;\n" +
+      "  delete from public.meeting_lifecycle_events\n" +
+      "  where meeting_id = launch_excluded_meeting_id;\n" +
+      "  alter table public.meeting_lifecycle_events\n" +
+      "  enable trigger meeting_lifecycle_events_prevent_mutation;";
+    const disableTrigger = migrationSql.indexOf(
+      "alter table public.meeting_lifecycle_events\n  disable trigger meeting_lifecycle_events_prevent_mutation",
+    );
+    const lifecycleDelete = migrationSql.indexOf(
+      "delete from public.meeting_lifecycle_events\n  where meeting_id = launch_excluded_meeting_id",
+    );
+    const enableTrigger = migrationSql.indexOf(
+      "alter table public.meeting_lifecycle_events\n  enable trigger meeting_lifecycle_events_prevent_mutation",
+    );
+    const meetingDelete = migrationSql.indexOf(
+      "delete from public.club_meetings\n  where id = launch_excluded_meeting_id",
+    );
+
+    expect(disableTrigger).toBeGreaterThan(-1);
+    expect(lifecycleDelete).toBeGreaterThan(disableTrigger);
+    expect(enableTrigger).toBeGreaterThan(lifecycleDelete);
+    expect(meetingDelete).toBeGreaterThan(enableTrigger);
+    expect(migrationSql).toContain(lifecycleCleanupSql);
+  });
+
   it("adds, backfills, and constrains persistent cumulative meeting numbers", () => {
     expect(migrationSql).toContain("add column meeting_number integer");
     expect(migrationSql).toContain("club_meetings_regular_number_unique");

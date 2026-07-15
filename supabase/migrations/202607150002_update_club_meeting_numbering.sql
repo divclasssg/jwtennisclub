@@ -20,8 +20,12 @@ begin
 
   delete from public.meeting_attendance
   where meeting_id = launch_excluded_meeting_id;
+  alter table public.meeting_lifecycle_events
+  disable trigger meeting_lifecycle_events_prevent_mutation;
   delete from public.meeting_lifecycle_events
   where meeting_id = launch_excluded_meeting_id;
+  alter table public.meeting_lifecycle_events
+  enable trigger meeting_lifecycle_events_prevent_mutation;
   delete from public.club_meetings
   where id = launch_excluded_meeting_id;
 end;
