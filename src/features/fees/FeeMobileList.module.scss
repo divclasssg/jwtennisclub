@@ -63,3 +63,27 @@
   line-height: var(--line-height-caption);
   letter-spacing: var(--letter-spacing-caption);
 }
+
+.fee-mobile-note {
+  display: grid;
+  gap: var(--spacing-xs);
+  color: var(--ink-muted-48);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-caption);
+}
+
+.fee-mobile-note-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.fee-mobile-note-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -23,7 +23,10 @@ const mocks = vi.hoisted(() => {
     eq: vi.fn(() => targetMemberQuery),
     neq: vi.fn(() => targetMemberQuery),
     lte: vi.fn(() => targetMemberQuery),
-    maybeSingle: vi.fn(async () => ({ data: { id: "member-1" }, error: null })),
+    maybeSingle: vi.fn(async () => ({
+      data: { id: "member-1" } as { id: string } | null,
+      error: null,
+    })),
   };
   const membersTable = {
     select: vi.fn((columns: string) =>
@@ -32,7 +35,10 @@ const mocks = vi.hoisted(() => {
   };
   const existingNoteQuery = {
     eq: vi.fn(() => existingNoteQuery),
-    maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+    maybeSingle: vi.fn(async () => ({
+      data: null as { id: string } | null,
+      error: null,
+    })),
   };
   const noteUpdateQuery = {
     eq: vi.fn(async () => ({ error: null })),

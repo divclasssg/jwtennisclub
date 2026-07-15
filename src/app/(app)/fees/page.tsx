@@ -1,5 +1,9 @@
 import styles from "./page.module.scss";
-import { cancelFeePayment, createFeePayment } from "./actions";
+import {
+  cancelFeePayment,
+  createFeePayment,
+  saveFeeMonthlyNote,
+} from "./actions";
 import { ActionLink, Button, TextInput } from "@/components/atoms";
 import {
   EmptyState,
@@ -11,6 +15,7 @@ import {
 import { DataPanel, DataTable, parseSortState, SortableTableHeader, stableSortRows } from "@/components/organisms";
 import { ManagementPageTemplate } from "@/components/templates";
 import { createClient } from "@/lib/supabase/server";
+import { currentOperatorHasPermission } from "@/features/auth/operator-context";
 import {
   buildFeeBoardRows,
   buildFeeListSummary,
@@ -21,6 +26,14 @@ import {
   type FeeListSearchParams,
 } from "@/features/fees/fee-list";
 import { FeeMobileList } from "@/features/fees/FeeMobileList";
+import { FeeNoteModal } from "@/features/fees/FeeNoteModal";
+import {
+  buildFeesHref,
+  FEE_SORT_KEYS,
+  mapFeeMonthlyNoteRow,
+  type FeeListState,
+  type FeeSortKey,
+} from "@/features/fees/fee-note";
 import {
   DEFAULT_MONTHLY_FEE_AMOUNT,
   FEE_EXEMPT_MEMBER_CODE,
@@ -28,6 +41,7 @@ import {
 } from "@/features/fees/fee-model";
 import {
   applyOperatorPositionInfo,
+  firstSearchParam,
   formatDate,
   formatMemberKind,
   mapMemberRow,
@@ -36,9 +50,6 @@ import {
 type FeesPageProps = {
   searchParams: Promise<FeeListSearchParams>;
 };
-
-const FEE_SORT_KEYS = ["memberCode", "name", "kind", "status", "amount", "paidDate", "memo"] as const;
-type FeeSortKey = (typeof FEE_SORT_KEYS)[number];
 
 type OperatorPositionDatabaseRow = {
   id: string;
@@ -91,6 +102,22 @@ async function getFeePayments(periodMonth: string) {
   }
 
   return (data ?? []).map(mapFeePaymentRow);
+}
+
+async function getFeeMonthlyNotes(periodMonth: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("fee_monthly_notes")
+    .select(
+      "id, member_id, period_month, memo, created_by, updated_by, created_at, updated_at",
+    )
+    .eq("period_month", periodMonth);
+
+  if (error) {
+    throw new Error("회비 메모를 불러오지 못했습니다.");
+  }
+
+  return (data ?? []).map(mapFeeMonthlyNoteRow);
 }
 
 async function getFeeTargetMembers(periodMonth: string, query: string) {
@@ -165,7 +192,7 @@ function feeSortValue(
     case "status": return formatPaymentStatus(row);
     case "amount": return row.payment?.amount ?? DEFAULT_MONTHLY_FEE_AMOUNT;
     case "paidDate": return row.payment?.paidDate;
-    case "memo": return row.payment?.memo;
+    case "memo": return row.note?.memo;
   }
 }
 
@@ -173,13 +200,18 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
   const params = await searchParams;
   const filters = normalizeFeeListFilters(params);
   const sortState = parseSortState(params, FEE_SORT_KEYS, { key: "memberCode", direction: "asc" });
-  const [payments, targetMembers] = await Promise.all([
+  const [payments, targetMembers, notes, canCreateNotes, canUpdateNotes] = await Promise.all([
     getFeePayments(filters.periodMonth),
     getFeeTargetMembers(filters.periodMonth, filters.query),
+    getFeeMonthlyNotes(filters.periodMonth),
+    currentOperatorHasPermission("fees.payments.create"),
+    currentOperatorHasPermission("fees.payments.update"),
   ]);
+  const canManageNotes = canCreateNotes || canUpdateNotes;
   const boardRows = buildFeeBoardRows({
     members: targetMembers,
     payments,
+    notes,
     query: filters.query,
   });
   const sortedBoardRows = stableSortRows(boardRows, (row) => feeSortValue(row, sortState.key), sortState.direction);
@@ -195,9 +227,21 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
   });
   const hasFilters = Boolean(filters.query);
   const today = getTodayInputValue();
+  const listState: FeeListState = {
+    month: filters.periodMonth.slice(0, 7),
+    q: filters.query || undefined,
+    sort: firstSearchParam(params.sort),
+    direction: firstSearchParam(params.direction),
+  };
+  const selectedNoteMemberId = firstSearchParam(params.note);
+  const selectedNoteRow = canManageNotes
+    ? sortedBoardRows.find((row) => row.memberId === selectedNoteMemberId)
+    : undefined;
+  const closeNoteHref = buildFeesHref(listState);
 
   return (
-    <ManagementPageTemplate
+    <>
+      <ManagementPageTemplate
       description={
         <>
           월을 선택한 뒤 회원별 납부 상태를 바로 확인하고 미납 행에서 즉시 납부
@@ -280,7 +324,32 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                           원
                         </td>
                         <td>{row.payment ? formatDate(row.payment.paidDate) : "-"}</td>
-                        <td>{row.payment?.memo ?? "-"}</td>
+                        <td>
+                          <div className={styles["fees-note-cell"]}>
+                            {row.note ? (
+                              <span
+                                className={styles["fees-note-summary"]}
+                                title={row.note.memo}
+                              >
+                                {row.note.memo}
+                              </span>
+                            ) : null}
+                            {canManageNotes ? (
+                              <ActionLink
+                                aria-label={`${row.memberName} 메모 ${row.note ? "수정" : "입력"}`}
+                                href={buildFeesHref(listState, {
+                                  note: row.memberId,
+                                })}
+                                size="compact"
+                                variant="secondary"
+                              >
+                                {row.note ? "수정" : "메모 입력"}
+                              </ActionLink>
+                            ) : row.note ? null : (
+                              "-"
+                            )}
+                          </div>
+                        </td>
                         <td>
                           {row.payment ? (
                             <form
@@ -335,11 +404,13 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
               </div>
               <div className={styles["fees-mobile-list-view"]}>
                 <FeeMobileList
+                  canManageNotes={canManageNotes}
                   cancelPaymentAction={cancelFeePayment}
                   createPaymentAction={createFeePayment}
                   periodMonth={filters.periodMonth.slice(0, 7)}
                   rows={sortedBoardRows}
                   today={today}
+                  listState={listState}
                 />
               </div>
             </>
@@ -358,6 +429,21 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
         </SummaryGrid>
       }
       title="회비 관리"
-    />
+      />
+      {selectedNoteRow ? (
+        <FeeNoteModal
+          action={saveFeeMonthlyNote}
+          closeHref={closeNoteHref}
+          direction={listState.direction ?? ""}
+          errorCode={firstSearchParam(params.noteError)}
+          memberId={selectedNoteRow.memberId}
+          memberName={selectedNoteRow.memberName}
+          memo={selectedNoteRow.note?.memo ?? ""}
+          periodMonth={filters.periodMonth}
+          query={filters.query}
+          sort={listState.sort ?? ""}
+        />
+      ) : null}
+    </>
   );
 }

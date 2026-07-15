@@ -34,7 +34,7 @@ export type FeeMonthlyNoteDatabaseRow = {
   updated_at: string;
 };
 
-type FeeListState = {
+export type FeeListState = {
   month?: string;
   q?: string;
   sort?: string;

@@ -4,6 +4,21 @@
   margin: 0;
 }
 
+.fees-note-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.fees-note-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .fees-table-view {
   display: block;
   height: 100%;

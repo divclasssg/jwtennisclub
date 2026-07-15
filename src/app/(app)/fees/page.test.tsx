@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 import FeesPage from "./page";
 
+const permissionMocks = vi.hoisted(() => ({
+  currentOperatorHasPermission: vi.fn(async () => true),
+}));
+
 const payments = [
   {
     id: "payment-1",
@@ -48,6 +52,18 @@ const members = [
 const queryState = {
   payments,
   members,
+  notes: [
+    {
+      id: "note-1",
+      member_id: "member-1",
+      period_month: "2026-07-01",
+      memo: "다음 달 합산",
+      created_by: "operator-id",
+      updated_by: "operator-id",
+      created_at: "2026-07-15T00:00:00Z",
+      updated_at: "2026-07-15T00:00:00Z",
+    },
+  ],
   profileRows: [
     {
       id: "profile-treasurer",
@@ -84,10 +100,14 @@ function createQueryBuilder() {
 }
 
 const feePaymentsQuery = createQueryBuilder();
+const feeNotesQuery = createQueryBuilder();
 const membersQuery = createQueryBuilder();
 const profilesQuery = createQueryBuilder();
 feePaymentsQuery.then.mockImplementation((resolve) =>
   resolve({ data: queryState.payments, error: null }),
+);
+feeNotesQuery.then.mockImplementation((resolve) =>
+  resolve({ data: queryState.notes, error: null }),
 );
 membersQuery.then.mockImplementation((resolve) =>
   resolve({ data: queryState.members, error: null }),
@@ -98,6 +118,8 @@ profilesQuery.then.mockImplementation((resolve) =>
 const from = vi.fn((table: string) =>
   table === "fee_payments"
     ? feePaymentsQuery
+    : table === "fee_monthly_notes"
+      ? feeNotesQuery
     : table === "profiles"
       ? profilesQuery
       : membersQuery,
@@ -106,6 +128,15 @@ const from = vi.fn((table: string) =>
 vi.mock("./actions", () => ({
   cancelFeePayment: vi.fn(),
   createFeePayment: vi.fn(),
+  saveFeeMonthlyNote: vi.fn(),
+}));
+
+vi.mock("@/features/auth/operator-context", () => ({
+  currentOperatorHasPermission: permissionMocks.currentOperatorHasPermission,
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ back: vi.fn(), replace: vi.fn() }),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -117,6 +148,18 @@ describe("FeesPage", () => {
     cleanup();
     queryState.payments = payments;
     queryState.members = members;
+    queryState.notes = [
+      {
+        id: "note-1",
+        member_id: "member-1",
+        period_month: "2026-07-01",
+        memo: "다음 달 합산",
+        created_by: "operator-id",
+        updated_by: "operator-id",
+        created_at: "2026-07-15T00:00:00Z",
+        updated_at: "2026-07-15T00:00:00Z",
+      },
+    ];
     queryState.profileRows = [
       {
         id: "profile-treasurer",
@@ -135,7 +178,7 @@ describe("FeesPage", () => {
     ];
     from.mockClear();
 
-    for (const query of [feePaymentsQuery, membersQuery, profilesQuery]) {
+    for (const query of [feePaymentsQuery, feeNotesQuery, membersQuery, profilesQuery]) {
       query.select.mockClear();
       query.eq.mockClear();
       query.lte.mockClear();
@@ -149,12 +192,17 @@ describe("FeesPage", () => {
     feePaymentsQuery.then.mockImplementation((resolve) =>
       resolve({ data: queryState.payments, error: null }),
     );
+    feeNotesQuery.then.mockImplementation((resolve) =>
+      resolve({ data: queryState.notes, error: null }),
+    );
     membersQuery.then.mockImplementation((resolve) =>
       resolve({ data: queryState.members, error: null }),
     );
     profilesQuery.then.mockImplementation((resolve) =>
       resolve({ data: queryState.profileRows, error: null }),
     );
+    permissionMocks.currentOperatorHasPermission.mockReset();
+    permissionMocks.currentOperatorHasPermission.mockResolvedValue(true);
   });
 
   it("renders monthly fee board rows with filters and summary", async () => {
@@ -258,13 +306,80 @@ describe("FeesPage", () => {
     expect(within(items[0]).getByRole("heading", { name: "김민수" })).toBeInTheDocument();
     expect(within(items[0]).getByText("회원번호 M0001")).toBeInTheDocument();
     expect(within(items[0]).getByText("납부일 2026.07.03")).toBeInTheDocument();
-    expect(within(items[0]).getByText("메모 입금 확인")).toBeInTheDocument();
+    expect(within(items[0]).getByText("다음 달 합산")).toBeInTheDocument();
+    expect(
+      within(items[0]).getByRole("link", { name: "김민수 메모 수정" }),
+    ).toBeInTheDocument();
     expect(within(items[0]).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
     expect(within(items[1]).getByRole("heading", { name: "이영희" })).toBeInTheDocument();
     expect(within(items[1]).getByText("회원번호 M0002")).toBeInTheDocument();
     expect(within(items[1]).getByText("미납")).toBeInTheDocument();
     expect(within(items[0]).getByText("기준 금액 30,000원")).toBeInTheDocument();
     expect(within(items[1]).getByRole("button", { name: "납부 처리" })).toBeInTheDocument();
+    expect(
+      within(items[1]).getByRole("link", { name: "이영희 메모 입력" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders independent note actions for paid and unpaid members", async () => {
+    render(
+      await FeesPage({
+        searchParams: Promise.resolve({
+          month: "2026-07",
+          sort: "memo",
+          direction: "desc",
+        }),
+      }),
+    );
+
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("다음 달 합산")).toBeInTheDocument();
+    expect(
+      within(table).getByRole("link", { name: "김민수 메모 수정" }),
+    ).toHaveAttribute(
+      "href",
+      "/fees?month=2026-07&sort=memo&direction=desc&note=member-1",
+    );
+    expect(
+      within(table).getByRole("link", { name: "이영희 메모 입력" }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the selected member note modal and preserves close state", async () => {
+    render(
+      await FeesPage({
+        searchParams: Promise.resolve({
+          month: "2026-07",
+          q: "김",
+          sort: "memo",
+          direction: "desc",
+          note: "member-1",
+        }),
+      }),
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "김민수 2026.07 회비 메모" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("메모")).toHaveValue("다음 달 합산");
+    expect(screen.getByRole("link", { name: "취소" })).toHaveAttribute(
+      "href",
+      "/fees?month=2026-07&q=%EA%B9%80&sort=memo&direction=desc",
+    );
+  });
+
+  it("keeps notes readable but hides edit controls without manage permission", async () => {
+    permissionMocks.currentOperatorHasPermission.mockResolvedValue(false);
+
+    render(
+      await FeesPage({
+        searchParams: Promise.resolve({ month: "2026-07", note: "member-1" }),
+      }),
+    );
+
+    expect(screen.getAllByText("다음 달 합산").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: /메모 (입력|수정)/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("renders an empty state when no members match", async () => {

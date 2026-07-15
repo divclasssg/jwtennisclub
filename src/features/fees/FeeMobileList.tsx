@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { Badge, Button } from "@/components/atoms";
+import { ActionLink, Badge, Button } from "@/components/atoms";
 import { formatDate, formatMemberKind } from "@/features/members/member-list";
 import {
   DEFAULT_MONTHLY_FEE_AMOUNT,
@@ -9,15 +9,18 @@ import {
   type FeeBoardMemberRow,
 } from "./fee-list";
 import styles from "./FeeMobileList.module.scss";
+import { buildFeesHref, type FeeListState } from "./fee-note";
 
 type FormAction = NonNullable<ComponentProps<"form">["action"]>;
 
 type FeeMobileListProps = {
+  canManageNotes: boolean;
   cancelPaymentAction: FormAction;
   createPaymentAction: FormAction;
   periodMonth: string;
   rows: FeeBoardMemberRow[];
   today: string;
+  listState: FeeListState;
 };
 
 function formatPaymentStatus(row: FeeBoardMemberRow) {
@@ -25,11 +28,13 @@ function formatPaymentStatus(row: FeeBoardMemberRow) {
 }
 
 export function FeeMobileList({
+  canManageNotes,
   cancelPaymentAction,
   createPaymentAction,
   periodMonth,
   rows,
   today,
+  listState,
 }: FeeMobileListProps) {
   return (
     <ul aria-label="모바일 회비 목록" className={styles["fee-mobile-list"]}>
@@ -81,9 +86,24 @@ export function FeeMobileList({
               <p className={styles["fee-mobile-detail"]}>
                 납부일 {row.payment ? formatDate(row.payment.paidDate) : "-"}
               </p>
-              <p className={styles["fee-mobile-detail"]}>
-                메모 {row.payment?.memo ?? "-"}
-              </p>
+              <div className={styles["fee-mobile-note"]}>
+                <span>메모</span>
+                <div className={styles["fee-mobile-note-content"]}>
+                  <span className={styles["fee-mobile-note-summary"]}>
+                    {row.note?.memo ?? "-"}
+                  </span>
+                  {canManageNotes ? (
+                    <ActionLink
+                      aria-label={`${row.memberName} 메모 ${row.note ? "수정" : "입력"}`}
+                      href={buildFeesHref(listState, { note: row.memberId })}
+                      size="compact"
+                      variant="secondary"
+                    >
+                      {row.note ? "수정" : "메모 입력"}
+                    </ActionLink>
+                  ) : null}
+                </div>
+              </div>
             </div>
           </li>
         );
