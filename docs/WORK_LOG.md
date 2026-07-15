@@ -11,6 +11,7 @@
 - 실제 QA에서 긴 메모가 데스크톱 표 셀을 과도하게 확장하는 문제를 발견해 전역 최대 너비 토큰과 말줄임 회귀 테스트를 추가했다.
 - Next.js가 생성한 병렬 라우트 타입에 맞춰 앱 레이아웃의 `modal` 슬롯을 필수 속성으로 정리했다.
 - Supabase SQL Editor에서 `202607150001_add_fee_monthly_notes.sql`을 단일 트랜잭션으로 운영 DB에 적용하고 마이그레이션 이력을 등록했다.
+- 검증된 월간 회비 메모 커밋을 `main`에 fast-forward 병합하고 기능 작업 트리와 로컬 기능 브랜치를 정리했다.
 
 ### Verification Evidence
 - 운영 DB에 `fee_monthly_notes` 테이블, RLS 정책 4개, `fee_payments_sync_monthly_note` 트리거와 `202607150001` 마이그레이션 이력이 존재함을 확인했다.
@@ -21,6 +22,7 @@
 - 전체 테스트: 85개 파일, 479개 테스트 통과.
 - `npm run lint`, `npx tsc --noEmit`, `git diff --check`: 통과.
 - 공개 Supabase 환경 변수만 사용한 Next.js 16.2.10 Webpack 프로덕션 빌드: 컴파일, TypeScript, 26개 정적 페이지 생성과 전체 라우트 빌드 통과.
+- 작업 트리 정리 후 원본 `main`에서 `npm test`: 85개 파일, 479개 테스트 통과.
 
 ## 2026-07-14
 
