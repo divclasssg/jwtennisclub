@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import Image from "next/image";
 import { logout } from "@/app/(auth)/login/actions";
 import { PageTitleProvider, ShellPageTitle } from "./PageTitleContext";
 import { ShellNavigation } from "./ShellNavigation";
@@ -46,6 +47,53 @@ export function AppShell({
             <div className={styles["shell"]}>
                 <header className={styles["shell-global-nav"]}>
                     <Link className={styles["shell-brand"]} href="/dashboard">
+                        JW TENNIS CLUB
+                    </Link>
+                </header>
+                <header
+                    aria-label="모바일 앱 헤더"
+                    className={styles["shell-mobile-header"]}
+                >
+                    <details className={styles["shell-mobile-menu"]}>
+                        <summary aria-label="계정 메뉴" role="button">
+                            <Image
+                                alt=""
+                                height={24}
+                                src="/icons/menu.png"
+                                width={24}
+                            />
+                        </summary>
+                        <div className={styles["shell-mobile-account-panel"]}>
+                            <div className={styles["shell-mobile-user-context"]}>
+                                <p className={styles["shell-mobile-user-name"]}>
+                                    {userDisplayName}
+                                </p>
+                                <p className={styles["shell-mobile-kicker"]}>
+                                    {shellKicker}
+                                </p>
+                            </div>
+                            <div className={styles["shell-mobile-account-actions"]}>
+                                <Link
+                                    className={styles["shell-password-link"]}
+                                    href="/settings/password"
+                                >
+                                    비밀번호 변경
+                                </Link>
+                                <form action={logout}>
+                                    <button
+                                        className={styles["shell-logout-button"]}
+                                        type="submit"
+                                    >
+                                        로그아웃
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </details>
+                    <Link
+                        className={styles["shell-mobile-brand"]}
+                        href="/dashboard"
+                    >
                         JW TENNIS CLUB
                     </Link>
                 </header>
