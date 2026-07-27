@@ -1,31 +1,16 @@
 import Link from "next/link";
-import { Badge } from "@/components/atoms";
 import {
-  formatDate,
   formatMemberDirectoryKind,
   formatMemberPosition,
   formatMemberStatus,
 } from "./member-list";
 import type { MemberListRow } from "./member-directory";
-import type { MemberStatus } from "./member-model";
 import styles from "./MemberMobileList.module.scss";
 
 type MemberMobileListProps = {
   canUpdate?: boolean;
   members: MemberListRow[];
 };
-
-function getMemberStatusTone(status: MemberStatus) {
-  if (status === "active") {
-    return "success";
-  }
-
-  if (status === "withdrawn") {
-    return "danger";
-  }
-
-  return "muted";
-}
 
 export function MemberMobileList({ canUpdate = true, members }: MemberMobileListProps) {
   return (
@@ -35,10 +20,11 @@ export function MemberMobileList({ canUpdate = true, members }: MemberMobileList
           <div className={styles["member-mobile-header"]}>
             <div className={styles["member-mobile-title"]}>
               <h3 className={styles["member-mobile-name"]}>{member.name}</h3>
-              <div className={styles["member-mobile-badges"]}>
-                <Badge tone={getMemberStatusTone(member.status)}>
-                  {formatMemberStatus(member.status)}
-                </Badge>
+              <div className={styles["member-mobile-meta"]}>
+                <span>{member.memberCode}</span>
+                <span>{formatMemberPosition(member)}</span>
+                <span>{formatMemberDirectoryKind(member)}</span>
+                <span>{formatMemberStatus(member.status)}</span>
               </div>
             </div>
             {canUpdate ? <Link
@@ -48,19 +34,6 @@ export function MemberMobileList({ canUpdate = true, members }: MemberMobileList
             >
               수정
             </Link> : null}
-          </div>
-
-          <div className={styles["member-mobile-detail-list"]}>
-            <p className={styles["member-mobile-detail"]}>회원번호 {member.memberCode}</p>
-            <p className={styles["member-mobile-detail"]}>
-              연락처 {member.phoneDisplay}
-            </p>
-            <p className={styles["member-mobile-detail"]}>그룹 {member.groupCode ?? "없음"}</p>
-            <p className={styles["member-mobile-detail"]}>구분 {formatMemberDirectoryKind(member)}</p>
-            <p className={styles["member-mobile-detail"]}>직책 {formatMemberPosition(member)}</p>
-            <p className={styles["member-mobile-detail"]}>
-              가입일 {formatDate(member.joinedDate)}
-            </p>
           </div>
         </li>
       ))}

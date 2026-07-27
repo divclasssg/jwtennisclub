@@ -1,16 +1,14 @@
 .member-mobile-list {
   display: grid;
-  gap: var(--spacing-sm);
   margin: 0;
-  padding: var(--spacing-md);
+  padding: 0;
   list-style: none;
 }
 
 .member-mobile-item {
-  display: grid;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  border-bottom: var(--hairline-width) solid var(--divider-soft);
+  min-width: 0;
+  padding: var(--spacing-sm) var(--spacing-24);
+  border-bottom: var(--hairline-width) solid var(--hairline);
 
   &:last-child {
     border-bottom: 0;
@@ -22,28 +20,38 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--spacing-sm);
+  min-width: 0;
 }
 
 .member-mobile-title {
   display: grid;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-4);
   min-width: 0;
 }
 
 .member-mobile-name {
   margin: 0;
   color: var(--ink);
-  font-size: var(--font-size-tagline);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-tagline);
+  font-size: var(--text-title-size);
+  font-weight: var(--text-title-weight);
+  line-height: var(--text-title-line-height);
   letter-spacing: var(--letter-spacing-tagline);
   overflow-wrap: anywhere;
 }
 
-.member-mobile-badges {
+.member-mobile-meta {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-xs);
+  min-width: 0;
+  color: var(--ink-muted-48);
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--text-body-line-height);
+
+  span {
+    overflow-wrap: anywhere;
+  }
 }
 
 .member-mobile-edit-link {
@@ -53,17 +61,4 @@
   line-height: var(--line-height-caption-strong);
   letter-spacing: var(--letter-spacing-caption);
   white-space: nowrap;
-}
-
-.member-mobile-detail-list {
-  display: grid;
-  gap: var(--spacing-xs);
-}
-
-.member-mobile-detail {
-  margin: 0;
-  color: var(--ink-muted-48);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  letter-spacing: var(--letter-spacing-caption);
 }
