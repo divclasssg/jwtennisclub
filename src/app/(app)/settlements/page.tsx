@@ -1,3 +1,4 @@
+import styles from "./page.module.scss";
 import { ActionLink, Button, TextInput } from "@/components/atoms";
 import {
   EmptyState,
@@ -21,6 +22,7 @@ import {
   type SettlementFeePaymentInput,
   type SettlementSearchParams,
 } from "@/features/settlements/settlement-summary";
+import { SettlementCategoryMobileList } from "@/features/settlements/SettlementCategoryMobileList";
 
 type SettlementsPageProps = {
   searchParams: Promise<SettlementSearchParams>;
@@ -145,7 +147,9 @@ export default async function SettlementsPage({
           headerTitle="카테고리별 지출"
         >
           {sortedCategoryRows.length > 0 ? (
-            <DataTable>
+            <>
+            <div className={styles["settlements-table-view"]}>
+              <DataTable>
               <thead>
                 <tr>
                   <SortableTableHeader label="카테고리" pathname="/settlements" searchParams={sortSearchParams} sortKey="category" sortState={sortState} />
@@ -162,7 +166,12 @@ export default async function SettlementsPage({
                   </tr>
                 ))}
               </tbody>
-            </DataTable>
+              </DataTable>
+            </div>
+            <div className={styles["settlements-mobile-list-view"]}>
+              <SettlementCategoryMobileList rows={sortedCategoryRows} />
+            </div>
+            </>
           ) : null}
         </DataPanel>
       }

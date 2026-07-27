@@ -135,6 +135,14 @@ describe("SettlementsPage", () => {
     expect(within(categories).getByRole("cell", { name: "120,000원" })).toBeInTheDocument();
     expect(within(categories).getByRole("cell", { name: "공" })).toBeInTheDocument();
     expect(within(categories).getByRole("cell", { name: "10,000원" })).toBeInTheDocument();
+
+    const mobileList = within(categories).getByRole("list", {
+      name: "모바일 카테고리별 지출",
+    });
+    expect(
+      within(mobileList).getByRole("heading", { name: "코트" }),
+    ).toBeInTheDocument();
+    expect(within(mobileList).getByText("120,000원")).toBeInTheDocument();
   });
 
   it("renders an empty category state when the month has no expenses", async () => {
