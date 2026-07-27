@@ -1,16 +1,17 @@
 .fee-mobile-list {
   display: grid;
-  gap: var(--spacing-sm);
   margin: 0;
-  padding: var(--spacing-md);
+  padding: 0;
   list-style: none;
 }
 
 .fee-mobile-item {
   display: grid;
   gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  border-bottom: var(--hairline-width) solid var(--divider-soft);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--spacing-sm) var(--spacing-24);
+  border-bottom: var(--hairline-width) solid var(--hairline);
 
   &:last-child {
     border-bottom: 0;
@@ -19,9 +20,11 @@
 
 .fee-mobile-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--spacing-sm);
+  min-width: 0;
 }
 
 .fee-mobile-title {
@@ -33,9 +36,9 @@
 .fee-mobile-name {
   margin: 0;
   color: var(--ink);
-  font-size: var(--font-size-tagline);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-tagline);
+  font-size: var(--text-title-size);
+  font-weight: var(--text-title-weight);
+  line-height: var(--text-title-line-height);
   letter-spacing: var(--letter-spacing-tagline);
   overflow-wrap: anywhere;
 }
@@ -47,13 +50,14 @@
 }
 
 .fee-mobile-action {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   margin: 0;
 }
 
 .fee-mobile-detail-list {
   display: grid;
   gap: var(--spacing-xs);
+  min-width: 0;
 }
 
 .fee-mobile-detail {
@@ -62,6 +66,7 @@
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   letter-spacing: var(--letter-spacing-caption);
+  overflow-wrap: anywhere;
 }
 
 .fee-mobile-note {
@@ -75,6 +80,7 @@
 
 .fee-mobile-note-content {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-sm);
   min-width: 0;

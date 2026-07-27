@@ -315,6 +315,7 @@ describe("FeesPage", () => {
     expect(within(items[1]).getByText("회원번호 M0002")).toBeInTheDocument();
     expect(within(items[1]).getByText("미납")).toBeInTheDocument();
     expect(within(items[0]).getByText("기준 금액 30,000원")).toBeInTheDocument();
+    expect(within(mobileList).queryByText("운영진")).not.toBeInTheDocument();
     expect(within(items[1]).getByRole("button", { name: "납부 처리" })).toBeInTheDocument();
     expect(
       within(items[1]).getByRole("link", { name: "이영희 메모 입력" }),

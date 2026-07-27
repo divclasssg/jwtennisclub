@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import { ActionLink, Badge, Button } from "@/components/atoms";
-import { formatDate, formatMemberKind } from "@/features/members/member-list";
+import { formatDate } from "@/features/members/member-list";
 import {
   DEFAULT_MONTHLY_FEE_AMOUNT,
 } from "./fee-model";
@@ -47,9 +47,6 @@ export function FeeMobileList({
               <div className={styles["fee-mobile-title"]}>
                 <h3 className={styles["fee-mobile-name"]}>{row.memberName}</h3>
                 <div className={styles["fee-mobile-badges"]}>
-                  <Badge tone={row.operatorProfileId ? "info" : "muted"}>
-                    {formatMemberKind(row)}
-                  </Badge>
                   <Badge tone={row.payment ? "success" : "danger"}>
                     {formatPaymentStatus(row)}
                   </Badge>
