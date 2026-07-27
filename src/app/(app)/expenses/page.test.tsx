@@ -85,18 +85,33 @@ describe("ExpensesPage", () => {
     expect(screen.getAllByText("120,000원").length).toBeGreaterThan(0);
 
     const list = screen.getByRole("region", { name: "월별 지출 목록" });
+    const table = within(list).getByRole("table");
     expect(within(list).getByText("2026.07 · 총 1건")).toBeInTheDocument();
-    expect(within(list).getByRole("cell", { name: "코트" })).toBeInTheDocument();
-    expect(within(list).getByRole("cell", { name: "코트 대관" })).toBeInTheDocument();
-    expect(within(list).getByRole("link", { name: "영수증 보기" })).toHaveAttribute(
+    expect(within(table).getByRole("cell", { name: "코트" })).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "코트 대관" })).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "영수증 보기" })).toHaveAttribute(
       "href",
       "/expenses/receipts?key=expenses%2Foperator-id%2F2026%2F07%2Freceipt.jpg",
     );
-    expect(within(list).getByRole("link", { name: "수정" })).toHaveAttribute(
+    expect(within(table).getByRole("link", { name: "수정" })).toHaveAttribute(
       "href",
       "/expenses/expense-1/edit",
     );
-    expect(within(list).getByRole("button", { name: "삭제" })).toBeInTheDocument();
+    expect(within(table).getByRole("button", { name: "삭제" })).toBeInTheDocument();
+
+    const mobileList = within(list).getByRole("list", {
+      name: "모바일 지출 목록",
+    });
+    expect(
+      within(mobileList).getByRole("heading", { name: "코트 대관" }),
+    ).toBeInTheDocument();
+    expect(within(mobileList).getByText("120,000원")).toBeInTheDocument();
+    expect(
+      within(mobileList).getByRole("link", { name: "영수증 보기" }),
+    ).toHaveAttribute(
+      "href",
+      "/expenses/receipts?key=expenses%2Foperator-id%2F2026%2F07%2Freceipt.jpg",
+    );
   });
 
   it("sorts expense rows and preserves month and category in sort links", async () => {
