@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -41,6 +41,22 @@ const meetingRecoverySql = readFileSync(
   ),
   "utf8",
 ).toLowerCase();
+
+const memberSaveAmbiguityFixPath = join(
+  process.cwd(),
+  "supabase/migrations/202607270001_fix_member_save_parameter_ambiguity.sql",
+);
+const memberSaveAmbiguityFixSql = existsSync(memberSaveAmbiguityFixPath)
+  ? readFileSync(memberSaveAmbiguityFixPath, "utf8").toLowerCase()
+  : "";
+
+const firstPostResetCodeFixPath = join(
+  process.cwd(),
+  "supabase/migrations/202607270002_resequence_first_post_reset_member_code.sql",
+);
+const firstPostResetCodeFixSql = existsSync(firstPostResetCodeFixPath)
+  ? readFileSync(firstPostResetCodeFixPath, "utf8").toLowerCase()
+  : "";
 
 describe("member roster preparation migration", () => {
   it("backfills codes before making them required and assigns every insert", () => {
@@ -402,6 +418,25 @@ describe("member roster finalization migration", () => {
 });
 
 describe("meeting roster member-write integration", () => {
+  it("removes every member_id parameter ambiguity from the public save RPC", () => {
+    const saveStart = memberSaveAmbiguityFixSql.indexOf(
+      "create or replace function public.save_member_with_contact",
+    );
+    const saveEnd = memberSaveAmbiguityFixSql.indexOf(
+      "revoke execute on function public.save_member_with_contact",
+      saveStart,
+    );
+    const saveFunction = memberSaveAmbiguityFixSql.slice(saveStart, saveEnd);
+
+    expect(saveStart).toBeGreaterThan(-1);
+    expect(saveFunction).toContain("save_member_with_contact.member_id");
+    expect(saveFunction).not.toMatch(/\bdistinct from member_id\b/);
+    expect(saveFunction).toContain(
+      "on conflict on constraint member_contacts_pkey",
+    );
+    expect(saveFunction).not.toContain("on conflict (member_id)");
+  });
+
   it("does not share-lock every member row before an authenticated member write", () => {
     const lockStart = meetingMigrationSql.indexOf(
       "create or replace function public.lock_meeting_automation_rows",
@@ -522,5 +557,29 @@ describe("meeting roster member-write integration", () => {
     expect(transactionBegin).toBeGreaterThan(-1);
     expect(transactionBegin).toBeLessThan(firstFunction);
     expect(transactionCommit).toBeGreaterThan(lastContractChange);
+  });
+});
+
+describe("first post-reset member code repair", () => {
+  it("only mutates the exact incident state and accepts an already-applied repair", () => {
+    const alreadyAppliedCheck = firstPostResetCodeFixSql.indexOf(
+      "allocator_next_suffix = 21",
+    );
+    const incidentGuard = firstPostResetCodeFixSql.indexOf(
+      "allocator_next_suffix is distinct from 25",
+    );
+    const triggerDisable = firstPostResetCodeFixSql.indexOf(
+      "disable trigger members_prevent_member_code_change",
+    );
+
+    expect(alreadyAppliedCheck).toBeGreaterThan(-1);
+    expect(firstPostResetCodeFixSql).toContain(
+      "member code #0020 repair is already applied",
+    );
+    expect(incidentGuard).toBeGreaterThan(alreadyAppliedCheck);
+    expect(triggerDisable).toBeGreaterThan(incidentGuard);
+    expect(firstPostResetCodeFixSql).toContain(
+      "skipping #0024 repair for non-matching state",
+    );
   });
 });
