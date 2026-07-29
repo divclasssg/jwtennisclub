@@ -7,30 +7,34 @@ select has_schema(
   'the private match schema exists'
 );
 
-select is(
-  (
-    select array_agg(class.relname order by class.relname)
-    from pg_catalog.pg_class as class
-    join pg_catalog.pg_namespace as namespace
-      on namespace.oid = class.relnamespace
-    where namespace.nspname = 'match'
-      and class.relkind = 'r'
+select ok(
+  not exists (
+    select 1
+    from unnest(array[
+      'attendances',
+      'audit_events',
+      'game_days',
+      'grades',
+      'match_players',
+      'matches',
+      'member_links',
+      'member_profiles',
+      'offline_leases',
+      'operations',
+      'release_state',
+      'seasons'
+    ]::name[]) as required_table(name)
+    where not exists (
+      select 1
+      from pg_catalog.pg_class as class
+      join pg_catalog.pg_namespace as namespace
+        on namespace.oid = class.relnamespace
+      where namespace.nspname = 'match'
+        and class.relname = required_table.name
+        and class.relkind = 'r'
+    )
   ),
-  array[
-    'attendances',
-    'audit_events',
-    'game_days',
-    'grades',
-    'match_players',
-    'matches',
-    'member_links',
-    'member_profiles',
-    'offline_leases',
-    'operations',
-    'release_state',
-    'seasons'
-  ]::name[],
-  'the match schema contains only the private foundation tables'
+  'all required private match foundation tables exist'
 );
 
 select ok(

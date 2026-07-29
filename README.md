@@ -39,6 +39,39 @@ repository. A later migration must call
 `public.match_assert_integration_preconditions()` with those private settings
 before it creates any match foreign key.
 
+### Local match foundation replay
+
+For the empty local fixture stack only, run the tracked replay wrapper:
+
+```bash
+./scripts/replay-match-foundation-local.sh
+```
+
+The wrapper performs this exact staged procedure:
+
+1. Reset only through migration `202607300000` with
+   `supabase db reset --local --no-seed --version 202607300000`.
+2. Pipe `supabase/scripts/prepare_match_baseline.local.sql` into `psql` inside
+   the local database container. The SQL computes the fixture count and digest
+   inside PostgreSQL and installs them as database-level settings; it does not
+   print either value.
+3. Reconnect as `postgres` and fail unless both `current_setting` values are
+   visible in that fresh connection and match the fixture. This proves the
+   later `supabase migration up --local` connection can see them.
+4. Apply the remaining local migration with `supabase migration up --local`.
+5. On success, command failure, or interruption, the shell `EXIT` trap pipes
+   `supabase/scripts/reset_match_baseline.local.sql` into a privileged local
+   connection. The cleanup reconnects as `postgres` and fails unless both
+   settings are absent.
+
+This boundary is intentionally local-only. The fixture values never appear in
+Git, command arguments, shell history, or wrapper output. Do not adapt this
+helper to a linked or remote database: production evidence must be supplied by
+the approved secret-capable deployment runner and cleaned up in its equivalent
+finally step, without placing evidence in command arguments, environment
+variables, logs, or shell history. This repository must not contain production
+evidence or a production replay command.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
