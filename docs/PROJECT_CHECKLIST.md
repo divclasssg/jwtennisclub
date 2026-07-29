@@ -66,6 +66,10 @@
 - [x] 정모 명단 검색·상태 필터·행 단위 자동 저장·모바일 작업면 개선
 - [x] 정모 관리 disclosure 진행 상태 보존과 필터 중 충돌 재시도 행 유지 회귀 수정
 - [x] 정모 참석·출석 관리와 UI 개선을 `main`에 fast-forward 병합하고 원격 푸시
+- [x] 휴회원별 휴회 시작 월 저장·검증·`2026-08-01` 안전 백필 구현
+- [x] 휴회 시작 월 기준으로 7월 회비 대상 포함 및 8월 제외 처리 구현
+- [x] 휴회 시작 월 기준 회비 메모·CSV와 정모 명단 월 경계 회귀 적용
+- [x] 휴회 시작 월 변경의 루트 전체 테스트·lint·typecheck·프로덕션 빌드 검증
 
 ## Next Work
 - [x] Implement `docs/superpowers/plans/2026-07-13-club-meeting-attendance.md`

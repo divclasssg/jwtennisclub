@@ -1,5 +1,23 @@
 # JW Tennis Club SaaS Work Log
 
+## 2026-07-29
+
+### Completed
+- `members.pause_start_month`를 추가하고 휴회원은 휴회 시작 월을 필수로, 활성·탈퇴 회원은 null만 허용하는 월 단위 제약을 구현했다. 기존 휴회원은 개인 식별 없이 모두 `2026-08-01`로 백필한다.
+- 회원 등록·수정·디렉터리·목록 UI에 휴회 시작 월을 연결했다. `2026-08-01`부터 휴회인 회원은 2026년 7월에는 대상에 남고 8월부터 제외된다.
+- 회비 보드와 월간 메모의 대상 필터, CSV 가져오기에 월 기준 자격 판정을 적용했다. CSV의 7월 행은 허용하고 같은 휴회원의 8월 행은 대상 외로 거부한다.
+- 정모 preparing 명단 동기화, 최초 locked 명단, ad-hoc 추가, 정모 디렉터리 후보를 각 회차 월 기준으로 제한했다. 이미 잠긴 명단과 기존 출석 행은 변경하지 않는다.
+
+### Verification Evidence
+- `.worktrees/**`를 제외한 전체 Vitest: 90개 파일, 527개 테스트 통과.
+- 루트 전체 ESLint: `npx eslint . --ignore-pattern '**/.worktrees/**'` 통과(오류·경고 없음).
+- `npx tsc --noEmit`: 통과.
+- `npm run build`: `.env.local` 표준 로딩으로 Next.js 16.2.10 Turbopack 프로덕션 빌드 통과(26개 정적 페이지 생성).
+- `git diff --check`: 통과.
+
+### Remaining Concern
+- 로컬 Supabase PostgreSQL 컨테이너가 없어 마이그레이션을 실제 DB에 적용하지는 못했다. 배포 전 롤백 가능한 환경에서 `2026-08-01` 백필, 제약 조건, RPC 저장·조회 및 정모 명단 경계를 실행 검증해야 한다.
+
 ## 2026-07-15
 
 ### Completed
