@@ -34,14 +34,20 @@ declare
   configured_key text;
   vault_secret_name text;
 begin
+  if pg_catalog.to_regclass('vault.decrypted_secrets') is null then
+    raise exception 'member-link HMAC key is unavailable'
+      using errcode = '55000';
+  end if;
+
   begin
-    configured_version := nullif(
-      pg_catalog.current_setting(
-        'app.match_link_hmac_key_version',
-        true
-      ),
-      ''
-    )::integer;
+    execute
+      'select nullif(decrypted_secret, '''')::integer
+         from vault.decrypted_secrets
+        where name = $1
+        order by created_at desc
+        limit 1'
+    into configured_version
+    using 'match_member_link_hmac_active_version';
   exception
     when others then
       configured_version := null;
@@ -55,26 +61,14 @@ begin
   vault_secret_name :=
     'match_member_link_hmac_v' || configured_version::text;
 
-  if pg_catalog.to_regclass('vault.decrypted_secrets') is not null then
-    execute
-      'select decrypted_secret
-         from vault.decrypted_secrets
-        where name = $1
-        order by created_at desc
-        limit 1'
-    into configured_key
-    using vault_secret_name;
-  end if;
-
-  if nullif(configured_key, '') is null then
-    configured_key := nullif(
-      pg_catalog.current_setting(
-        'app.match_link_hmac_key_v' || configured_version::text,
-        true
-      ),
-      ''
-    );
-  end if;
+  execute
+    'select decrypted_secret
+       from vault.decrypted_secrets
+      where name = $1
+      order by created_at desc
+      limit 1'
+  into configured_key
+  using vault_secret_name;
 
   if nullif(configured_key, '') is null then
     raise exception 'member-link HMAC key is unavailable'
@@ -108,20 +102,20 @@ declare
   recent_attempts integer;
   matched_member_id uuid;
   matched_member_count integer := 0;
+  release_enabled boolean;
 begin
   if requester_id is null then
     raise exception 'authentication required'
       using errcode = '42501';
   end if;
 
-  if not coalesce(
-    (
-      select release_state.traffic_enabled
-      from match.release_state as release_state
-      where release_state.singleton
-    ),
-    false
-  ) then
+  select release_state.traffic_enabled
+  into release_enabled
+  from match.release_state as release_state
+  where release_state.singleton
+  for update;
+
+  if not coalesce(release_enabled, false) then
     raise exception 'match traffic is disabled'
       using errcode = '55000';
   end if;

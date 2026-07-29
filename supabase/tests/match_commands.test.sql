@@ -1,6 +1,6 @@
 begin;
 
-select plan(51);
+select plan(58);
 
 select has_function(
   'public',
@@ -293,14 +293,14 @@ set local role authenticated;
 
 select throws_like(
   $$select public.apply_game_day_command('{}'::jsonb)$$,
-  '%match traffic is disabled%',
-  'release-off rejects a game mutation before parsing its command'
+  '%invalid game-day command%',
+  'a new game command minimally parses its operation before the release gate'
 );
 
 select throws_like(
   $$select public.apply_admin_command('{}'::jsonb)$$,
-  '%match traffic is disabled%',
-  'release-off rejects a management mutation before parsing its command'
+  '%invalid match management command%',
+  'a new management command minimally parses its operation before the release gate'
 );
 
 reset role;
@@ -432,6 +432,55 @@ set local role authenticated;
 select is(
   public.apply_game_day_command(
     '{
+      "operationId":"b4600000-0000-0000-0000-000000000024",
+      "gameDayId":"b4400000-0000-0000-0000-000000000001",
+      "baseVersion":99,
+      "deviceId":"b4700000-0000-0000-0000-000000000001",
+      "occurredAt":"2026-07-29T01:03:30Z",
+      "source":"online",
+      "type":"update_attendance",
+      "payload":{"memberId":"b4200000-0000-0000-0000-000000000001","checkedIn":true}
+    }'::jsonb
+  ),
+  '{"status":"conflict","version":1,"conflict":{"currentVersion":1}}'::jsonb,
+  'a stale command records and returns a replayable conflict'
+);
+
+reset role;
+
+select is(
+  (select first_write_at from match.release_state where singleton),
+  null::timestamptz,
+  'a persisted conflict is not a successful domain write'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  'b4000000-0000-0000-0000-000000000002',
+  true
+);
+set local role authenticated;
+
+select is(
+  public.apply_game_day_command(
+    '{
+      "operationId":"b4600000-0000-0000-0000-000000000024",
+      "gameDayId":"b4400000-0000-0000-0000-000000000001",
+      "baseVersion":99,
+      "deviceId":"b4700000-0000-0000-0000-000000000001",
+      "occurredAt":"2026-07-29T01:03:30Z",
+      "source":"online",
+      "type":"update_attendance",
+      "payload":{"memberId":"b4200000-0000-0000-0000-000000000001","checkedIn":true}
+    }'::jsonb
+  ),
+  '{"status":"conflict","version":1,"conflict":{"currentVersion":1}}'::jsonb,
+  'an exact stale-command replay returns the stored conflict'
+);
+
+select is(
+  public.apply_game_day_command(
+    '{
       "operationId":"b4600000-0000-0000-0000-000000000005",
       "gameDayId":"b4400000-0000-0000-0000-000000000001",
       "baseVersion":1,
@@ -455,9 +504,19 @@ select ok(
 
 select is(
   (select count(*)::integer from match.operations),
-  1,
-  'a successful mutation records one operation'
+  2,
+  'the conflict and successful mutation each record one operation'
 );
+
+reset role;
+
+update public.profiles
+set status = 'disabled'
+where id = 'b4000000-0000-0000-0000-000000000002';
+
+update match.release_state
+set traffic_enabled = false
+where singleton;
 
 select set_config(
   'request.jwt.claim.sub',
@@ -466,24 +525,61 @@ select set_config(
 );
 set local role authenticated;
 
-select is(
-  public.apply_game_day_command(
-    '{
-      "operationId":"b4600000-0000-0000-0000-000000000005",
-      "gameDayId":"b4400000-0000-0000-0000-000000000001",
-      "baseVersion":1,
-      "deviceId":"b4700000-0000-0000-0000-000000000001",
-      "occurredAt":"2026-07-29T01:04:00Z",
-      "source":"online",
-      "type":"update_attendance",
-      "payload":{"memberId":"b4200000-0000-0000-0000-000000000001","checkedIn":true}
-    }'::jsonb
-  ),
-  '{"status":"applied","version":2,"conflict":null}'::jsonb,
-  'same-content replay returns the exact stored result'
+select lives_ok(
+  $$
+    select public.apply_game_day_command(
+      '{
+        "operationId":"b4600000-0000-0000-0000-000000000005",
+        "gameDayId":"b4400000-0000-0000-0000-000000000001",
+        "baseVersion":1,
+        "deviceId":"b4700000-0000-0000-0000-000000000001",
+        "occurredAt":"2026-07-29T01:04:00Z",
+        "source":"online",
+        "type":"update_attendance",
+        "payload":{"memberId":"b4200000-0000-0000-0000-000000000001","checkedIn":true}
+      }'::jsonb
+    )
+  $$,
+  'same-content game replay survives release-off and revoked permission'
 );
 
 reset role;
+
+select set_config(
+  'request.jwt.claim.sub',
+  'b4000000-0000-0000-0000-000000000003',
+  true
+);
+set local role authenticated;
+
+select throws_like(
+  $$
+    select public.apply_game_day_command(
+      '{
+        "operationId":"b4600000-0000-0000-0000-000000000005",
+        "gameDayId":"b4400000-0000-0000-0000-000000000001",
+        "baseVersion":1,
+        "deviceId":"b4700000-0000-0000-0000-000000000001",
+        "occurredAt":"2026-07-29T01:04:00Z",
+        "source":"online",
+        "type":"update_attendance",
+        "payload":{"memberId":"b4200000-0000-0000-0000-000000000001","checkedIn":true}
+      }'::jsonb
+    )
+  $$,
+  '%operation ID was reused with different content%',
+  'an actor swap cannot replay a game operation while gates are closed'
+);
+
+reset role;
+
+update public.profiles
+set status = 'active'
+where id = 'b4000000-0000-0000-0000-000000000002';
+
+update match.release_state
+set traffic_enabled = true
+where singleton;
 
 select is(
   (select version from match.game_days where id = 'b4400000-0000-0000-0000-000000000001'),
@@ -656,6 +752,14 @@ select is(
   'profile setup does not rewrite the canonical member'
 );
 
+update public.profiles
+set status = 'disabled'
+where id = 'b4000000-0000-0000-0000-000000000003';
+
+update match.release_state
+set traffic_enabled = false
+where singleton;
+
 select set_config(
   'request.jwt.claim.sub',
   'b4000000-0000-0000-0000-000000000003',
@@ -663,24 +767,72 @@ select set_config(
 );
 set local role authenticated;
 
-select is(
-  public.apply_admin_command(
-    '{
-      "operationId":"b4600000-0000-0000-0000-000000000011",
-      "deviceId":"b4700000-0000-0000-0000-000000000002",
-      "occurredAt":"2026-07-29T01:10:00Z",
-      "type":"setup_member_profile",
-      "payload":{
-        "memberId":"b4200000-0000-0000-0000-000000000002",
-        "publicAlias":"Pending Ready",
-        "gender":"unspecified",
-        "gradeId":"b4100000-0000-0000-0000-000000000001"
-      }
-    }'::jsonb
-  ),
-  '{"status":"applied","targetId":"b4200000-0000-0000-0000-000000000002"}'::jsonb,
-  'management replay returns the exact stored result'
+select lives_ok(
+  $$
+    select public.apply_admin_command(
+      '{
+        "operationId":"b4600000-0000-0000-0000-000000000011",
+        "deviceId":"b4700000-0000-0000-0000-000000000002",
+        "occurredAt":"2026-07-29T01:10:00Z",
+        "type":"setup_member_profile",
+        "payload":{
+          "memberId":"b4200000-0000-0000-0000-000000000002",
+          "publicAlias":"Pending Ready",
+          "gender":"unspecified",
+          "gradeId":"b4100000-0000-0000-0000-000000000001"
+        }
+      }'::jsonb
+    )
+  $$,
+  'management replay survives release-off and revoked permission'
 );
+
+reset role;
+
+select set_config(
+  'request.jwt.claim.sub',
+  'b4000000-0000-0000-0000-000000000002',
+  true
+);
+set local role authenticated;
+
+select throws_like(
+  $$
+    select public.apply_admin_command(
+      '{
+        "operationId":"b4600000-0000-0000-0000-000000000011",
+        "deviceId":"b4700000-0000-0000-0000-000000000002",
+        "occurredAt":"2026-07-29T01:10:00Z",
+        "type":"setup_member_profile",
+        "payload":{
+          "memberId":"b4200000-0000-0000-0000-000000000002",
+          "publicAlias":"Pending Ready",
+          "gender":"unspecified",
+          "gradeId":"b4100000-0000-0000-0000-000000000001"
+        }
+      }'::jsonb
+    )
+  $$,
+  '%operation ID was reused with different content%',
+  'an actor swap cannot replay a management operation while gates are closed'
+);
+
+reset role;
+
+update public.profiles
+set status = 'active'
+where id = 'b4000000-0000-0000-0000-000000000003';
+
+update match.release_state
+set traffic_enabled = true
+where singleton;
+
+select set_config(
+  'request.jwt.claim.sub',
+  'b4000000-0000-0000-0000-000000000003',
+  true
+);
+set local role authenticated;
 
 select throws_like(
   $$
@@ -943,6 +1095,45 @@ select is(
 
 reset role;
 
+select set_config(
+  'request.jwt.claim.sub',
+  'b4000000-0000-0000-0000-000000000002',
+  true
+);
+set local role authenticated;
+
+select throws_like(
+  $$
+    select public.apply_game_day_command(
+      '{
+        "operationId":"b4600000-0000-0000-0000-000000000025",
+        "gameDayId":"b4400000-0000-0000-0000-000000000002",
+        "baseVersion":2,
+        "deviceId":"b4700000-0000-0000-0000-000000000001",
+        "occurredAt":"2026-07-29T01:22:00Z",
+        "source":"online",
+        "type":"cancel_match",
+        "payload":{"matchId":"b4500000-0000-0000-0000-000000000001"}
+      }'::jsonb
+    )
+  $$,
+  '%match cannot be cancelled%',
+  'a normal operator cannot erase a completed result by cancellation'
+);
+
+reset role;
+
+select ok(
+  exists (
+    select 1
+    from match.matches
+    where id = 'b4500000-0000-0000-0000-000000000001'
+      and status = 'completed'
+      and winner_team = 2
+  ),
+  'rejected cancellation preserves the completed result'
+);
+
 select ok(
   exists (
     select 1
@@ -978,8 +1169,8 @@ select is(
 
 select is(
   (select count(*)::integer from match.operations),
-  16,
-  'only successful unique commands are persisted'
+  17,
+  'only conflicts and successful unique commands are persisted'
 );
 
 select is(

@@ -1,6 +1,6 @@
 begin;
 
-select plan(33);
+select plan(36);
 
 select has_function(
   'public',
@@ -56,6 +56,15 @@ select ok(
     'EXECUTE'
   ),
   'the member-link RPC adds no service-role execute grant'
+);
+
+select ok(
+  not pg_catalog.has_table_privilege(
+    'authenticated',
+    'vault.decrypted_secrets',
+    'SELECT'
+  ),
+  'authenticated callers cannot read decrypted Vault secrets'
 );
 
 select ok(
@@ -218,10 +227,27 @@ select is(
   'failed link requests do not mark a first write'
 );
 
-select set_config('app.match_link_hmac_key_version', '7', true);
+do $vault_setup$
+begin
+  perform vault.create_secret(
+    '7',
+    'match_member_link_hmac_active_version',
+    'pgTAP active version',
+    null
+  );
+  perform vault.create_secret(
+    pg_catalog.encode(extensions.gen_random_bytes(32), 'hex'),
+    'match_member_link_hmac_v7',
+    'pgTAP versioned key',
+    null
+  );
+end;
+$vault_setup$;
+
+select set_config('app.match_link_hmac_key_version', '999', true);
 select set_config(
-  'app.match_link_hmac_key_v7',
-  'task-4-local-hmac-key-not-for-production',
+  'app.match_link_hmac_key_v999',
+  pg_catalog.encode(extensions.gen_random_bytes(32), 'hex'),
   true
 );
 
@@ -255,7 +281,13 @@ select is(
     extensions.hmac(
       pg_catalog.convert_to('link unique' || chr(31) || '5678', 'utf8'),
       pg_catalog.convert_to(
-        'task-4-local-hmac-key-not-for-production',
+        (
+          select decrypted_secret
+          from vault.decrypted_secrets
+          where name = 'match_member_link_hmac_v7'
+          order by created_at desc
+          limit 1
+        ),
         'utf8'
       ),
       'sha256'
@@ -272,7 +304,7 @@ select is(
     where auth_user_id = 'c4000000-0000-0000-0000-000000000001'
   ),
   7,
-  'attempts persist the active HMAC key version'
+  'Vault controls the active key version despite injected session GUCs'
 );
 
 select ok(
@@ -299,12 +331,41 @@ select is(
   'a mismatch returns the same generic accepted shape'
 );
 
-select set_config('app.match_link_hmac_key_version', '8', true);
+reset role;
+
+do $vault_rotation$
+declare
+  active_version_secret_id uuid;
+begin
+  select id
+  into active_version_secret_id
+  from vault.decrypted_secrets
+  where name = 'match_member_link_hmac_active_version'
+  order by created_at desc
+  limit 1;
+
+  perform vault.update_secret(
+    active_version_secret_id,
+    '8',
+    'match_member_link_hmac_active_version',
+    'pgTAP active version',
+    null
+  );
+  perform vault.create_secret(
+    pg_catalog.encode(extensions.gen_random_bytes(32), 'hex'),
+    'match_member_link_hmac_v8',
+    'pgTAP versioned key',
+    null
+  );
+end;
+$vault_rotation$;
+
 select set_config(
-  'app.match_link_hmac_key_v8',
-  'task-4-rotated-local-hmac-key-not-for-production',
+  'request.jwt.claim.sub',
+  'c4000000-0000-0000-0000-000000000002',
   true
 );
+set local role authenticated;
 
 select is(
   public.request_member_link('Nobody Here', '1111'),
@@ -333,7 +394,72 @@ select ok(
   'key rotation persists versions and produces distinct HMACs'
 );
 
-select set_config('app.match_link_hmac_key_version', '7', true);
+do $vault_missing_rotation$
+declare
+  active_version_secret_id uuid;
+begin
+  select id
+  into active_version_secret_id
+  from vault.decrypted_secrets
+  where name = 'match_member_link_hmac_active_version'
+  order by created_at desc
+  limit 1;
+
+  perform vault.update_secret(
+    active_version_secret_id,
+    '9',
+    'match_member_link_hmac_active_version',
+    'pgTAP active version',
+    null
+  );
+end;
+$vault_missing_rotation$;
+
+select set_config(
+  'request.jwt.claim.sub',
+  'c4000000-0000-0000-0000-000000000005',
+  true
+);
+set local role authenticated;
+
+select throws_like(
+  $$select public.request_member_link('Missing Rotation', '9999')$$,
+  '%member-link HMAC key is unavailable%',
+  'an active Vault version without key material fails closed'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)::integer
+    from match.member_link_attempts
+    where auth_user_id = 'c4000000-0000-0000-0000-000000000005'
+  ),
+  0,
+  'a missing rotated Vault key leaves no attempt row'
+);
+
+do $vault_restore$
+declare
+  active_version_secret_id uuid;
+begin
+  select id
+  into active_version_secret_id
+  from vault.decrypted_secrets
+  where name = 'match_member_link_hmac_active_version'
+  order by created_at desc
+  limit 1;
+
+  perform vault.update_secret(
+    active_version_secret_id,
+    '7',
+    'match_member_link_hmac_active_version',
+    'pgTAP active version',
+    null
+  );
+end;
+$vault_restore$;
 
 set local role authenticated;
 
@@ -397,11 +523,7 @@ insert into match.member_link_attempts (
 )
 select
   'c4000000-0000-0000-0000-000000000005',
-  extensions.hmac(
-    pg_catalog.convert_to('cap-' || item::text, 'utf8'),
-    pg_catalog.convert_to('task-4-local-hmac-key-not-for-production', 'utf8'),
-    'sha256'
-  ),
+  extensions.gen_random_bytes(32),
   7,
   case when item = 1
     then clock_timestamp() - interval '25 hours'

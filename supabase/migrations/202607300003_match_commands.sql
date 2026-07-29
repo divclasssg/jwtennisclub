@@ -36,60 +36,22 @@ declare
   team_two uuid[];
   players uuid[];
   acknowledge_unfinished boolean;
+  release_enabled boolean;
 begin
   if actor_id is null then
     raise exception 'authentication required'
       using errcode = '42501';
   end if;
 
-  if not coalesce(
-    (
-      select release_state.traffic_enabled
-      from match.release_state as release_state
-      where release_state.singleton
-    ),
-    false
-  ) then
-    raise exception 'match traffic is disabled'
-      using errcode = '55000';
-  end if;
-
-  command_type := command_json->>'type';
-
-  if command_type = 'correct_winner' then
-    if not public.has_permission('matches.results.correct') then
-      raise exception 'matches.results.correct permission required'
-        using errcode = '42501';
-    end if;
-  elsif not public.has_permission('matches.operate') then
-    raise exception 'matches.operate permission required'
-      using errcode = '42501';
-  end if;
-
   begin
     operation_id := (command_json->>'operationId')::uuid;
-    game_day_id := (command_json->>'gameDayId')::uuid;
-    device_id := (command_json->>'deviceId')::uuid;
-    base_version := (command_json->>'baseVersion')::integer;
-    payload := command_json->'payload';
-    occurred_at := (command_json->>'occurredAt')::timestamptz;
-    command_source := coalesce(
-      command_json->>'source',
-      'online'
-    )::match.change_source;
   exception
     when others then
       raise exception 'invalid game-day command'
         using errcode = '22023';
   end;
 
-  if operation_id is null
-     or game_day_id is null
-     or device_id is null
-     or base_version is null
-     or command_type is null
-     or payload is null
-     or occurred_at is null then
+  if operation_id is null then
     raise exception 'invalid game-day command'
       using errcode = '22023';
   end if;
@@ -120,6 +82,55 @@ begin
         using errcode = '22023';
     end if;
     return existing_result;
+  end if;
+
+  select release_state.traffic_enabled
+  into release_enabled
+  from match.release_state as release_state
+  where release_state.singleton
+  for update;
+
+  if not coalesce(release_enabled, false) then
+    raise exception 'match traffic is disabled'
+      using errcode = '55000';
+  end if;
+
+  command_type := command_json->>'type';
+
+  if command_type = 'correct_winner' then
+    if not public.has_permission('matches.results.correct') then
+      raise exception 'matches.results.correct permission required'
+        using errcode = '42501';
+    end if;
+  elsif not public.has_permission('matches.operate') then
+    raise exception 'matches.operate permission required'
+      using errcode = '42501';
+  end if;
+
+  begin
+    game_day_id := (command_json->>'gameDayId')::uuid;
+    device_id := (command_json->>'deviceId')::uuid;
+    base_version := (command_json->>'baseVersion')::integer;
+    payload := command_json->'payload';
+    occurred_at := (command_json->>'occurredAt')::timestamptz;
+    command_source := coalesce(
+      command_json->>'source',
+      'online'
+    )::match.change_source;
+  exception
+    when others then
+      raise exception 'invalid game-day command'
+        using errcode = '22023';
+  end;
+
+  if game_day_id is null
+     or device_id is null
+     or base_version is null
+     or command_type is null
+     or payload is null
+     or occurred_at is null then
+    raise exception 'invalid game-day command'
+      using errcode = '22023';
   end if;
 
   if command_source = 'offline'
@@ -250,11 +261,6 @@ begin
         occurred_at,
         result
       );
-
-      update match.release_state
-      set first_write_at = pg_catalog.clock_timestamp()
-      where singleton
-        and first_write_at is null;
 
       return result;
     end if;
@@ -643,7 +649,7 @@ begin
             version = version + 1
         where id = requested_match_id
           and matches.game_day_id = command_scope.game_day_id
-          and status <> 'cancelled';
+          and status in ('suggested', 'confirmed', 'in_progress');
         get diagnostics affected = row_count;
 
         if affected <> 1 then
@@ -803,46 +809,22 @@ declare
   after_data jsonb;
   affected integer;
   changes jsonb;
+  release_enabled boolean;
 begin
   if actor_id is null then
     raise exception 'authentication required'
       using errcode = '42501';
   end if;
 
-  if not coalesce(
-    (
-      select release_state.traffic_enabled
-      from match.release_state as release_state
-      where release_state.singleton
-    ),
-    false
-  ) then
-    raise exception 'match traffic is disabled'
-      using errcode = '55000';
-  end if;
-
-  if not public.has_permission('matches.manage') then
-    raise exception 'matches.manage permission required'
-      using errcode = '42501';
-  end if;
-
   begin
     operation_id := (command_json->>'operationId')::uuid;
-    device_id := (command_json->>'deviceId')::uuid;
-    command_type := command_json->>'type';
-    payload := command_json->'payload';
-    occurred_at := (command_json->>'occurredAt')::timestamptz;
   exception
     when others then
       raise exception 'invalid match management command'
         using errcode = '22023';
   end;
 
-  if operation_id is null
-     or device_id is null
-     or command_type is null
-     or payload is null
-     or occurred_at is null then
+  if operation_id is null then
     raise exception 'invalid match management command'
       using errcode = '22023';
   end if;
@@ -873,6 +855,41 @@ begin
         using errcode = '22023';
     end if;
     return existing_result;
+  end if;
+
+  select release_state.traffic_enabled
+  into release_enabled
+  from match.release_state as release_state
+  where release_state.singleton
+  for update;
+
+  if not coalesce(release_enabled, false) then
+    raise exception 'match traffic is disabled'
+      using errcode = '55000';
+  end if;
+
+  if not public.has_permission('matches.manage') then
+    raise exception 'matches.manage permission required'
+      using errcode = '42501';
+  end if;
+
+  begin
+    device_id := (command_json->>'deviceId')::uuid;
+    command_type := command_json->>'type';
+    payload := command_json->'payload';
+    occurred_at := (command_json->>'occurredAt')::timestamptz;
+  exception
+    when others then
+      raise exception 'invalid match management command'
+        using errcode = '22023';
+  end;
+
+  if device_id is null
+     or command_type is null
+     or payload is null
+     or occurred_at is null then
+    raise exception 'invalid match management command'
+      using errcode = '22023';
   end if;
 
   case command_type
