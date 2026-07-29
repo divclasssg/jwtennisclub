@@ -18,6 +18,7 @@ export type MemberRecord = {
   status: MemberStatus;
   joinedDate: string;
   withdrawnDate: string | null;
+  pauseStartMonth: string | null;
   memo: string | null;
   createdBy: string | null;
   updatedBy: string | null;
@@ -27,11 +28,23 @@ export type MemberRecord = {
 
 export type MemberLifecycleInput = Pick<
   MemberRecord,
-  "status" | "joinedDate" | "withdrawnDate"
+  "status" | "joinedDate" | "withdrawnDate" | "pauseStartMonth"
 >;
 
 export function isFeeChargeTarget(status: MemberStatus): boolean {
   return status === "active";
+}
+
+export function isMemberEligibleForPeriod(
+  member: Pick<MemberRecord, "status" | "pauseStartMonth">,
+  periodMonth: string,
+): boolean {
+  if (member.status === "active") return true;
+  return (
+    member.status === "paused" &&
+    member.pauseStartMonth !== null &&
+    periodMonth < member.pauseStartMonth
+  );
 }
 
 export function validateMemberLifecycle(
@@ -45,6 +58,14 @@ export function validateMemberLifecycle(
 
   if (member.status !== "withdrawn" && member.withdrawnDate) {
     errors.push("활동중 또는 휴회 회원은 탈퇴일을 비워야 합니다.");
+  }
+
+  if (member.status === "paused" && !member.pauseStartMonth) {
+    errors.push("휴회 회원은 휴회 시작 월이 필요합니다.");
+  }
+
+  if (member.status !== "paused" && member.pauseStartMonth) {
+    errors.push("활동중 또는 탈퇴 회원은 휴회 시작 월을 비워야 합니다.");
   }
 
   if (
