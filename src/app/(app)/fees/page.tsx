@@ -36,6 +36,7 @@ import {
 } from "@/features/fees/fee-note";
 import {
   DEFAULT_MONTHLY_FEE_AMOUNT,
+  buildFeeEligibilityFilter,
   FEE_EXEMPT_MEMBER_CODE,
   getPeriodMonthEnd,
 } from "@/features/fees/fee-model";
@@ -125,9 +126,9 @@ async function getFeeTargetMembers(periodMonth: string, query: string) {
   let request = supabase
     .from("members")
     .select(
-      "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, memo",
+      "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, pause_start_month, memo",
     )
-    .eq("status", "active")
+    .or(buildFeeEligibilityFilter(periodMonth))
     .neq("member_code", FEE_EXEMPT_MEMBER_CODE)
     .lte("joined_date", getPeriodMonthEnd(periodMonth))
     .order("member_code", { ascending: true });

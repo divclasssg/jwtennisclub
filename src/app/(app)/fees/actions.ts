@@ -16,10 +16,12 @@ import {
 } from "@/features/fees/fee-note";
 import {
   FEE_EXEMPT_MEMBER_CODE,
+  buildFeeEligibilityFilter,
   getCurrentPeriodMonth,
   getPeriodMonthEnd,
   normalizePeriodMonth,
 } from "@/features/fees/fee-model";
+import { isMemberEligibleForPeriod, type MemberStatus } from "@/features/members/member-model";
 
 const feesPath = "/fees";
 const feeCreatePath = "/fees/new";
@@ -28,6 +30,8 @@ const maximumCsvRows = 200;
 type FeeImportMemberRow = {
   id: string;
   member_code: string;
+  status: MemberStatus;
+  pause_start_month: string | null;
 };
 
 function buildRedirect(path: string, params: Record<string, string | number>) {
@@ -167,9 +171,9 @@ export async function saveFeeMonthlyNote(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedUserId();
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("id")
+    .select("id, status, pause_start_month, joined_date, member_code")
     .eq("id", memberId)
-    .eq("status", "active")
+    .or(buildFeeEligibilityFilter(periodMonth))
     .neq("member_code", FEE_EXEMPT_MEMBER_CODE)
     .lte("joined_date", getPeriodMonthEnd(periodMonth))
     .maybeSingle();
@@ -262,8 +266,8 @@ export async function importFeePaymentsCsv(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedUserId();
   const { data: members, error: membersError } = await supabase
     .from("members")
-    .select("id, member_code")
-    .eq("status", "active");
+    .select("id, member_code, status, pause_start_month")
+    .in("status", ["active", "paused"]);
 
   if (membersError) {
     redirect(buildRedirect(feeCreatePath, { importError: "member-load-failed" }));
@@ -271,9 +275,18 @@ export async function importFeePaymentsCsv(formData: FormData) {
 
   const memberMap = buildMemberImportMap(members ?? []);
   const payments = parsed.payments.map((payment, index) => {
-    const memberId = memberMap.get(payment.memberCode);
+    const member = memberMap.get(payment.memberCode);
 
-    if (!memberId) {
+    if (
+      !member ||
+      !isMemberEligibleForPeriod(
+        {
+          status: member.status,
+          pauseStartMonth: member.pauseStartMonth,
+        },
+        payment.periodMonth,
+      )
+    ) {
       redirect(
         buildRedirect(feeCreatePath, {
           importError: "member-not-found",
@@ -283,7 +296,7 @@ export async function importFeePaymentsCsv(formData: FormData) {
     }
 
     return {
-      member_id: memberId,
+      member_id: member.id,
       period_month: payment.periodMonth,
       amount: payment.amount,
       paid_date: payment.paidDate,
@@ -311,6 +324,13 @@ export async function importFeePaymentsCsv(formData: FormData) {
 
 function buildMemberImportMap(members: FeeImportMemberRow[]) {
   return new Map(
-    members.map((member) => [member.member_code.trim().toUpperCase(), member.id]),
+    members.map((member) => [
+      member.member_code.trim().toUpperCase(),
+      {
+        id: member.id,
+        status: member.status,
+        pauseStartMonth: member.pause_start_month,
+      },
+    ]),
   );
 }

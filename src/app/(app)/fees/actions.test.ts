@@ -14,6 +14,20 @@ const mocks = vi.hoisted(() => {
         {
           id: "member-1",
           member_code: "M0001",
+          status: "active",
+          pause_start_month: null,
+        },
+      ],
+      error: null,
+    })),
+    in: vi.fn(() => importMembersQuery),
+    then: vi.fn((resolve) => resolve({
+      data: [
+        {
+          id: "member-1",
+          member_code: "M0001",
+          status: "active",
+          pause_start_month: null,
         },
       ],
       error: null,
@@ -23,6 +37,7 @@ const mocks = vi.hoisted(() => {
     eq: vi.fn(() => targetMemberQuery),
     neq: vi.fn(() => targetMemberQuery),
     lte: vi.fn(() => targetMemberQuery),
+    or: vi.fn(() => targetMemberQuery),
     maybeSingle: vi.fn(async () => ({
       data: { id: "member-1" } as { id: string } | null,
       error: null,
@@ -30,7 +45,9 @@ const mocks = vi.hoisted(() => {
   };
   const membersTable = {
     select: vi.fn((columns: string) =>
-      columns === "id" ? targetMemberQuery : importMembersQuery,
+      columns === "id" || columns.includes("joined_date")
+        ? targetMemberQuery
+        : importMembersQuery,
     ),
   };
   const existingNoteQuery = {
@@ -128,9 +145,12 @@ describe("fee payment actions", () => {
     mocks.feePaymentsTable.insert.mockClear();
     mocks.membersTable.select.mockClear();
     mocks.importMembersQuery.eq.mockClear();
+    mocks.importMembersQuery.in.mockClear();
+    mocks.importMembersQuery.then.mockClear();
     mocks.targetMemberQuery.eq.mockClear();
     mocks.targetMemberQuery.neq.mockClear();
     mocks.targetMemberQuery.lte.mockClear();
+    mocks.targetMemberQuery.or.mockClear();
     mocks.targetMemberQuery.maybeSingle.mockReset();
     mocks.targetMemberQuery.maybeSingle.mockResolvedValue({
       data: { id: "member-1" },
@@ -170,7 +190,7 @@ describe("fee payment actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
   });
 
-  it("imports fee payments from CSV by matching active members", async () => {
+  it("imports fee payments from CSV by matching members eligible for the payment month", async () => {
     const formData = new FormData();
     formData.set(
       "csvFile",
@@ -191,8 +211,10 @@ describe("fee payment actions", () => {
     );
 
     expect(mocks.supabase.from).toHaveBeenCalledWith("members");
-    expect(mocks.membersTable.select).toHaveBeenCalledWith("id, member_code");
-    expect(mocks.importMembersQuery.eq).toHaveBeenCalledWith("status", "active");
+    expect(mocks.membersTable.select).toHaveBeenCalledWith(
+      "id, member_code, status, pause_start_month",
+    );
+    expect(mocks.importMembersQuery.in).toHaveBeenCalledWith("status", ["active", "paused"]);
     expect(mocks.feePaymentsTable.insert).toHaveBeenCalledWith([
       {
         member_id: "member-1",
@@ -207,8 +229,46 @@ describe("fee payment actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
   });
 
+  it("accepts an August-paused member's July CSV row but rejects its August row", async () => {
+    mocks.importMembersQuery.then.mockImplementationOnce((resolve) => resolve({
+      data: [
+        {
+          id: "member-2",
+          member_code: "M0002",
+          status: "paused",
+          pause_start_month: "2026-08-01",
+        },
+      ],
+      error: null,
+    }));
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(
+        [
+          [
+            "memberCode,periodMonth,amount,paidDate,memo",
+            "m0002,2026-07,30000,2026-07-03,7월 회비",
+            "m0002,2026-08,30000,2026-08-03,8월 회비",
+          ].join("\n"),
+        ],
+        "fees.csv",
+        { type: "text/csv" },
+      ),
+    );
+
+    await expect(importFeePaymentsCsv(formData)).rejects.toThrow(
+      "redirect:/fees/new?importError=member-not-found&line=3",
+    );
+
+    expect(mocks.importMembersQuery.in).toHaveBeenCalledWith("status", ["active", "paused"]);
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
   it("redirects a missing member with the original CSV line after blank rows", async () => {
-    mocks.importMembersQuery.eq.mockResolvedValueOnce({ data: [], error: null });
+    mocks.importMembersQuery.then.mockImplementationOnce((resolve) =>
+      resolve({ data: [], error: null }),
+    );
     const formData = new FormData();
     formData.set(
       "csvFile",
@@ -270,6 +330,12 @@ describe("fee payment actions", () => {
       created_by: "operator-id",
       updated_by: "operator-id",
     });
+    expect(mocks.membersTable.select).toHaveBeenCalledWith(
+      "id, status, pause_start_month, joined_date, member_code",
+    );
+    expect(mocks.targetMemberQuery.or).toHaveBeenCalledWith(
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
+    );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
   });
 
