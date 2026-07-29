@@ -2499,13 +2499,15 @@ begin
   limit 1;
 
   if bootstrap_actor_id is null then
-    raise exception 'active profile required to bootstrap club meeting automation';
+    if exists (select 1 from public.profiles) then
+      raise exception 'active profile required to bootstrap club meeting automation';
+    end if;
+  else
+    perform public.bootstrap_club_meeting_automation(
+      kst_today,
+      bootstrap_actor_id,
+      extract(day from kst_today) > 1
+    );
   end if;
-
-  perform public.bootstrap_club_meeting_automation(
-    kst_today,
-    bootstrap_actor_id,
-    extract(day from kst_today) > 1
-  );
 end;
 $$;

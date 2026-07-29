@@ -18,6 +18,27 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Shared match backend ownership
+
+`jwtennisclub` is the only repository that owns or deploys the shared
+Supabase database, RPCs, and Edge Functions. Do not run `supabase link`,
+`supabase db push`, or `supabase functions deploy` from `jwtennisclub_match`.
+
+`supabase/config.toml` configures a local-only test stack on ports 56320–56322.
+Before changing the shared schema, start that local stack and run:
+
+```bash
+supabase start
+npm test -- src/features/matches/match-migration.test.ts
+```
+
+The preflight requires private deployment evidence for the sorted
+`member_code:id` row count and SHA-256 digest. Capture and retain that evidence
+outside Git; never add a member list, the count, or the digest to this
+repository. A later migration must call
+`public.match_assert_integration_preconditions()` with those private settings
+before it creates any match foreign key.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

@@ -1,5 +1,7 @@
 -- Global transaction lock order shared with profile-trigger and roster-reset writes.
 -- SHARE locks block authorization-changing writes until this migration commits.
+begin;
+
 lock table public.profiles in share mode;
 lock table public.member_code_allocator in share mode;
 lock table public.members in share mode;
@@ -270,3 +272,5 @@ from public, anon, authenticated, service_role;
 drop function public.admin_reset_member_roster(jsonb, text, uuid[]);
 
 drop table public.member_roster_reset_state;
+
+commit;
