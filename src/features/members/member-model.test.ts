@@ -121,6 +121,20 @@ describe("member model", () => {
     ).toContain("활동중 또는 탈퇴 회원은 휴회 시작 월을 비워야 합니다.");
   });
 
+  it.each(["active", "withdrawn"] as const)(
+    "rejects an empty pause start month for %s members",
+    (status) => {
+      expect(
+        validateMemberLifecycle({
+          status,
+          joinedDate: "2026-07-01",
+          withdrawnDate: status === "withdrawn" ? "2026-07-02" : null,
+          pauseStartMonth: "",
+        }),
+      ).toContain("활동중 또는 탈퇴 회원은 휴회 시작 월을 비워야 합니다.");
+    },
+  );
+
   it("keeps a member charge-eligible before the pause start month", () => {
     const pausedInAugust = {
       status: "paused" as const,

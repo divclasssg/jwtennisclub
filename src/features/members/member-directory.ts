@@ -114,6 +114,7 @@ type MemberDatabaseRow = {
   status: MemberStatus;
   joined_date: string;
   withdrawn_date: string | null;
+  pause_start_month: string | null;
   memo: string | null;
 };
 
@@ -150,6 +151,7 @@ function mapMemberRecord(row: MemberEditDatabaseRow): MemberRecord {
     status: row.status,
     joinedDate: row.joined_date,
     withdrawnDate: row.withdrawn_date,
+    pauseStartMonth: row.pause_start_month,
     memo: row.memo,
     createdBy: null,
     updatedBy: null,
@@ -360,7 +362,7 @@ export async function loadMemberForEdit(
   const { data, error } = await supabase
     .from("members")
     .select(
-      "id, member_code, group_id, member_groups(code), name, status, joined_date, withdrawn_date, memo",
+      "id, member_code, group_id, member_groups(code), name, status, joined_date, withdrawn_date, pause_start_month, memo",
     )
     .eq("id", id)
     .maybeSingle();

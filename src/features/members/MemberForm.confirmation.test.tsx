@@ -19,6 +19,7 @@ describe("MemberForm duplicate confirmation", () => {
             status: "paused" as const,
             joinedDate: String(formData.get("joinedDate")),
             withdrawnDate: String(formData.get("withdrawnDate")),
+            pauseStartMonth: null,
             memo: String(formData.get("memo")),
             duplicateConfirmation: null,
           },

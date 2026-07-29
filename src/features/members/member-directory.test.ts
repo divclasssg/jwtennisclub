@@ -32,6 +32,7 @@ const memberRow: MemberRecord = {
   status: "active",
   joinedDate: "2026-07-01",
   withdrawnDate: null,
+  pauseStartMonth: null,
   memo: "첫 등록",
   createdBy: null,
   updatedBy: null,
@@ -49,6 +50,7 @@ const databaseMemberRow = {
   status: "active",
   joined_date: "2026-07-01",
   withdrawn_date: null,
+  pause_start_month: null,
   memo: "첫 등록",
 };
 

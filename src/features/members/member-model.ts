@@ -64,7 +64,7 @@ export function validateMemberLifecycle(
     errors.push("휴회 회원은 휴회 시작 월이 필요합니다.");
   }
 
-  if (member.status !== "paused" && member.pauseStartMonth) {
+  if (member.status !== "paused" && member.pauseStartMonth !== null) {
     errors.push("활동중 또는 탈퇴 회원은 휴회 시작 월을 비워야 합니다.");
   }
 

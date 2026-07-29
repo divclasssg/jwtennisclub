@@ -95,6 +95,23 @@ describe("member form validation", () => {
 
     expect(validateMemberForm(member)).toContain(expectedError);
   });
+
+  it.each(["active", "withdrawn"] as const)(
+    "rejects an empty pause start month for %s members",
+    (status) => {
+      const member = normalizeMemberInput({
+        name: "엄다해",
+        status,
+        joinedDate: "2026-01-01",
+        withdrawnDate: status === "withdrawn" ? "2026-07-01" : null,
+      });
+      member.pauseStartMonth = "";
+
+      expect(validateMemberForm(member)).toContain(
+        "활동중 또는 탈퇴 회원은 휴회 시작 월을 비워야 합니다.",
+      );
+    },
+  );
 });
 
 describe("parseMemberSaveResult", () => {
