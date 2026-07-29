@@ -19,6 +19,7 @@ const member = {
   status: "active" as const,
   joinedDate: "2026-07-01",
   withdrawnDate: null,
+  pauseStartMonth: null,
   memo: null,
 };
 
@@ -59,6 +60,7 @@ describe("MembersPage", () => {
       "직책",
       "그룹",
       "상태",
+      "휴회 시작",
       "가입일",
       "관리",
     ]);
@@ -108,7 +110,7 @@ describe("MembersPage", () => {
     render(await MembersPage({ searchParams: Promise.resolve({}) }));
 
     const table = screen.getByRole("table");
-    expect(within(table).getByRole("cell", { name: "-" })).toBeInTheDocument();
+    expect(within(table).getAllByRole("cell", { name: "-" })).toHaveLength(2);
     expect(within(table).getByRole("cell", { name: "일반회원" })).toBeInTheDocument();
     const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
     expect(within(mobileList).getByText("구분 -")).toBeInTheDocument();
@@ -124,6 +126,22 @@ describe("MembersPage", () => {
     expect(within(mobileList).getByText("그룹 A")).toBeInTheDocument();
     expect(within(mobileList).getByText("구분 운영진")).toBeInTheDocument();
     expect(within(mobileList).getByText("직책 총무")).toBeInTheDocument();
+    expect(within(mobileList).getByText("휴회 시작 -")).toBeInTheDocument();
+  });
+
+  it("renders the pause start month for paused members on desktop and mobile", async () => {
+    loadMemberDirectoryPage.mockResolvedValue({
+      members: [{ ...member, status: "paused", pauseStartMonth: "2026-08-01" }],
+      canCreate: true,
+      canUpdate: true,
+    });
+
+    render(await MembersPage({ searchParams: Promise.resolve({ status: "paused" }) }));
+
+    const table = screen.getByRole("table");
+    expect(within(table).getByRole("cell", { name: "2026.08" })).toBeInTheDocument();
+    const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
+    expect(within(mobileList).getByText("휴회 시작 2026.08")).toBeInTheDocument();
   });
 
   it("hides member management links without create and update permissions", async () => {

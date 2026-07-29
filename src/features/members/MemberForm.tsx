@@ -116,6 +116,17 @@ export function MemberForm({
             ))}
           </SelectInput>
         </FormField>
+        <div>
+          <FormField label="휴회 시작 월" labelVisible>
+            <TextInput
+              aria-describedby="pause-start-month-help"
+              defaultValue={(candidate?.pauseStartMonth ?? member?.pauseStartMonth ?? "").slice(0, 7)}
+              name="pauseStartMonth"
+              type="month"
+            />
+          </FormField>
+          <small id="pause-start-month-help">선택한 월부터 회원은 회비 대상에서 제외됩니다.</small>
+        </div>
         <FormField label="탈퇴일" labelVisible>
           <DateInput
             defaultValue={candidate?.withdrawnDate ?? member?.withdrawnDate ?? ""}

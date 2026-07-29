@@ -124,6 +124,7 @@ describe("member directory DTO", () => {
     const row = toMemberListRow(memberRow, "010-****-5678");
 
     expect(row.phoneDisplay).toBe("010-****-5678");
+    expect(row.pauseStartMonth).toBeNull();
     expect(row).not.toHaveProperty("phoneNumber");
     expect(JSON.stringify(row)).not.toContain("01012345678");
   });
@@ -145,6 +146,8 @@ describe("member directory page RPC", () => {
         can_update: false,
         members: [{
           ...databaseMemberRow,
+          status: "paused",
+          pause_start_month: "2026-08-01",
           club_position_label: "총무",
           phone_display: "010-****-5678",
           group_code: "A",
@@ -163,7 +166,11 @@ describe("member directory page RPC", () => {
     });
     expect(result.canCreate).toBe(true);
     expect(result.canUpdate).toBe(false);
-    expect(result.members[0]).toMatchObject({ name: "김민수", phoneDisplay: "010-****-5678" });
+    expect(result.members[0]).toMatchObject({
+      name: "김민수",
+      phoneDisplay: "010-****-5678",
+      pauseStartMonth: "2026-08-01",
+    });
   });
 });
 
@@ -174,7 +181,7 @@ describe("member directory contact query scope", () => {
   });
 
   it("연락처 관리자는 필터 결과 회원 ID만 원문 연락처 조회에 전달한다", async () => {
-    const { contacts } = mockDirectoryClient({
+    const { contacts, members } = mockDirectoryClient({
       members: [databaseMemberRow],
       canManageContacts: true,
       contactData: [{ member_id: "member-id", phone_number: "01012345678" }],
@@ -182,6 +189,7 @@ describe("member directory contact query scope", () => {
 
     await loadMemberDirectory({ q: "A0012" });
 
+    expect(members.select).toHaveBeenCalledWith(expect.stringContaining("pause_start_month"));
     expect(contacts.in).toHaveBeenCalledWith("member_id", ["member-id"]);
   });
 
@@ -252,11 +260,28 @@ describe("member directory contact query scope", () => {
       contactData: [{ member_id: "member-id", phone_masked: "010-****-5678" }],
     });
 
-    await loadMemberForEdit("member-id");
+    const member = await loadMemberForEdit("member-id");
 
     expect(rpc).toHaveBeenCalledWith("get_masked_member_contacts", {
       member_ids: ["member-id"],
     });
+    expect(member?.pauseStartMonth).toBeNull();
+  });
+
+  it("단일 편집 조회는 휴회 시작 월을 보존한다", async () => {
+    mockDirectoryClient({
+      members: [{
+        ...databaseMemberRow,
+        status: "paused",
+        pause_start_month: "2026-08-01",
+      }],
+      canManageContacts: false,
+      contactData: [{ member_id: "member-id", phone_masked: "010-****-5678" }],
+    });
+
+    const member = await loadMemberForEdit("member-id");
+
+    expect(member?.pauseStartMonth).toBe("2026-08-01");
   });
 
   it("연락처 관리자의 단일 편집은 해당 회원 ID만 원문 연락처 조회에 전달한다", async () => {

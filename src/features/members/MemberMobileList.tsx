@@ -5,6 +5,7 @@ import {
   formatMemberDirectoryKind,
   formatMemberPosition,
   formatMemberStatus,
+  formatPauseStartMonth,
 } from "./member-list";
 import type { MemberListRow } from "./member-directory";
 import type { MemberStatus } from "./member-model";
@@ -58,6 +59,9 @@ export function MemberMobileList({ canUpdate = true, members }: MemberMobileList
             <p className={styles["member-mobile-detail"]}>그룹 {member.groupCode ?? "없음"}</p>
             <p className={styles["member-mobile-detail"]}>구분 {formatMemberDirectoryKind(member)}</p>
             <p className={styles["member-mobile-detail"]}>직책 {formatMemberPosition(member)}</p>
+            <p className={styles["member-mobile-detail"]}>
+              휴회 시작 {formatPauseStartMonth(member.status === "paused" ? member.pauseStartMonth : null)}
+            </p>
             <p className={styles["member-mobile-detail"]}>
               가입일 {formatDate(member.joinedDate)}
             </p>

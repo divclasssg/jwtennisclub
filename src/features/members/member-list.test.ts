@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMemberSearchFilter,
   formatDate,
+  formatPauseStartMonth,
   formatMemberKind,
   formatMemberStatus,
   formatMemberStatusTab,
@@ -62,6 +63,7 @@ describe("member list formatting", () => {
         status: "active",
         joined_date: "2026-07-01",
         withdrawn_date: null,
+        pause_start_month: "2026-08-01",
         memo: "첫 등록",
       }),
     ).toEqual({
@@ -74,6 +76,7 @@ describe("member list formatting", () => {
       status: "active",
       joinedDate: "2026-07-01",
       withdrawnDate: null,
+      pauseStartMonth: "2026-08-01",
       memo: "첫 등록",
     });
   });
@@ -87,6 +90,8 @@ describe("member list formatting", () => {
     expect(formatMemberStatusTab("withdrawn")).toBe("탈퇴");
     expect(formatDate("2026-07-01")).toBe("2026.07.01");
     expect(formatDate(null)).toBe("-");
+    expect(formatPauseStartMonth("2026-08-01")).toBe("2026.08");
+    expect(formatPauseStartMonth(null)).toBe("-");
   });
 
   it("formats member kind by operator profile linkage", () => {
