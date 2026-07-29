@@ -92,6 +92,25 @@ export async function createFeePayment(formData: FormData) {
   }
 
   const { supabase, userId } = await getAuthenticatedUserId();
+  const canCreate = await currentOperatorHasPermission("fees.payments.create");
+
+  if (!canCreate) {
+    redirect(buildRedirect(feeCreatePath, { error: "forbidden" }));
+  }
+
+  const { data: member, error: memberError } = await supabase
+    .from("members")
+    .select("id")
+    .eq("id", payment.memberId)
+    .or(buildFeeEligibilityFilter(payment.periodMonth))
+    .neq("member_code", FEE_EXEMPT_MEMBER_CODE)
+    .lte("joined_date", getPeriodMonthEnd(payment.periodMonth))
+    .maybeSingle();
+
+  if (memberError || !member) {
+    redirect(buildRedirect(feeCreatePath, { error: "invalid-member" }));
+  }
+
   const { error } = await supabase.from("fee_payments").insert({
     ...toFeePaymentDatabaseInput(payment),
     created_by: userId,

@@ -52,6 +52,14 @@ describe("member pause start month migration", () => {
     );
   });
 
+  it("preserves a paused member's start month when rolling old clients omit the key", () => {
+    const functionSql = migrationFunctionBody("save_member_with_contact");
+
+    expect(functionSql).toMatch(
+      /pause_start_month = case\s+when coalesce\(\s*\(member_data->>'status'\)::public\.member_status,\s*saved_members\.status\s*\) <> 'paused'\s+then null\s+when member_data \? 'pause_start_month'\s+then \(member_data->>'pause_start_month'\)::date\s+else saved_members\.pause_start_month\s+end/,
+    );
+  });
+
   it("keeps future-paused members in preparing meeting rosters for their eligible month", () => {
     const functionSql = migrationFunctionBody(
       "sync_preparing_meeting_roster",

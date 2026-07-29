@@ -196,7 +196,16 @@ begin
           (member_data->>'status')::public.member_status,
           saved_members.status
         ),
-        pause_start_month = (member_data->>'pause_start_month')::date,
+        pause_start_month = case
+          when coalesce(
+            (member_data->>'status')::public.member_status,
+            saved_members.status
+          ) <> 'paused'
+            then null
+          when member_data ? 'pause_start_month'
+            then (member_data->>'pause_start_month')::date
+          else saved_members.pause_start_month
+        end,
         joined_date = coalesce(
           (member_data->>'joined_date')::date,
           saved_members.joined_date
