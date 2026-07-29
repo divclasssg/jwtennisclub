@@ -9,6 +9,8 @@
 - 정모 preparing 명단 동기화, 최초 locked 명단, ad-hoc 추가, 정모 디렉터리 후보를 각 회차 월 기준으로 제한했다. 이미 잠긴 명단과 기존 출석 행은 변경하지 않는다.
 
 ### Verification Evidence
+- 회원·회비 집중 Vitest(`src/features/members`, `src/features/fees`, `src/app/(app)/members`, `src/app/(app)/fees`; `.worktrees/**` 제외): 23개 파일, 175개 테스트 통과.
+- 정모 집중 Vitest(`src/features/meetings`, `src/app/(app)/meetings`; `.worktrees/**` 제외): 18개 파일, 144개 테스트 통과.
 - `.worktrees/**`를 제외한 전체 Vitest: 90개 파일, 527개 테스트 통과.
 - 루트 전체 ESLint: `npx eslint . --ignore-pattern '**/.worktrees/**'` 통과(오류·경고 없음).
 - `npx tsc --noEmit`: 통과.
