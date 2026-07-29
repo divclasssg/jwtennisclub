@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  isMemberEligibleForPeriod,
   isFeeChargeTarget,
   MEMBER_STATUSES,
   type MemberRecord,
@@ -31,6 +32,7 @@ describe("member model", () => {
       status: "active",
       joinedDate: "2026-01-01",
       withdrawnDate: null,
+      pauseStartMonth: null,
       memo: null,
       createdBy: null,
       updatedBy: null,
@@ -59,6 +61,7 @@ describe("member model", () => {
         status: "withdrawn",
         joinedDate: "2026-07-01",
         withdrawnDate: null,
+        pauseStartMonth: null,
       }),
     ).toContain("탈퇴 회원은 탈퇴일이 필요합니다.");
   });
@@ -69,6 +72,7 @@ describe("member model", () => {
         status: "paused",
         joinedDate: "2026-07-01",
         withdrawnDate: "2026-07-02",
+        pauseStartMonth: null,
       }),
     ).toContain("활동중 또는 휴회 회원은 탈퇴일을 비워야 합니다.");
   });
@@ -79,6 +83,7 @@ describe("member model", () => {
         status: "withdrawn",
         joinedDate: "2026-01-01",
         withdrawnDate: "2026-07-01",
+        pauseStartMonth: null,
       }),
     ).toEqual([]);
   });
@@ -89,8 +94,56 @@ describe("member model", () => {
         status: "withdrawn",
         joinedDate: "2026-07-02",
         withdrawnDate: "2026-07-01",
+        pauseStartMonth: null,
       }),
     ).toContain("탈퇴일은 가입일보다 빠를 수 없습니다.");
+  });
+
+  it("requires paused members to have a pause start month", () => {
+    expect(
+      validateMemberLifecycle({
+        status: "paused",
+        joinedDate: "2026-07-01",
+        withdrawnDate: null,
+        pauseStartMonth: null,
+      }),
+    ).toContain("휴회 회원은 휴회 시작 월이 필요합니다.");
+  });
+
+  it("keeps pause start months only on paused members", () => {
+    expect(
+      validateMemberLifecycle({
+        status: "active",
+        joinedDate: "2026-07-01",
+        withdrawnDate: null,
+        pauseStartMonth: "2026-08-01",
+      }),
+    ).toContain("활동중 또는 탈퇴 회원은 휴회 시작 월을 비워야 합니다.");
+  });
+
+  it.each(["active", "withdrawn"] as const)(
+    "rejects an empty pause start month for %s members",
+    (status) => {
+      expect(
+        validateMemberLifecycle({
+          status,
+          joinedDate: "2026-07-01",
+          withdrawnDate: status === "withdrawn" ? "2026-07-02" : null,
+          pauseStartMonth: "",
+        }),
+      ).toContain("활동중 또는 탈퇴 회원은 휴회 시작 월을 비워야 합니다.");
+    },
+  );
+
+  it("keeps a member charge-eligible before the pause start month", () => {
+    const pausedInAugust = {
+      status: "paused" as const,
+      pauseStartMonth: "2026-08-01",
+    };
+
+    expect(isMemberEligibleForPeriod(pausedInAugust, "2026-07-01")).toBe(true);
+    expect(isMemberEligibleForPeriod(pausedInAugust, "2026-08-01")).toBe(false);
+    expect(isMemberEligibleForPeriod(pausedInAugust, "2026-09-01")).toBe(false);
   });
 });
 

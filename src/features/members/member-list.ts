@@ -21,6 +21,7 @@ export type MemberListRow = {
   status: MemberStatus;
   joinedDate: string;
   withdrawnDate: string | null;
+  pauseStartMonth: string | null;
   memo: string | null;
 };
 
@@ -53,6 +54,7 @@ type MemberDatabaseRow = {
   status: MemberStatus;
   joined_date: string;
   withdrawn_date: string | null;
+  pause_start_month?: string | null;
   memo?: string | null;
 };
 
@@ -90,6 +92,7 @@ export function mapMemberRow(row: MemberDatabaseRow): MemberListRow {
     status: row.status,
     joinedDate: row.joined_date,
     withdrawnDate: row.withdrawn_date,
+    pauseStartMonth: row.pause_start_month ?? null,
     memo: row.memo ?? null,
   };
 }
@@ -169,4 +172,8 @@ export function formatDate(value: string | null) {
   }
 
   return value.replaceAll("-", ".");
+}
+
+export function formatPauseStartMonth(value: string | null) {
+  return value ? value.slice(0, 7).replace("-", ".") : "-";
 }

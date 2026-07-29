@@ -35,6 +35,7 @@ const members = [
     status: "active",
     joined_date: "2026-07-01",
     withdrawn_date: null,
+    pause_start_month: null,
     memo: null,
   },
   {
@@ -42,9 +43,10 @@ const members = [
     member_code: "M0002",
     name: "이영희",
     operator_profile_id: "profile-president",
-    status: "active",
+    status: "paused",
     joined_date: "2026-07-01",
     withdrawn_date: null,
+    pause_start_month: "2026-08-01",
     memo: null,
   },
 ];
@@ -247,7 +249,10 @@ describe("FeesPage", () => {
     expect(within(table).getByRole("cell", { name: "30,000원" })).toBeInTheDocument();
     expect(within(table).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
     expect(membersQuery.select).toHaveBeenCalledWith(
-      "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, memo",
+      "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, pause_start_month, memo",
+    );
+    expect(membersQuery.or).toHaveBeenCalledWith(
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
     );
     expect(membersQuery.neq).toHaveBeenCalledWith("member_code", "#0000");
   });

@@ -100,6 +100,29 @@ describe("member actions", () => {
     expect(mocks.from).not.toHaveBeenCalled();
   });
 
+  it("passes a paused member's start month to the save RPC", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { status: "SAVED", member_code: "A0001" },
+      error: null,
+    });
+    const formData = memberFormData();
+    formData.set("status", "paused");
+    formData.set("pauseStartMonth", "2026-08-01");
+
+    await expect(createMember(initialState, formData)).rejects.toThrow(
+      "redirect:/members?status=created&memberCode=A0001",
+    );
+
+    expect(mocks.rpc).toHaveBeenCalledWith("save_member_with_contact", {
+      member_id: null,
+      member_data: expect.objectContaining({
+        status: "paused",
+        pause_start_month: "2026-08-01",
+      }),
+      duplicate_confirmation: null,
+    });
+  });
+
   it("disables general member CSV imports without calling the database", async () => {
     const formData = new FormData();
     formData.set(

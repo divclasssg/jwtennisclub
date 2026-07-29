@@ -34,6 +34,7 @@ const member = {
   status: "active" as const,
   joinedDate: "2026-07-01",
   withdrawnDate: null,
+  pauseStartMonth: "2026-08-01",
   memo: "초기 등록",
 };
 
@@ -54,6 +55,7 @@ describe("EditMemberPage", () => {
     expect(screen.getByLabelText("연락처")).toHaveValue("01012345678");
     expect(screen.getByLabelText("연락처")).toHaveAttribute("autocomplete", "tel");
     expect(screen.getByLabelText("그룹")).toHaveValue("group-a");
+    expect(screen.getByLabelText("휴회 시작 월")).toHaveValue("2026-08");
     expect(screen.queryByText("탈퇴 사유")).not.toBeInTheDocument();
   });
 

@@ -14,6 +14,7 @@ export type MemberFormInput = {
   status: MemberStatus;
   joinedDate: string;
   withdrawnDate: string | null;
+  pauseStartMonth: string | null;
   memo: string | null;
   duplicateConfirmation: DuplicateConfirmation;
 };
@@ -35,6 +36,7 @@ export type MemberDatabaseInput = {
   status: MemberStatus;
   joined_date: string;
   withdrawn_date: string | null;
+  pause_start_month: string | null;
   memo: string | null;
 };
 
@@ -55,6 +57,7 @@ export function parseMemberFormData(formData: FormData): MemberFormInput {
     status: readFormString(formData, "status"),
     joinedDate: readFormString(formData, "joinedDate"),
     withdrawnDate: readFormString(formData, "withdrawnDate"),
+    pauseStartMonth: readFormString(formData, "pauseStartMonth"),
     memo: readFormString(formData, "memo"),
     duplicateConfirmation: readFormString(
       formData,
@@ -70,6 +73,7 @@ export function normalizeMemberInput(input: {
   status?: string | null;
   joinedDate?: string | null;
   withdrawnDate?: string | null;
+  pauseStartMonth?: string | null;
   memo?: string | null;
   duplicateConfirmation?: string | null;
 }): MemberFormInput {
@@ -80,6 +84,7 @@ export function normalizeMemberInput(input: {
     status: isMemberStatus(input.status) ? input.status : "active",
     joinedDate: normalizeRequiredText(input.joinedDate),
     withdrawnDate: normalizeOptionalText(input.withdrawnDate),
+    pauseStartMonth: normalizePauseStartMonth(input.pauseStartMonth),
     memo: normalizeOptionalText(input.memo),
     duplicateConfirmation: isDuplicateConfirmation(input.duplicateConfirmation)
       ? input.duplicateConfirmation
@@ -98,6 +103,9 @@ export function validateMemberForm(input: MemberFormInput): string[] {
   if (input.withdrawnDate && !isDateInput(input.withdrawnDate)) {
     errors.push("탈퇴일을 YYYY-MM-DD 형식으로 입력하세요.");
   }
+  if (input.pauseStartMonth && !isPauseStartMonth(input.pauseStartMonth)) {
+    errors.push("휴회 시작 월을 YYYY-MM 형식으로 입력하세요.");
+  }
 
   errors.push(...validateMemberLifecycle(input));
   return errors;
@@ -113,6 +121,7 @@ export function toMemberDatabaseInput(
     status: input.status,
     joined_date: input.joinedDate,
     withdrawn_date: input.withdrawnDate,
+    pause_start_month: input.pauseStartMonth,
     memo: input.memo,
   };
   if (options.includeContact !== false) {
@@ -169,6 +178,20 @@ function normalizeOptionalText(value: string | null | undefined) {
   return trimmed || null;
 }
 
+function normalizePauseStartMonth(value: string | null | undefined) {
+  const month = normalizeOptionalText(value);
+  if (!month || !isMonthInput(month)) return month;
+  return `${month}-01`;
+}
+
 function isDateInput(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+function isMonthInput(value: string) {
+  return /^\d{4}-\d{2}$/.test(value) && isDateInput(`${value}-01`);
+}
+
+function isPauseStartMonth(value: string) {
+  return /^\d{4}-\d{2}-01$/.test(value) && isDateInput(value);
 }

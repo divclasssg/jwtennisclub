@@ -23,6 +23,13 @@ const migrationSql = readFileSync(
   ),
   "utf8",
 ).toLowerCase();
+const pauseMonthMigrationSql = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/migrations/202607290001_add_member_pause_start_month.sql",
+  ),
+  "utf8",
+).toLowerCase();
 
 const regularMeetingId = "11111111-1111-4111-8111-111111111111";
 const memberOneId = "22222222-2222-4222-8222-222222222222";
@@ -468,5 +475,21 @@ describe("meeting directory SQL boundary", () => {
     );
     expect(migrationSql).toContain("requested_meeting.id::text = requested_selected_meeting_id");
     expect(migrationSql).toContain("requested_meeting.period_month = normalized_period_month");
+  });
+
+  it("offers future-paused ad-hoc candidates for the selected meeting month", () => {
+    const start = pauseMonthMigrationSql.indexOf(
+      "create or replace function public.get_club_meeting_directory_page",
+    );
+    const end = pauseMonthMigrationSql.indexOf("$$;", start);
+    const functionSql = pauseMonthMigrationSql.slice(start, end);
+
+    expect(start).toBeGreaterThan(-1);
+    expect(functionSql).toMatch(
+      /where\s+\(\s*members\.status = 'active'\s+or\s+\(\s*members\.status = 'paused'\s+and members\.pause_start_month > normalized_period_month\s*\)\s*\)\s+and not exists/,
+    );
+    expect(functionSql).toContain(
+      "requested_meeting.period_month = normalized_period_month",
+    );
   });
 });

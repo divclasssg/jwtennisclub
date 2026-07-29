@@ -13,9 +13,10 @@ describe("MemberForm presentation", () => {
       />,
     );
 
-    for (const label of ["이름", "연락처", "그룹", "가입일", "상태", "탈퇴일", "메모"]) {
+    for (const label of ["이름", "연락처", "그룹", "가입일", "상태", "휴회 시작 월", "탈퇴일", "메모"]) {
       expect(screen.getByText(label).className).toContain("form-field-label-visible");
     }
+    expect(screen.getByLabelText("휴회 시작 월")).toHaveAttribute("type", "month");
     expect(screen.getByLabelText("이름")).toHaveAttribute("placeholder", "홍길동");
     expect(screen.getByLabelText("연락처")).toHaveAttribute(
       "placeholder",
@@ -25,5 +26,34 @@ describe("MemberForm presentation", () => {
       "placeholder",
       "특이사항을 입력하세요",
     );
+  });
+
+  it("uses the saved pause start month as the edit default", () => {
+    render(
+      <MemberForm
+        action={vi.fn(async () => ({ status: "idle" as const }))}
+        groups={[]}
+        member={{
+          id: "member-id",
+          memberCode: "JW-000001",
+          name: "김민수",
+          operatorProfileId: null,
+          clubPositionLabel: null,
+          phoneDisplay: "010-****-5678",
+          groupCode: null,
+          status: "paused",
+          joinedDate: "2026-07-01",
+          withdrawnDate: null,
+          pauseStartMonth: "2026-08-01",
+          memo: null,
+          phoneNumber: null,
+          groupId: null,
+          canManageContacts: false,
+        }}
+        mode="edit"
+      />,
+    );
+
+    expect(screen.getByLabelText("휴회 시작 월")).toHaveValue("2026-08");
   });
 });

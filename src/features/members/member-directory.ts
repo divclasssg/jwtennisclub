@@ -24,6 +24,7 @@ export type MemberListRow = {
   status: MemberStatus;
   joinedDate: string;
   withdrawnDate: string | null;
+  pauseStartMonth: string | null;
   memo: string | null;
 };
 
@@ -55,6 +56,7 @@ type MemberDirectoryPageDatabase = {
     status: MemberStatus;
     joined_date: string;
     withdrawn_date: string | null;
+    pause_start_month: string | null;
     memo: string | null;
   }>;
 };
@@ -88,6 +90,7 @@ export async function loadMemberDirectoryPage(input: {
       status: member.status,
       joinedDate: member.joined_date,
       withdrawnDate: member.withdrawn_date,
+      pauseStartMonth: member.pause_start_month,
       memo: member.memo,
     })),
   };
@@ -114,6 +117,7 @@ type MemberDatabaseRow = {
   status: MemberStatus;
   joined_date: string;
   withdrawn_date: string | null;
+  pause_start_month: string | null;
   memo: string | null;
 };
 
@@ -150,6 +154,7 @@ function mapMemberRecord(row: MemberEditDatabaseRow): MemberRecord {
     status: row.status,
     joinedDate: row.joined_date,
     withdrawnDate: row.withdrawn_date,
+    pauseStartMonth: row.pause_start_month,
     memo: row.memo,
     createdBy: null,
     updatedBy: null,
@@ -174,6 +179,7 @@ function mapMemberListRow(
     status: row.status,
     joinedDate: row.joined_date,
     withdrawnDate: row.withdrawn_date,
+    pauseStartMonth: row.pause_start_month,
     memo: row.memo,
   };
 }
@@ -204,6 +210,7 @@ export function toMemberListRow(
     status: member.status,
     joinedDate: member.joinedDate,
     withdrawnDate: member.withdrawnDate,
+    pauseStartMonth: member.pauseStartMonth,
     memo: member.memo,
   };
 }
@@ -287,7 +294,7 @@ export async function loadMemberDirectory(input: {
   let request = supabase
     .from("members")
     .select(
-      "id, member_code, member_groups(code), name, operator_profile_id, status, joined_date, withdrawn_date, memo",
+      "id, member_code, member_groups(code), name, operator_profile_id, status, joined_date, withdrawn_date, pause_start_month, memo",
     )
     .order("member_code", { ascending: true });
 
@@ -360,7 +367,7 @@ export async function loadMemberForEdit(
   const { data, error } = await supabase
     .from("members")
     .select(
-      "id, member_code, group_id, member_groups(code), name, status, joined_date, withdrawn_date, memo",
+      "id, member_code, group_id, member_groups(code), name, status, joined_date, withdrawn_date, pause_start_month, memo",
     )
     .eq("id", id)
     .maybeSingle();

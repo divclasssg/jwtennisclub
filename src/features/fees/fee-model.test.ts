@@ -2,11 +2,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  buildFeeEligibilityFilter,
   formatCurrency,
   formatPeriodMonth,
   getPeriodMonthEnd,
   normalizePeriodMonth,
 } from "./fee-model";
+import { isMemberEligibleForPeriod } from "@/features/members/member-model";
 
 const migrationSql = readFileSync(
   join(process.cwd(), "supabase/migrations/202607030003_add_fee_payments.sql"),
@@ -27,6 +29,19 @@ describe("fee model", () => {
 
   it("calculates the last day for a payment month", () => {
     expect(getPeriodMonthEnd("2026-02-01")).toBe("2026-02-28");
+  });
+
+  it("keeps a member paused in August eligible for July fees only", () => {
+    const pausedInAugust = {
+      status: "paused" as const,
+      pauseStartMonth: "2026-08-01",
+    };
+
+    expect(buildFeeEligibilityFilter("2026-07-01")).toBe(
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
+    );
+    expect(isMemberEligibleForPeriod(pausedInAugust, "2026-07-01")).toBe(true);
+    expect(isMemberEligibleForPeriod(pausedInAugust, "2026-08-01")).toBe(false);
   });
 });
 

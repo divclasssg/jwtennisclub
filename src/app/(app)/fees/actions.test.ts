@@ -14,6 +14,20 @@ const mocks = vi.hoisted(() => {
         {
           id: "member-1",
           member_code: "M0001",
+          status: "active",
+          pause_start_month: null,
+        },
+      ],
+      error: null,
+    })),
+    in: vi.fn(() => importMembersQuery),
+    then: vi.fn((resolve) => resolve({
+      data: [
+        {
+          id: "member-1",
+          member_code: "M0001",
+          status: "active",
+          pause_start_month: null,
         },
       ],
       error: null,
@@ -23,6 +37,7 @@ const mocks = vi.hoisted(() => {
     eq: vi.fn(() => targetMemberQuery),
     neq: vi.fn(() => targetMemberQuery),
     lte: vi.fn(() => targetMemberQuery),
+    or: vi.fn(() => targetMemberQuery),
     maybeSingle: vi.fn(async () => ({
       data: { id: "member-1" } as { id: string } | null,
       error: null,
@@ -30,7 +45,9 @@ const mocks = vi.hoisted(() => {
   };
   const membersTable = {
     select: vi.fn((columns: string) =>
-      columns === "id" ? targetMemberQuery : importMembersQuery,
+      columns === "id" || columns.includes("joined_date")
+        ? targetMemberQuery
+        : importMembersQuery,
     ),
   };
   const existingNoteQuery = {
@@ -56,7 +73,7 @@ const mocks = vi.hoisted(() => {
   const supabase = {
     auth: {
       getUser: vi.fn(async () => ({
-        data: { user: { id: "operator-id" } },
+        data: { user: { id: "operator-id" } as { id: string } | null },
         error: null,
       })),
     },
@@ -114,6 +131,7 @@ vi.mock("@/features/auth/operator-context", () => ({
 
 import {
   cancelFeePayment,
+  createFeePayment,
   importFeePaymentsCsv,
   saveFeeMonthlyNote,
 } from "./actions";
@@ -122,15 +140,22 @@ describe("fee payment actions", () => {
   beforeEach(() => {
     mocks.redirect.mockClear();
     mocks.revalidatePath.mockClear();
-    mocks.supabase.auth.getUser.mockClear();
+    mocks.supabase.auth.getUser.mockReset();
+    mocks.supabase.auth.getUser.mockResolvedValue({
+      data: { user: { id: "operator-id" } },
+      error: null,
+    });
     mocks.supabase.from.mockClear();
     mocks.feePaymentsTable.delete.mockClear();
     mocks.feePaymentsTable.insert.mockClear();
     mocks.membersTable.select.mockClear();
     mocks.importMembersQuery.eq.mockClear();
+    mocks.importMembersQuery.in.mockClear();
+    mocks.importMembersQuery.then.mockClear();
     mocks.targetMemberQuery.eq.mockClear();
     mocks.targetMemberQuery.neq.mockClear();
     mocks.targetMemberQuery.lte.mockClear();
+    mocks.targetMemberQuery.or.mockClear();
     mocks.targetMemberQuery.maybeSingle.mockReset();
     mocks.targetMemberQuery.maybeSingle.mockResolvedValue({
       data: { id: "member-1" },
@@ -170,7 +195,124 @@ describe("fee payment actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
   });
 
-  it("imports fee payments from CSV by matching active members", async () => {
+  it("creates a July payment for a member whose pause begins in August", async () => {
+    const formData = buildPaymentFormData({
+      memberId: "member-2",
+      periodMonth: "2026-07",
+    });
+
+    await expect(createFeePayment(formData)).rejects.toThrow(
+      "redirect:/fees?status=created&month=2026-07",
+    );
+
+    expect(mocks.currentOperatorHasPermission).toHaveBeenCalledWith(
+      "fees.payments.create",
+    );
+    expect(mocks.membersTable.select).toHaveBeenCalledWith("id");
+    expect(mocks.targetMemberQuery.eq).toHaveBeenCalledWith("id", "member-2");
+    expect(mocks.targetMemberQuery.or).toHaveBeenCalledWith(
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
+    );
+    expect(mocks.targetMemberQuery.neq).toHaveBeenCalledWith(
+      "member_code",
+      "#0000",
+    );
+    expect(mocks.targetMemberQuery.lte).toHaveBeenCalledWith(
+      "joined_date",
+      "2026-07-31",
+    );
+    expect(mocks.feePaymentsTable.insert).toHaveBeenCalledWith({
+      member_id: "member-2",
+      period_month: "2026-07-01",
+      amount: 30000,
+      paid_date: "2026-07-03",
+      memo: null,
+      created_by: "operator-id",
+      updated_by: "operator-id",
+    });
+  });
+
+  it("rejects an August payment when the member's pause begins in August", async () => {
+    mocks.targetMemberQuery.maybeSingle.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({
+          memberId: "member-2",
+          periodMonth: "2026-08",
+          paidDate: "2026-08-03",
+        }),
+      ),
+    ).rejects.toThrow("redirect:/fees/new?error=invalid-member");
+
+    expect(mocks.targetMemberQuery.or).toHaveBeenCalledWith(
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-08-01)",
+    );
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects a stale or direct payment form for a non-target member id", async () => {
+    mocks.targetMemberQuery.maybeSingle.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({
+          memberId: "stale-member",
+          periodMonth: "2026-07",
+        }),
+      ),
+    ).rejects.toThrow("redirect:/fees/new?error=invalid-member");
+
+    expect(mocks.targetMemberQuery.eq).toHaveBeenCalledWith(
+      "id",
+      "stale-member",
+    );
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects direct payment creation without create permission", async () => {
+    mocks.currentOperatorHasPermission.mockResolvedValueOnce(false);
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({
+          memberId: "member-1",
+          periodMonth: "2026-07",
+        }),
+      ),
+    ).rejects.toThrow("redirect:/fees/new?error=forbidden");
+
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("members");
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("preserves the login redirect before checking direct payment permission", async () => {
+    mocks.currentOperatorHasPermission.mockResolvedValueOnce(false);
+    mocks.supabase.auth.getUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: null,
+    });
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({
+          memberId: "member-1",
+          periodMonth: "2026-07",
+        }),
+      ),
+    ).rejects.toThrow("redirect:/login");
+
+    expect(mocks.currentOperatorHasPermission).not.toHaveBeenCalled();
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("imports fee payments from CSV by matching members eligible for the payment month", async () => {
     const formData = new FormData();
     formData.set(
       "csvFile",
@@ -191,8 +333,10 @@ describe("fee payment actions", () => {
     );
 
     expect(mocks.supabase.from).toHaveBeenCalledWith("members");
-    expect(mocks.membersTable.select).toHaveBeenCalledWith("id, member_code");
-    expect(mocks.importMembersQuery.eq).toHaveBeenCalledWith("status", "active");
+    expect(mocks.membersTable.select).toHaveBeenCalledWith(
+      "id, member_code, status, pause_start_month",
+    );
+    expect(mocks.importMembersQuery.in).toHaveBeenCalledWith("status", ["active", "paused"]);
     expect(mocks.feePaymentsTable.insert).toHaveBeenCalledWith([
       {
         member_id: "member-1",
@@ -207,8 +351,46 @@ describe("fee payment actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
   });
 
+  it("accepts an August-paused member's July CSV row but rejects its August row", async () => {
+    mocks.importMembersQuery.then.mockImplementationOnce((resolve) => resolve({
+      data: [
+        {
+          id: "member-2",
+          member_code: "M0002",
+          status: "paused",
+          pause_start_month: "2026-08-01",
+        },
+      ],
+      error: null,
+    }));
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(
+        [
+          [
+            "memberCode,periodMonth,amount,paidDate,memo",
+            "m0002,2026-07,30000,2026-07-03,7월 회비",
+            "m0002,2026-08,30000,2026-08-03,8월 회비",
+          ].join("\n"),
+        ],
+        "fees.csv",
+        { type: "text/csv" },
+      ),
+    );
+
+    await expect(importFeePaymentsCsv(formData)).rejects.toThrow(
+      "redirect:/fees/new?importError=member-not-found&line=3",
+    );
+
+    expect(mocks.importMembersQuery.in).toHaveBeenCalledWith("status", ["active", "paused"]);
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
   it("redirects a missing member with the original CSV line after blank rows", async () => {
-    mocks.importMembersQuery.eq.mockResolvedValueOnce({ data: [], error: null });
+    mocks.importMembersQuery.then.mockImplementationOnce((resolve) =>
+      resolve({ data: [], error: null }),
+    );
     const formData = new FormData();
     formData.set(
       "csvFile",
@@ -270,6 +452,12 @@ describe("fee payment actions", () => {
       created_by: "operator-id",
       updated_by: "operator-id",
     });
+    expect(mocks.membersTable.select).toHaveBeenCalledWith(
+      "id, status, pause_start_month, joined_date, member_code",
+    );
+    expect(mocks.targetMemberQuery.or).toHaveBeenCalledWith(
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
+    );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
   });
 
@@ -349,5 +537,18 @@ function buildNoteFormData(memo: string) {
   formData.set("sort", "memo");
   formData.set("direction", "desc");
   formData.set("memo", memo);
+  return formData;
+}
+
+function buildPaymentFormData(input: {
+  memberId: string;
+  periodMonth: string;
+  paidDate?: string;
+}) {
+  const formData = new FormData();
+  formData.set("memberId", input.memberId);
+  formData.set("periodMonth", input.periodMonth);
+  formData.set("amount", "30000");
+  formData.set("paidDate", input.paidDate ?? "2026-07-03");
   return formData;
 }

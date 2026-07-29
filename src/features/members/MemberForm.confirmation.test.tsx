@@ -19,6 +19,7 @@ describe("MemberForm duplicate confirmation", () => {
             status: "paused" as const,
             joinedDate: String(formData.get("joinedDate")),
             withdrawnDate: String(formData.get("withdrawnDate")),
+            pauseStartMonth: String(formData.get("pauseStartMonth")),
             memo: String(formData.get("memo")),
             duplicateConfirmation: null,
           },
@@ -32,6 +33,7 @@ describe("MemberForm duplicate confirmation", () => {
     fireEvent.change(screen.getByLabelText("그룹"), { target: { value: "group-a" } });
     fireEvent.change(screen.getByLabelText("가입일"), { target: { value: "2026-07-02" } });
     fireEvent.change(screen.getByLabelText("상태"), { target: { value: "paused" } });
+    fireEvent.change(screen.getByLabelText("휴회 시작 월"), { target: { value: "2026-08" } });
     fireEvent.change(screen.getByLabelText("탈퇴일"), { target: { value: "2026-07-10" } });
     fireEvent.change(screen.getByLabelText("메모"), { target: { value: "후보 메모" } });
     fireEvent.submit(screen.getByRole("button", { name: "회원 등록" }).closest("form")!);
@@ -48,6 +50,7 @@ describe("MemberForm duplicate confirmation", () => {
       status: "paused",
       joinedDate: "2026-07-02",
       withdrawnDate: "2026-07-10",
+      pauseStartMonth: "2026-08",
       memo: "후보 메모",
       duplicateConfirmation: "phone-reuse",
     });

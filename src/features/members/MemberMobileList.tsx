@@ -3,6 +3,7 @@ import {
   formatMemberDirectoryKind,
   formatMemberPosition,
   formatMemberStatus,
+  formatPauseStartMonth,
 } from "./member-list";
 import type { MemberListRow } from "./member-directory";
 import styles from "./MemberMobileList.module.scss";
@@ -35,6 +36,11 @@ export function MemberMobileList({ canUpdate = true, members }: MemberMobileList
               수정
             </Link> : null}
           </div>
+          {member.status === "paused" ? (
+            <p className={styles["member-mobile-detail"]}>
+              휴회 시작 {formatPauseStartMonth(member.pauseStartMonth)}
+            </p>
+          ) : null}
         </li>
       ))}
     </ul>
