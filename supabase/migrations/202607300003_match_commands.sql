@@ -87,8 +87,7 @@ begin
   select release_state.traffic_enabled
   into release_enabled
   from match.release_state as release_state
-  where release_state.singleton
-  for update;
+  where release_state.singleton;
 
   if not coalesce(release_enabled, false) then
     raise exception 'match traffic is disabled'
@@ -149,6 +148,17 @@ begin
      ) then
     raise exception 'offline lease does not allow this write'
       using errcode = '42501';
+  end if;
+
+  select release_state.traffic_enabled
+  into release_enabled
+  from match.release_state as release_state
+  where release_state.singleton
+  for update;
+
+  if not coalesce(release_enabled, false) then
+    raise exception 'match traffic is disabled'
+      using errcode = '55000';
   end if;
 
   if command_type = 'create_game_day' then
@@ -860,8 +870,7 @@ begin
   select release_state.traffic_enabled
   into release_enabled
   from match.release_state as release_state
-  where release_state.singleton
-  for update;
+  where release_state.singleton;
 
   if not coalesce(release_enabled, false) then
     raise exception 'match traffic is disabled'
@@ -890,6 +899,17 @@ begin
      or occurred_at is null then
     raise exception 'invalid match management command'
       using errcode = '22023';
+  end if;
+
+  select release_state.traffic_enabled
+  into release_enabled
+  from match.release_state as release_state
+  where release_state.singleton
+  for update;
+
+  if not coalesce(release_enabled, false) then
+    raise exception 'match traffic is disabled'
+      using errcode = '55000';
   end if;
 
   case command_type

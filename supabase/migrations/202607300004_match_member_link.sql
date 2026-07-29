@@ -112,17 +112,12 @@ begin
   select release_state.traffic_enabled
   into release_enabled
   from match.release_state as release_state
-  where release_state.singleton
-  for update;
+  where release_state.singleton;
 
   if not coalesce(release_enabled, false) then
     raise exception 'match traffic is disabled'
       using errcode = '55000';
   end if;
-
-  select hmac_key.key_version, hmac_key.key_material
-  into active_key_version, active_key
-  from match.get_member_link_hmac_key() as hmac_key;
 
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(requester_id::text, 1)
@@ -138,6 +133,10 @@ begin
   if recent_attempts >= 5 then
     return '{"accepted":true}'::pg_catalog.jsonb;
   end if;
+
+  select hmac_key.key_version, hmac_key.key_material
+  into active_key_version, active_key
+  from match.get_member_link_hmac_key() as hmac_key;
 
   normalized_name := pg_catalog.lower(
     pg_catalog.btrim(coalesce(requested_legal_name, ''))
@@ -176,6 +175,17 @@ begin
         pg_catalog.convert_to(active_key, 'utf8'),
         'sha256'
       ) = request_fingerprint;
+  end if;
+
+  select release_state.traffic_enabled
+  into release_enabled
+  from match.release_state as release_state
+  where release_state.singleton
+  for update;
+
+  if not coalesce(release_enabled, false) then
+    raise exception 'match traffic is disabled'
+      using errcode = '55000';
   end if;
 
   insert into match.member_link_attempts (
