@@ -10,6 +10,17 @@ const migrationSql = readFileSync(
   "utf8",
 ).toLowerCase();
 
+function migrationFunctionBody(functionName: string) {
+  const start = migrationSql.indexOf(
+    `create or replace function public.${functionName}`,
+  );
+  const end = migrationSql.indexOf("$$;", start);
+
+  expect(start, functionName).toBeGreaterThan(-1);
+  expect(end, functionName).toBeGreaterThan(start);
+  return migrationSql.slice(start, end);
+}
+
 describe("member pause start month migration", () => {
   it("adds and backfills a month-aligned pause start date for every paused member", () => {
     expect(migrationSql).toContain("add column pause_start_month date");
@@ -41,19 +52,46 @@ describe("member pause start month migration", () => {
     );
   });
 
+  it("keeps future-paused members in preparing meeting rosters for their eligible month", () => {
+    const functionSql = migrationFunctionBody(
+      "sync_preparing_meeting_roster",
+    );
+    const eligibilityCondition =
+      /members\.status = 'active'\s+or\s+\(\s*members\.status = 'paused'\s+and members\.pause_start_month > requested_period_month\s*\)/g;
+
+    expect(functionSql).toContain("and rosters.status = 'preparing'");
+    expect(functionSql.match(eligibilityCondition)).toHaveLength(2);
+    expect(functionSql).toMatch(
+      /where\s+\(\s*members\.status = 'active'\s+or\s+\(\s*members\.status = 'paused'\s+and members\.pause_start_month > requested_period_month\s*\)\s*\)\s+on conflict/,
+    );
+  });
+
+  it("uses the requested month when initially populating a locked meeting roster", () => {
+    const functionSql = migrationFunctionBody(
+      "ensure_locked_meeting_roster",
+    );
+
+    expect(functionSql).toMatch(
+      /where\s+\(\s*members\.status = 'active'\s+or\s+\(\s*members\.status = 'paused'\s+and members\.pause_start_month > requested_period_month\s*\)\s*\)\s+on conflict/,
+    );
+    expect(functionSql).toContain("if roster_row.status = 'preparing' then");
+  });
+
   it("does not target a named member or mutate historical financial and meeting data", () => {
     expect(migrationSql).not.toContain("엄다해");
     expect(migrationSql).not.toMatch(
       /(?:update|delete from)\s+public\.fee_payments/,
     );
     expect(migrationSql).not.toMatch(
-      /(?:update|delete from)\s+public\.meeting_month_rosters/,
-    );
-    expect(migrationSql).not.toMatch(
-      /(?:update|delete from)\s+public\.meeting_month_roster_members/,
-    );
-    expect(migrationSql).not.toMatch(
       /(?:update|delete from)\s+public\.meeting_attendance/,
     );
+    expect(migrationSql).not.toContain(
+      "delete from public.meeting_month_rosters",
+    );
+    expect(
+      migrationSql.match(
+        /delete from public\.meeting_month_roster_members/g,
+      ),
+    ).toHaveLength(1);
   });
 });

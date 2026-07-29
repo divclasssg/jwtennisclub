@@ -9,6 +9,13 @@ const migrationPath = join(
 const migrationSql = existsSync(migrationPath)
   ? readFileSync(migrationPath, "utf8").toLowerCase()
   : "";
+const pauseMonthMigrationSql = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/migrations/202607290001_add_member_pause_start_month.sql",
+  ),
+  "utf8",
+).toLowerCase();
 
 const meetingTables = [
   "club_meetings",
@@ -414,6 +421,22 @@ describe("club meeting migration", () => {
     );
     expect(directoryFunction).toContain(
       "from public.meeting_month_roster_members as candidate_roster_members",
+    );
+  });
+
+  it("authorizes an ad-hoc insertion against the selected meeting month", () => {
+    const start = pauseMonthMigrationSql.indexOf(
+      "create or replace function public.add_meeting_ad_hoc_member",
+    );
+    const end = pauseMonthMigrationSql.indexOf("$$;", start);
+    const functionSql = pauseMonthMigrationSql.slice(start, end);
+
+    expect(start).toBeGreaterThan(-1);
+    expect(functionSql).toMatch(
+      /and\s+\(\s*members\.status = 'active'\s+or\s+\(\s*members\.status = 'paused'\s+and members\.pause_start_month > locked_meeting\.period_month\s*\)\s*\)\s+for share of members/,
+    );
+    expect(functionSql).toContain(
+      "where rosters.period_month = locked_meeting.period_month",
     );
   });
 
