@@ -17,19 +17,25 @@ Use three distinct locations:
   `ab1a6f0a41f4ce62a9a69ada7408627190a34e2e`.
 
 Set `TASK8_EVIDENCE_ROOT` to an encrypted durable directory outside both Git
-roots. The helper canonicalizes paths, sets `umask 077`, requires directory
-mode `0700`, writes redacted `0600` files, and hashes them in `manifest.json`.
-Keep credentials, tokens, member rows, and service keys outside evidence.
+roots. The helper canonicalizes paths, sets `umask 077`, requires directory mode
+`0700`, writes redacted `0600` files, and hashes them in `manifest.json`. Keep
+credentials, tokens, member rows, and service keys outside evidence.
 
 First capture the server-derived production fingerprint read-only:
 
 ```bash
 cd "$TOOL_ROOT"
 TASK8_PRODUCTION_REF=ydiusirreirhbvlftegp \
-TASK8_PRODUCTION_PGSERVICE=task8-production-readonly \
 deno run --allow-read --allow-write --allow-run --allow-env --allow-sys \
   supabase/scripts/task8/rollout.ts capture-production
 ```
+
+The helper obtains Management API identity through `supabase projects list`,
+then connects only to `db.ydiusirreirhbvlftegp.supabase.co:5432` as
+database/user `postgres` with `sslmode=verify-full`. Supply the password through
+the process environment; never put it in an argument, URL, runbook, or evidence.
+Whitespace, poolers, aliases, ref/user mismatches, and a missing direct endpoint
+fail before SQL.
 
 Stop unless the clone owner supplies its exact 20-letter ref, source snapshot,
 isolated Auth/redirects/Storage/credentials, and approval IDs. Link only
@@ -52,56 +58,64 @@ Run `rollout.ts inventory`, then compose `inventory-v1.json` using
 `inventory-v1.schema.json` and run `rollout.ts validate-inventory`. It requires:
 
 - migration version/name/statement hash and member count/hash;
-- Auth user/identity/provider counts plus site URL, redirect hosts, JWT expiry,
-  and explicit production isolation;
+- Auth user/identity/provider counts plus instance ID, site URL, redirect hosts,
+  and JWT expiry; Storage includes its project ref;
 - public/match table counts/hashes, Storage bucket config/object counts, and
   database function identity arguments/definition hashes;
 - exact deployed version/status for `admin-command`, `game-day-command`,
-  `game-day-snapshot`, `match-recommendation`, `member-link`, `member-read`,
-  and `operator-read`;
+  `game-day-snapshot`, `match-recommendation`, `member-link`, `member-read`, and
+  `operator-read`;
 - physical-backup/PITR status, newest recovery point, restore start/healthy
   timestamps, latest restored operation, and before/after member/match hashes.
 
+Validation requires `TASK8_IDENTITY_FILE` and `TASK8_PRODUCTION_INVENTORY_FILE`;
+the helper queries and validates live DB identity itself through the exact
+direct endpoint. Isolation is derived by comparing stored/live DB identity,
+production system fingerprint, Auth instance and network hosts, and Storage
+project refs. A supplied `isolated` boolean is not accepted. Every Edge status
+must equal `ACTIVE`.
+
 Stop unless RPO is `<=15m`, the admin connection can prepare and reset the
 database baseline, and `rollout.ts lock-capability` passes. That gate requires
-approved instrumented lock acquisition with `lock_wait_ms` resolution
-`<=10ms`; `pg_stat_activity` polling is not accepted as lock-duration evidence.
+approved instrumented lock acquisition with `lock_wait_ms` resolution `<=10ms`;
+`pg_stat_activity` polling is not accepted as lock-duration evidence.
 
 ## 3. DB dry-run and apply
 
 `db-dry-run` is read-only and separate from apply. Review and retain its
-transcript. Every helper checks clean product HEADs, linked clone ref,
-server fingerprint, database OID, and provenance marker before and after SQL.
+transcript. Every helper checks clean product HEADs, linked clone ref, server
+fingerprint, database OID, and provenance marker before and after SQL.
 
 Apply requires this exact value:
 
 ```text
-APPLY:<clone-ref>:1fc16f34442b60083a003292d59fdc95c5afec0b:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
+APPLY:<clone-ref>:<db-dry-run-stage-hash>:1fc16f34442b60083a003292d59fdc95c5afec0b:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
 ```
 
-Run `rollout.ts db-apply` with an admin-capable `TASK8_PGSERVICE`. It prepares
-the member baseline, revalidates, runs linked DB push, revalidates, and resets
-the baseline in `finally`. Any failed gate aborts.
+Set `TASK8_DRY_RUN_HASH` to that exact stage hash. The helper uses only the
+derived direct endpoint for identity SQL. It prepares the member baseline,
+rechecks clean trees and live identity immediately before and after linked DB
+push, and resets the baseline in `finally`. Any failed gate aborts.
 
 ## 4. RPC, Edge, and iOS gates
 
-With external view/operate/manage JWTs, test this direct-RPC matrix while
-release is off:
+Put JWT-bearing curl config files in an external `0700` directory and set
+`TASK8_AUTH_CONFIG_ROOT`; tokens never appear in command arguments or evidence.
+Run `rollout.ts direct-rpc`. Its fixed direct PostgREST matrix proves allowed
+200, unauthenticated 401, insufficient-permission 403, and release-off SQLSTATE
+`55000`/HTTP 500 mapping. Checked-in payloads contain no credentials. The Edge
+post-deploy checks below prove that internal `55000` is normalized to the
+external 503 contract.
 
-- reads: `get_match_release_state`, `get_match_operator_read`,
-  `get_match_game_day_snapshot`, `get_match_member_directory`,
-  `get_member_read`, `get_match_recommendation_input`;
-- commands: `apply_game_day_command`, `apply_admin_command`,
-  `request_member_link`, `consume_member_link_edge_rate`;
-- every role: valid result, unauthenticated, forbidden, malformed, release-off
-  SQLSTATE `55000`, idempotent replay, and conflict where applicable.
+Approve Edge replacement with
+`EDGE:<clone-ref>:<identity-digest>:<backend-head>:<client-head>`, then run
+`rollout.ts edge-replace`. It deletes exactly the seven functions, lists and
+requires empty, redeploys exactly seven, requires exact positive versions and
+`ACTIVE`, and curls all seven for the release-off 503 `feature_unavailable`
+contract.
 
-Before first write, delete exactly the seven Edge Functions listed in §2 and
-assert the inventory is empty; run `rollout.ts removal-proof`; redeploy the
-same seven and assert exact names, versions, and `ACTIVE` status. With release
-off all endpoints must return the fixed 503 contract.
-
-Build from `CLIENT_ROOT` using the real project path:
+Run `rollout.ts ios-gates`; it checks the clean pinned client before and after
+each concrete command:
 
 ```bash
 cd "$CLIENT_ROOT/ios/JWTennisMatch"
@@ -114,14 +128,24 @@ xcodebuild build -project JWTennisMatch.xcodeproj -scheme JWTennisMatch \
 ## 5. Release transaction and deterministic load
 
 Only after all prior gates pass may the owner run `release-enable`. The helper
-updates only `match.release_state` in one transaction and proves every other
-match table retained its exact count/hash.
+requires the distinct approval
+`RELEASE:<clone-ref>:<ledger-hash>:<manifest-hash>:<backend-head>:<client-head>`.
+The hash-chained ledger must contain exactly one passed, correctly ordered DB
+dry-run/apply, direct RPC, Edge delete-empty/deploy-ACTIVE, and iOS test/build
+stage for the same identity. Missing, stale, duplicate, or reordered evidence
+fails. The helper then updates only `match.release_state`.
 
 Generate JSONL conforming to `evidence-event-v1.schema.json` and the immutable
 `load-plan-v1.json`: five operator sessions, 2-second cadence, 900 polls each;
 25 member sessions, 2-second cadence, 900 alternating requests each (450 reads
 and 450 commands); 900 web requests before and after. Each of 11,250 member
 commands needs one explicit instrumented `lock_wait_ms` sample.
+
+Every event has an ISO timestamp. One run window must be exactly 30 minutes;
+after-phase timestamps must match the 2-second schedule within 250ms. Session,
+operation, and iteration sets are exact. Status allowlists must agree with
+`outcome=ok`. Telemetry must cover the complete request interval and every lock
+sample must name the approved instrumentation point/source at `<=10ms`.
 
 Run `load_gate.ts load-plan-v1.json evidence.jsonl`. It fails on missing,
 duplicate, malformed, or extra events. Required boundaries are:

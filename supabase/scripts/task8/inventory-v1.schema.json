@@ -71,10 +71,10 @@
                 "userCount",
                 "identityCount",
                 "providerCounts",
+                "instanceId",
                 "siteUrl",
                 "redirectHosts",
-                "jwtExpirySeconds",
-                "isolatedFromProduction"
+                "jwtExpirySeconds"
             ],
             "properties": {
                 "userCount": { "type": "integer", "minimum": 0 },
@@ -83,21 +83,25 @@
                     "type": "object",
                     "additionalProperties": { "type": "integer", "minimum": 0 }
                 },
+                "instanceId": { "type": "string", "minLength": 1 },
                 "siteUrl": { "type": "string", "format": "uri" },
                 "redirectHosts": {
                     "type": "array",
                     "items": { "type": "string", "minLength": 1 }
                 },
-                "jwtExpirySeconds": { "type": "integer", "minimum": 1 },
-                "isolatedFromProduction": { "const": true }
+                "jwtExpirySeconds": { "type": "integer", "minimum": 1 }
             }
         },
         "tables": { "type": "array", "items": { "$ref": "#/$defs/namedHash" } },
         "storage": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["buckets"],
+            "required": ["projectRef", "buckets"],
             "properties": {
+                "projectRef": {
+                    "type": "string",
+                    "pattern": "^[a-z]{20}$"
+                },
                 "buckets": {
                     "type": "array",
                     "items": { "$ref": "#/$defs/bucket" }
@@ -235,7 +239,7 @@
                     ]
                 },
                 "version": { "type": "integer", "minimum": 1 },
-                "status": { "type": "string", "minLength": 1 }
+                "status": { "const": "ACTIVE" }
             }
         }
     }

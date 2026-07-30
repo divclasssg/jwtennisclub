@@ -11,6 +11,22 @@ import {
     requireSystemIdentifier,
     validateDatabaseIdentity,
 } from "./identity_lib.ts";
+import {
+    boundPsqlInvocation,
+    captureBoundServerIdentity,
+    type ManagementProjectIdentity,
+    type ProjectDbTarget,
+    validateProjectDbTarget,
+} from "./connection_binding_lib.ts";
+import {
+    appendStageEvidence,
+    commandStreamEvidence,
+    expectedIdentityDigest,
+    type GateStage,
+    readStageCursor,
+    verifyApplyApproval,
+    verifyReleaseApproval,
+} from "./stage_evidence_lib.ts";
 
 export {
     BACKEND_PRODUCT_SHA,
@@ -52,8 +68,10 @@ export interface RolloutStepOptions {
     step: RolloutStep;
     backendRoot: string;
     clientRoot: string;
-    psqlService: string;
+    validationTarget: ProjectDbTarget;
     expectedIdentity: ExpectedDatabaseIdentity;
+    evidenceRoot: string;
+    dryRunHash?: string;
     approval?: string;
     runner: RolloutCommandRunner;
 }
@@ -61,7 +79,8 @@ export interface RolloutStepOptions {
 export interface BootstrapProvenanceOptions {
     backendRoot: string;
     clientRoot: string;
-    psqlService: string;
+    validationTarget: ProjectDbTarget;
+    managementProject: ManagementProjectIdentity;
     validationRef: string;
     productionSystemIdentifier: string;
     sourceSnapshotAt: string;
@@ -153,6 +172,13 @@ export async function bootstrapCloneProvenance(
     const backendRoot = await Deno.realPath(resolve(options.backendRoot));
     const clientRoot = await Deno.realPath(resolve(options.clientRoot));
     const validationRef = normalizeProjectRef(options.validationRef);
+    const validationTarget = validateProjectDbTarget(
+        options.validationTarget,
+        "validation",
+    );
+    if (validationTarget.projectRef !== validationRef) {
+        throw new Error("validation target ref mismatch");
+    }
     const productionSystemIdentifier = requireSystemIdentifier(
         options.productionSystemIdentifier,
         "production database fingerprint",
@@ -187,25 +213,13 @@ export async function bootstrapCloneProvenance(
         throw new Error("explicit bootstrap approval is required");
     }
 
-    const capture = await runChecked(options.runner, {
-        command: "psql",
-        args: [
-            `service=${options.psqlService.trim()}`,
-            "-X",
-            "-A",
-            "-t",
-            "-v",
-            "ON_ERROR_STOP=1",
-            "-f",
-            task8Script("task8_capture_server_identity.sql"),
-        ],
+    const raw = await captureBoundServerIdentity({
+        purpose: "validation",
+        target: validationTarget,
+        managementProject: options.managementProject,
+        runner: options.runner,
         cwd: backendRoot,
     });
-    const raw = parseJsonLine<{
-        systemIdentifier: string;
-        databaseOid: string;
-        databaseName: string;
-    }>(capture.stdout, "validation identity query");
     const validationSystemIdentifier = requireSystemIdentifier(
         raw.systemIdentifier,
         "validation database fingerprint",
@@ -218,10 +232,11 @@ export async function bootstrapCloneProvenance(
         throw new Error("database name mismatch");
     }
 
+    const connection = boundPsqlInvocation(validationTarget, "validation");
     const bootstrap = await runChecked(options.runner, {
         command: "psql",
         args: [
-            `service=${options.psqlService.trim()}`,
+            ...connection.args,
             "-X",
             "-A",
             "-t",
@@ -241,6 +256,7 @@ export async function bootstrapCloneProvenance(
             task8Script("task8_bootstrap_provenance.sql"),
         ],
         cwd: backendRoot,
+        env: connection.env,
     });
     const identity = parseJsonLine<DatabaseIdentity>(
         bootstrap.stdout,
@@ -286,10 +302,14 @@ function identityVariables(expected: ExpectedDatabaseIdentity): string[] {
 async function readAndAssertIdentity(
     options: RolloutStepOptions,
 ): Promise<DatabaseIdentity> {
+    const connection = boundPsqlInvocation(
+        options.validationTarget,
+        "validation",
+    );
     const result = await runChecked(options.runner, {
         command: "psql",
         args: [
-            `service=${options.psqlService.trim()}`,
+            ...connection.args,
             "-X",
             "-A",
             "-t",
@@ -300,6 +320,7 @@ async function readAndAssertIdentity(
             task8Script("task8_identity.sql"),
         ],
         cwd: options.backendRoot,
+        env: connection.env,
     });
     const parsed = parseJsonLine<DatabaseIdentity>(
         result.stdout,
@@ -308,16 +329,27 @@ async function readAndAssertIdentity(
     return validateDatabaseIdentity(parsed, options.expectedIdentity);
 }
 
+export async function captureValidatedDatabaseIdentity(
+    options: RolloutStepOptions,
+): Promise<DatabaseIdentity> {
+    validateProjectDbTarget(options.validationTarget, "validation");
+    return await readAndAssertIdentity(options);
+}
+
 async function runIdentityGuardedSql(
     options: RolloutStepOptions,
     script: string,
     extraVariables: string[] = [],
-): Promise<void> {
+): Promise<CommandResult> {
     await readAndAssertIdentity(options);
-    await runChecked(options.runner, {
+    const connection = boundPsqlInvocation(
+        options.validationTarget,
+        "validation",
+    );
+    const result = await runChecked(options.runner, {
         command: "psql",
         args: [
-            `service=${options.psqlService.trim()}`,
+            ...connection.args,
             "-X",
             "-v",
             "ON_ERROR_STOP=1",
@@ -327,20 +359,43 @@ async function runIdentityGuardedSql(
             task8Script(script),
         ],
         cwd: options.backendRoot,
+        env: connection.env,
     });
     await readAndAssertIdentity(options);
+    return result;
 }
 
-function requireApplyApproval(options: RolloutStepOptions): void {
-    const expected = [
-        "APPLY",
-        normalizeProjectRef(options.expectedIdentity.validationRef),
-        BACKEND_PRODUCT_SHA,
-        CLIENT_PRODUCT_SHA,
-    ].join(":");
-    if (options.approval !== expected) {
-        throw new Error("explicit apply approval is required");
-    }
+async function appendCommandStage(
+    options: RolloutStepOptions,
+    stage: GateStage,
+    invocation: CommandInvocation,
+    result: CommandResult,
+    startedAt: string,
+    passed = true,
+): Promise<string> {
+    const cursor = await readStageCursor(options.evidenceRoot);
+    const written = await appendStageEvidence(options.evidenceRoot, {
+        schemaVersion: 1,
+        stage,
+        sequence: cursor.sequence,
+        startedAt,
+        endedAt: new Date().toISOString(),
+        projectRef: normalizeProjectRef(
+            options.expectedIdentity.validationRef,
+        ),
+        identityDigest: await expectedIdentityDigest(options.expectedIdentity),
+        backendHead: BACKEND_PRODUCT_SHA,
+        clientHead: CLIENT_PRODUCT_SHA,
+        predecessorHash: cursor.predecessorHash,
+        command: {
+            program: invocation.command,
+            args: invocation.args,
+        },
+        stdout: commandStreamEvidence(result.stdout),
+        stderr: commandStreamEvidence(result.stderr),
+        result: { passed, exitCode: result.code },
+    });
+    return written.entryHash;
 }
 
 export async function executeRolloutStep(
@@ -372,46 +427,126 @@ export async function executeRolloutStep(
     ) {
         throw new Error("linked project ref mismatch");
     }
-    if (options.psqlService.trim() === "") {
-        throw new Error("PGSERVICE name is required");
-    }
+    validateProjectDbTarget(options.validationTarget, "validation");
 
     await readAndAssertIdentity(options);
 
     if (options.step === "db-dry-run") {
-        await runChecked(options.runner, {
+        const invocation = {
             command: "supabase",
             args: ["db", "push", "--linked", "--dry-run"],
             cwd: backendRoot,
-        });
+        };
+        const startedAt = new Date().toISOString();
+        const result = await runChecked(options.runner, invocation);
         await readAndAssertIdentity(options);
+        await appendCommandStage(
+            options,
+            "db-dry-run",
+            invocation,
+            result,
+            startedAt,
+        );
         return;
     }
 
     if (options.step === "inventory") {
-        await runIdentityGuardedSql(options, "task8_inventory.sql");
+        const startedAt = new Date().toISOString();
+        const result = await runIdentityGuardedSql(
+            options,
+            "task8_inventory.sql",
+        );
+        await appendCommandStage(
+            options,
+            "inventory",
+            {
+                command: "psql",
+                args: [task8Script("task8_inventory.sql")],
+                cwd: backendRoot,
+            },
+            result,
+            startedAt,
+        );
         return;
     }
     if (options.step === "lock-capability") {
-        await runIdentityGuardedSql(options, "task8_lock_capability.sql");
+        const startedAt = new Date().toISOString();
+        const result = await runIdentityGuardedSql(
+            options,
+            "task8_lock_capability.sql",
+        );
+        await appendCommandStage(
+            options,
+            "lock-capability",
+            {
+                command: "psql",
+                args: [task8Script("task8_lock_capability.sql")],
+                cwd: backendRoot,
+            },
+            result,
+            startedAt,
+        );
         return;
     }
 
-    requireApplyApproval(options);
-
     if (options.step === "db-apply") {
+        if (!options.approval) {
+            throw new Error("explicit apply approval is required");
+        }
+        if (!options.dryRunHash) {
+            throw new Error("dry-run transcript hash is required");
+        }
+        await verifyApplyApproval(
+            options.evidenceRoot,
+            options.approval,
+            normalizeProjectRef(options.expectedIdentity.validationRef),
+            options.dryRunHash,
+        );
         let baselinePrepared = false;
         let primaryError: unknown;
         let resetError: unknown;
+        let pushResult: CommandResult | undefined;
+        const pushInvocation = {
+            command: "supabase",
+            args: ["db", "push", "--linked"],
+            cwd: backendRoot,
+        };
+        const startedAt = new Date().toISOString();
         try {
             await runIdentityGuardedSql(options, "task8_prepare_baseline.sql");
             baselinePrepared = true;
+            await assertCheckout(
+                options.runner,
+                backendRoot,
+                BACKEND_PRODUCT_SHA,
+                "backend product",
+            );
+            await assertCheckout(
+                options.runner,
+                clientRoot,
+                CLIENT_PRODUCT_SHA,
+                "client product",
+            );
             await readAndAssertIdentity(options);
-            await runChecked(options.runner, {
-                command: "supabase",
-                args: ["db", "push", "--linked"],
-                cwd: backendRoot,
-            });
+            pushResult = await options.runner.run(pushInvocation);
+            if (pushResult.code !== 0) {
+                throw new Error(
+                    pushResult.stderr.trim() || pushResult.stdout.trim() ||
+                        `exit ${pushResult.code}`,
+                );
+            }
+            await assertCheckout(
+                options.runner,
+                backendRoot,
+                BACKEND_PRODUCT_SHA,
+                "backend product",
+            );
+            await assertCheckout(
+                options.runner,
+                clientRoot,
+                CLIENT_PRODUCT_SHA,
+                "client product",
+            );
             await readAndAssertIdentity(options);
             await runIdentityGuardedSql(options, "task8_reset_baseline.sql");
             baselinePrepared = false;
@@ -429,12 +564,28 @@ export async function executeRolloutStep(
                 }
             }
         }
-        if (primaryError !== undefined) throw primaryError;
-        if (resetError !== undefined) throw resetError;
+        const finalError = primaryError ?? resetError;
+        if (pushResult) {
+            await appendCommandStage(
+                options,
+                "db-apply",
+                pushInvocation,
+                pushResult,
+                startedAt,
+                finalError === undefined,
+            );
+        }
+        if (finalError !== undefined) throw finalError;
         return;
     }
 
     if (options.step === "release-enable") {
+        await verifyReleaseApproval(
+            options.evidenceRoot,
+            options.approval ?? "",
+            normalizeProjectRef(options.expectedIdentity.validationRef),
+            await expectedIdentityDigest(options.expectedIdentity),
+        );
         await runIdentityGuardedSql(options, "task8_release_state.sql", [
             "-v",
             "task8_release_enabled=true",

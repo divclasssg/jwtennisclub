@@ -8,15 +8,17 @@
         { "$ref": "#/$defs/telemetryCapability" },
         { "$ref": "#/$defs/counter" },
         { "$ref": "#/$defs/resource" },
-        { "$ref": "#/$defs/recovery" }
+        { "$ref": "#/$defs/recovery" },
+        { "$ref": "#/$defs/runWindow" }
     ],
     "$defs": {
         "base": {
             "type": "object",
-            "required": ["schemaVersion", "kind"],
+            "required": ["schemaVersion", "kind", "timestamp"],
             "properties": {
                 "schemaVersion": { "const": 1 },
-                "kind": { "type": "string" }
+                "kind": { "type": "string" },
+                "timestamp": { "$ref": "#/$defs/timestamp" }
             }
         },
         "request": {
@@ -25,6 +27,7 @@
             "required": [
                 "schemaVersion",
                 "kind",
+                "timestamp",
                 "phase",
                 "sessionId",
                 "requestType",
@@ -36,6 +39,7 @@
             "properties": {
                 "schemaVersion": { "const": 1 },
                 "kind": { "const": "request" },
+                "timestamp": { "$ref": "#/$defs/timestamp" },
                 "phase": { "enum": ["baseline", "after"] },
                 "sessionId": { "type": "string", "minLength": 1 },
                 "requestType": {
@@ -56,12 +60,27 @@
         "lockWait": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["schemaVersion", "kind", "operationId", "lockWaitMs"],
+            "required": [
+                "schemaVersion",
+                "kind",
+                "timestamp",
+                "operationId",
+                "lockWaitMs",
+                "source",
+                "instrumentationPoint",
+                "resolutionMs"
+            ],
             "properties": {
                 "schemaVersion": { "const": 1 },
                 "kind": { "const": "lock_wait" },
+                "timestamp": { "$ref": "#/$defs/timestamp" },
                 "operationId": { "type": "string", "minLength": 1 },
-                "lockWaitMs": { "type": "number", "minimum": 0 }
+                "lockWaitMs": { "type": "number", "minimum": 0 },
+                "source": { "const": "instrumented_lock_acquisition" },
+                "instrumentationPoint": {
+                    "const": "member_command_lock_acquisition"
+                },
+                "resolutionMs": { "type": "number", "exclusiveMinimum": 0 }
             }
         },
         "telemetryCapability": {
@@ -70,7 +89,10 @@
             "required": [
                 "schemaVersion",
                 "kind",
+                "timestamp",
                 "source",
+                "instrumentationPoint",
+                "collectorVersion",
                 "resolutionMs",
                 "coverageStartedAt",
                 "coverageEndedAt",
@@ -79,7 +101,12 @@
             "properties": {
                 "schemaVersion": { "const": 1 },
                 "kind": { "const": "telemetry_capability" },
+                "timestamp": { "$ref": "#/$defs/timestamp" },
                 "source": { "const": "instrumented_lock_acquisition" },
+                "instrumentationPoint": {
+                    "const": "member_command_lock_acquisition"
+                },
+                "collectorVersion": { "type": "string", "minLength": 1 },
                 "resolutionMs": { "type": "number", "exclusiveMinimum": 0 },
                 "coverageStartedAt": {
                     "type": "string",
@@ -92,10 +119,18 @@
         "counter": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["schemaVersion", "kind", "phase", "name", "value"],
+            "required": [
+                "schemaVersion",
+                "kind",
+                "timestamp",
+                "phase",
+                "name",
+                "value"
+            ],
             "properties": {
                 "schemaVersion": { "const": 1 },
                 "kind": { "const": "counter" },
+                "timestamp": { "$ref": "#/$defs/timestamp" },
                 "phase": { "enum": ["before", "after"] },
                 "name": {
                     "enum": [
@@ -114,6 +149,7 @@
             "required": [
                 "schemaVersion",
                 "kind",
+                "timestamp",
                 "phase",
                 "name",
                 "warningUsageRatio"
@@ -121,6 +157,7 @@
             "properties": {
                 "schemaVersion": { "const": 1 },
                 "kind": { "const": "resource" },
+                "timestamp": { "$ref": "#/$defs/timestamp" },
                 "phase": { "enum": ["before", "after"] },
                 "name": { "enum": ["cpu", "connections"] },
                 "warningUsageRatio": { "type": "number", "minimum": 0 }
@@ -132,6 +169,7 @@
             "required": [
                 "schemaVersion",
                 "kind",
+                "timestamp",
                 "restoreStartedAt",
                 "restoreHealthyAt",
                 "recoveryPointAt",
@@ -144,6 +182,7 @@
             "properties": {
                 "schemaVersion": { "const": 1 },
                 "kind": { "const": "recovery" },
+                "timestamp": { "$ref": "#/$defs/timestamp" },
                 "restoreStartedAt": { "type": "string", "format": "date-time" },
                 "restoreHealthyAt": { "type": "string", "format": "date-time" },
                 "recoveryPointAt": { "type": "string", "format": "date-time" },
@@ -156,6 +195,28 @@
                 "beforeMatchChecksum": { "$ref": "#/$defs/sha256" },
                 "afterMatchChecksum": { "$ref": "#/$defs/sha256" }
             }
+        },
+        "runWindow": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "schemaVersion",
+                "kind",
+                "timestamp",
+                "startedAt",
+                "endedAt"
+            ],
+            "properties": {
+                "schemaVersion": { "const": 1 },
+                "kind": { "const": "run_window" },
+                "timestamp": { "$ref": "#/$defs/timestamp" },
+                "startedAt": { "$ref": "#/$defs/timestamp" },
+                "endedAt": { "$ref": "#/$defs/timestamp" }
+            }
+        },
+        "timestamp": {
+            "type": "string",
+            "format": "date-time"
         },
         "sha256": {
             "type": "string",

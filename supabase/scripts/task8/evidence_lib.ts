@@ -16,19 +16,28 @@ export async function ensureEvidenceRoot(
     evidenceRoot: string,
     backendRoot: string,
     clientRoot: string,
+    toolRoot: string,
 ): Promise<string> {
     Deno.umask(0o077);
-    const [canonicalEvidence, canonicalBackend, canonicalClient] = await Promise
-        .all([
-            Deno.realPath(resolve(evidenceRoot)),
-            Deno.realPath(resolve(backendRoot)),
-            Deno.realPath(resolve(clientRoot)),
-        ]);
+    const [
+        canonicalEvidence,
+        canonicalBackend,
+        canonicalClient,
+        canonicalTool,
+    ] = await Promise.all([
+        Deno.realPath(resolve(evidenceRoot)),
+        Deno.realPath(resolve(backendRoot)),
+        Deno.realPath(resolve(clientRoot)),
+        Deno.realPath(resolve(toolRoot)),
+    ]);
     if (
         isInside(canonicalEvidence, canonicalBackend) ||
-        isInside(canonicalEvidence, canonicalClient)
+        isInside(canonicalEvidence, canonicalClient) ||
+        isInside(canonicalEvidence, canonicalTool)
     ) {
-        throw new Error("evidence root must be outside both Git roots");
+        throw new Error(
+            "evidence root must be outside backend, client, and tool Git roots",
+        );
     }
     await Deno.chmod(canonicalEvidence, 0o700);
     const mode = (await Deno.stat(canonicalEvidence)).mode;

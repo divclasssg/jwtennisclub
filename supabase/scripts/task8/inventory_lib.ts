@@ -1,4 +1,12 @@
+import {
+    type DatabaseIdentity,
+    type ExpectedDatabaseIdentity,
+    PRODUCTION_REF,
+    validateDatabaseIdentity,
+} from "./identity_lib.ts";
+
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const PROJECT_REF_PATTERN = /^[a-z]{20}$/;
 const EDGE_FUNCTIONS = [
     "admin-command",
     "game-day-command",
@@ -25,13 +33,13 @@ export interface InventoryBundle {
         userCount: number;
         identityCount: number;
         providerCounts: Record<string, number>;
+        instanceId: string;
         siteUrl: string;
         redirectHosts: string[];
         jwtExpirySeconds: number;
-        isolatedFromProduction: true;
     };
     tables: unknown[];
-    storage: { buckets: unknown[] };
+    storage: { projectRef: string; buckets: unknown[] };
     databaseFunctions: unknown[];
     edgeFunctions: Array<{ name: string; version: number; status: string }>;
     backup: {
@@ -48,6 +56,29 @@ export interface InventoryBundle {
         afterMemberChecksum: string;
         beforeMatchChecksum: string;
         afterMatchChecksum: string;
+    };
+}
+
+export interface InventoryValidationContext {
+    storedIdentity: ExpectedDatabaseIdentity;
+    liveIdentity: DatabaseIdentity;
+    productionInventory: {
+        projectRef: string;
+        systemIdentifier: string;
+        auth: {
+            instanceId: string;
+            siteUrl: string;
+            redirectHosts: string[];
+        };
+        storage: { projectRef: string };
+    };
+}
+
+export interface ValidatedInventoryBundle extends InventoryBundle {
+    derivedIsolation: {
+        authInstanceDistinct: true;
+        storageProjectBound: true;
+        networkHostsDistinct: true;
     };
 }
 
@@ -103,7 +134,10 @@ function requireChecksum(value: unknown, path: string): string {
     return value;
 }
 
-function validateIdentity(root: Record<string, unknown>): void {
+function validateIdentity(
+    root: Record<string, unknown>,
+    context: InventoryValidationContext,
+): void {
     const identity = record(root.identity, "identity");
     exactKeys(identity, [
         "validationRef",
@@ -131,6 +165,30 @@ function validateIdentity(root: Record<string, unknown>): void {
     ) {
         throw new Error("identity fingerprints must differ");
     }
+    const stored = context.storedIdentity;
+    const expectedEntries: Array<[string, string]> = [
+        ["validationRef", stored.validationRef],
+        ["productionSystemIdentifier", stored.productionSystemIdentifier],
+        ["validationSystemIdentifier", stored.validationSystemIdentifier],
+        ["databaseOid", stored.databaseOid],
+        ["markerDigest", stored.markerDigest],
+        ["provenanceId", stored.provenanceId],
+    ];
+    if (
+        !PROJECT_REF_PATTERN.test(stored.validationRef) ||
+        expectedEntries.some(([key, expected]) => identity[key] !== expected)
+    ) {
+        throw new Error("inventory identity does not match stored identity");
+    }
+    validateDatabaseIdentity(context.liveIdentity, stored);
+    const production = context.productionInventory;
+    if (
+        production.projectRef !== PRODUCTION_REF ||
+        production.storage.projectRef !== PRODUCTION_REF ||
+        production.systemIdentifier !== stored.productionSystemIdentifier
+    ) {
+        throw new Error("production inventory identity mismatch");
+    }
 }
 
 function validateMigrations(root: Record<string, unknown>): void {
@@ -148,7 +206,28 @@ function validateMigrations(root: Record<string, unknown>): void {
     });
 }
 
-function validateAuthAndMember(root: Record<string, unknown>): void {
+function hostFromSiteUrl(value: string, path: string): string {
+    try {
+        const url = new URL(value);
+        if (url.protocol !== "https:" || url.hostname === "") throw new Error();
+        return url.hostname.toLowerCase();
+    } catch {
+        throw new Error(`${path} must be an HTTPS URL`);
+    }
+}
+
+function overlapsHost(left: string, right: string): boolean {
+    return left === right || left.endsWith(`.${right}`) ||
+        right.endsWith(`.${left}`);
+}
+
+function validateAuthAndMember(
+    root: Record<string, unknown>,
+    context: InventoryValidationContext,
+): {
+    authInstanceDistinct: true;
+    networkHostsDistinct: true;
+} {
     const member = record(root.memberBaseline, "memberBaseline");
     exactKeys(member, ["count", "sha256"], "memberBaseline");
     required(member, "count", isCount, "memberBaseline");
@@ -159,10 +238,10 @@ function validateAuthAndMember(root: Record<string, unknown>): void {
         "userCount",
         "identityCount",
         "providerCounts",
+        "instanceId",
         "siteUrl",
         "redirectHosts",
         "jwtExpirySeconds",
-        "isolatedFromProduction",
     ], "auth");
     required(auth, "userCount", isCount, "auth");
     required(auth, "identityCount", isCount, "auth");
@@ -174,18 +253,45 @@ function validateAuthAndMember(root: Record<string, unknown>): void {
     ) {
         throw new Error("auth.providerCounts is invalid");
     }
-    required(auth, "siteUrl", isString, "auth");
+    const instanceId = required(auth, "instanceId", isString, "auth");
+    const siteUrl = required(auth, "siteUrl", isString, "auth");
     const redirectHosts = required(auth, "redirectHosts", isArray, "auth");
     if (!redirectHosts.every(isString)) {
         throw new Error("auth.redirectHosts is invalid");
     }
     required(auth, "jwtExpirySeconds", isCount, "auth");
-    if (auth.isolatedFromProduction !== true) {
-        throw new Error("auth.isolatedFromProduction must be true");
+    const productionAuth = context.productionInventory.auth;
+    if (instanceId === productionAuth.instanceId) {
+        throw new Error("validation auth instance matches production");
     }
+    const validationHosts = [
+        hostFromSiteUrl(siteUrl, "auth.siteUrl"),
+        ...redirectHosts.map((host) => host.toLowerCase()),
+    ];
+    const productionHosts = [
+        hostFromSiteUrl(productionAuth.siteUrl, "production auth.siteUrl"),
+        ...productionAuth.redirectHosts.map((host) => host.toLowerCase()),
+    ];
+    if (
+        validationHosts.some((host) =>
+            host.includes(PRODUCTION_REF) ||
+            productionHosts.some((productionHost) =>
+                overlapsHost(host, productionHost)
+            )
+        )
+    ) {
+        throw new Error("validation auth network host overlaps production");
+    }
+    return {
+        authInstanceDistinct: true,
+        networkHostsDistinct: true,
+    };
 }
 
-function validateTablesAndStorage(root: Record<string, unknown>): void {
+function validateTablesAndStorage(
+    root: Record<string, unknown>,
+    context: InventoryValidationContext,
+): { storageProjectBound: true } {
     const tables = required(root, "tables", isArray, "inventory");
     tables.forEach((entry, index) => {
         const path = `tables[${index}]`;
@@ -198,7 +304,20 @@ function validateTablesAndStorage(root: Record<string, unknown>): void {
     });
 
     const storage = record(root.storage, "storage");
-    exactKeys(storage, ["buckets"], "storage");
+    exactKeys(storage, ["projectRef", "buckets"], "storage");
+    const storageProjectRef = required(
+        storage,
+        "projectRef",
+        isString,
+        "storage",
+    );
+    if (
+        storageProjectRef !== context.storedIdentity.validationRef ||
+        storageProjectRef === context.productionInventory.storage.projectRef ||
+        !PROJECT_REF_PATTERN.test(storageProjectRef)
+    ) {
+        throw new Error("storage project is not bound to validation");
+    }
     const buckets = required(storage, "buckets", isArray, "storage");
     buckets.forEach((entry, index) => {
         const path = `storage.buckets[${index}]`;
@@ -224,6 +343,7 @@ function validateTablesAndStorage(root: Record<string, unknown>): void {
         }
         required(item, "objectCount", isCount, path);
     });
+    return { storageProjectBound: true };
 }
 
 function validateFunctions(root: Record<string, unknown>): void {
@@ -271,6 +391,9 @@ function validateFunctions(root: Record<string, unknown>): void {
     }
     if (edgeFunctions.some(({ version }) => version < 1)) {
         throw new Error("edge function versions must be positive");
+    }
+    if (edgeFunctions.some(({ status }) => status !== "ACTIVE")) {
+        throw new Error("all seven edge functions must have ACTIVE status");
     }
 }
 
@@ -347,7 +470,10 @@ function validateRecovery(root: Record<string, unknown>): void {
     }
 }
 
-export function validateInventoryBundle(value: unknown): InventoryBundle {
+export function validateInventoryBundle(
+    value: unknown,
+    context: InventoryValidationContext,
+): ValidatedInventoryBundle {
     const root = record(value, "inventory");
     exactKeys(root, [
         "schemaVersion",
@@ -363,11 +489,17 @@ export function validateInventoryBundle(value: unknown): InventoryBundle {
         "recovery",
     ], "inventory");
     if (root.schemaVersion !== 1) throw new Error("schemaVersion must equal 1");
-    validateIdentity(root);
+    validateIdentity(root, context);
     validateMigrations(root);
-    validateAuthAndMember(root);
-    validateTablesAndStorage(root);
+    const authIsolation = validateAuthAndMember(root, context);
+    const storageIsolation = validateTablesAndStorage(root, context);
     validateFunctions(root);
     validateRecovery(root);
-    return value as InventoryBundle;
+    return {
+        ...(value as InventoryBundle),
+        derivedIsolation: {
+            ...authIsolation,
+            ...storageIsolation,
+        },
+    };
 }

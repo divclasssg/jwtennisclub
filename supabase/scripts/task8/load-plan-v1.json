@@ -33,9 +33,17 @@
     },
     "lockTelemetry": {
         "requiredSource": "instrumented_lock_acquisition",
+        "requiredInstrumentationPoint": "member_command_lock_acquisition",
         "maximumResolutionMs": 10,
         "samplesPerMemberCommand": 1,
         "minimumCoverageSeconds": 1800
+    },
+    "cadenceToleranceMs": 250,
+    "successStatusByRequestType": {
+        "operator_poll": [200],
+        "member_read": [200],
+        "member_command": [200],
+        "web": [200]
     },
     "thresholds": {
         "webP95RegressionRatio": 0.2,

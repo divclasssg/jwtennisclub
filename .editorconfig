@@ -10,3 +10,9 @@ trim_trailing_whitespace = true
 
 [*.md]
 trim_trailing_whitespace = false
+
+[supabase/scripts/task8/**]
+end_of_line = lf
+
+[docs/runbooks/match-integration-rollout.md]
+end_of_line = lf

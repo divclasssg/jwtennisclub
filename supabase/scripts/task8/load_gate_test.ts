@@ -33,15 +33,30 @@ async function loadPlan(): Promise<LoadPlan> {
 }
 
 function buildPassingEvents(): LoadEvidenceEvent[] {
-    const events: LoadEvidenceEvent[] = [{
-        schemaVersion: 1,
-        kind: "telemetry_capability",
-        source: "instrumented_lock_acquisition",
-        resolutionMs: 10,
-        coverageStartedAt: "2026-07-30T00:00:00.000Z",
-        coverageEndedAt: "2026-07-30T00:30:00.000Z",
-        approvalId: "telemetry-approval-1",
-    }];
+    const startMs = Date.parse("2026-07-30T00:00:00.000Z");
+    const at = (iteration: number) =>
+        new Date(startMs + iteration * 2000).toISOString();
+    const events: LoadEvidenceEvent[] = [
+        {
+            schemaVersion: 1,
+            kind: "run_window",
+            timestamp: "2026-07-30T00:30:00.000Z",
+            startedAt: "2026-07-30T00:00:00.000Z",
+            endedAt: "2026-07-30T00:30:00.000Z",
+        },
+        {
+            schemaVersion: 1,
+            kind: "telemetry_capability",
+            timestamp: "2026-07-30T00:00:00.000Z",
+            source: "instrumented_lock_acquisition",
+            instrumentationPoint: "member_command_lock_acquisition",
+            collectorVersion: "lock-collector-v1",
+            resolutionMs: 10,
+            coverageStartedAt: "2026-07-30T00:00:00.000Z",
+            coverageEndedAt: "2026-07-30T00:30:00.000Z",
+            approvalId: "telemetry-approval-1",
+        },
+    ];
 
     for (let operator = 1; operator <= 5; operator += 1) {
         const sessionId = `operator-${String(operator).padStart(2, "0")}`;
@@ -49,6 +64,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
             events.push({
                 schemaVersion: 1,
                 kind: "request",
+                timestamp: at(iteration),
                 phase: "after",
                 sessionId,
                 requestType: "operator_poll",
@@ -71,6 +87,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
             events.push({
                 schemaVersion: 1,
                 kind: "request",
+                timestamp: at(iteration),
                 phase: "after",
                 sessionId,
                 requestType: isRead ? "member_read" : "member_command",
@@ -85,8 +102,12 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
                 events.push({
                     schemaVersion: 1,
                     kind: "lock_wait",
+                    timestamp: at(iteration),
                     operationId: operationId!,
                     lockWaitMs,
+                    source: "instrumented_lock_acquisition",
+                    instrumentationPoint: "member_command_lock_acquisition",
+                    resolutionMs: 10,
                 });
                 commandIndex += 1;
             }
@@ -98,6 +119,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
             events.push({
                 schemaVersion: 1,
                 kind: "request",
+                timestamp: at(iteration),
                 phase,
                 sessionId: "web-01",
                 requestType: "web",
@@ -121,6 +143,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
             {
                 schemaVersion: 1,
                 kind: "counter",
+                timestamp: "2026-07-30T00:00:00.000Z",
                 phase: "before",
                 name,
                 value: 10,
@@ -128,6 +151,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
             {
                 schemaVersion: 1,
                 kind: "counter",
+                timestamp: "2026-07-30T00:30:00.000Z",
                 phase: "after",
                 name,
                 value: 10,
@@ -140,6 +164,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
             {
                 schemaVersion: 1,
                 kind: "resource",
+                timestamp: "2026-07-30T00:00:00.000Z",
                 phase: "before",
                 name,
                 warningUsageRatio: 0.2,
@@ -147,6 +172,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
             {
                 schemaVersion: 1,
                 kind: "resource",
+                timestamp: "2026-07-30T00:30:00.000Z",
                 phase: "after",
                 name,
                 warningUsageRatio: 0.69,
@@ -157,6 +183,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
     events.push({
         schemaVersion: 1,
         kind: "recovery",
+        timestamp: "2026-07-30T02:00:00.000Z",
         restoreStartedAt: "2026-07-30T01:00:00.000Z",
         restoreHealthyAt: "2026-07-30T02:00:00.000Z",
         recoveryPointAt: "2026-07-30T00:45:00.000Z",
@@ -173,6 +200,7 @@ Deno.test("versioned JSONL parser rejects unknown event fields", () => {
     const valid = JSON.stringify({
         schemaVersion: 1,
         kind: "counter",
+        timestamp: "2026-07-30T00:00:00.000Z",
         phase: "before",
         name: "deadlocks",
         value: 0,
@@ -201,6 +229,7 @@ Deno.test("versioned JSONL parser rejects missing and invalid typed fields", () 
             [{
                 schemaVersion: 1,
                 kind: "request",
+                timestamp: "2026-07-30T00:00:00.000Z",
                 phase: "after",
                 sessionId: "operator-01",
                 requestType: "operator_poll",
@@ -211,6 +240,7 @@ Deno.test("versioned JSONL parser rejects missing and invalid typed fields", () 
             [{
                 schemaVersion: 1,
                 kind: "counter",
+                timestamp: "2026-07-30T00:00:00.000Z",
                 phase: "during",
                 name: "deadlocks",
                 value: 0,
@@ -218,7 +248,10 @@ Deno.test("versioned JSONL parser rejects missing and invalid typed fields", () 
             [{
                 schemaVersion: 1,
                 kind: "telemetry_capability",
+                timestamp: "2026-07-30T00:00:00.000Z",
                 source: "pg_stat_activity",
+                instrumentationPoint: "member_command_lock_acquisition",
+                collectorVersion: "v1",
                 resolutionMs: 1000,
                 coverageStartedAt: "not-a-time",
                 coverageEndedAt: "also-not-a-time",
@@ -342,4 +375,93 @@ Deno.test("lock, error delta, resource, RTO, and RPO violations are rejected", a
             `missing failure: ${expected}\n${result.failures.join("\n")}`,
         );
     }
+});
+
+Deno.test("an instant fake run cannot satisfy the 30-minute cadence gate", async () => {
+    const events = buildPassingEvents().map((event) => ({
+        ...event,
+        timestamp: "2026-07-30T00:00:00.000Z",
+    }));
+    const result = evaluateLoadGate(
+        await loadPlan(),
+        events as LoadEvidenceEvent[],
+    );
+    assert(!result.passed);
+    assert(result.failures.some((failure) => failure.includes("30-minute")));
+});
+
+Deno.test("wrong iteration sets and extra session IDs are rejected", async () => {
+    const wrongIteration = buildPassingEvents();
+    const lastOperator = wrongIteration.find((event) =>
+        event.kind === "request" &&
+        event.sessionId === "operator-01" &&
+        event.iteration === 899
+    );
+    assert(lastOperator?.kind === "request");
+    lastOperator.iteration = 900;
+    const wrongResult = evaluateLoadGate(await loadPlan(), wrongIteration);
+    assert(!wrongResult.passed);
+    assert(
+        wrongResult.failures.some((failure) =>
+            failure.includes("iteration set")
+        ),
+    );
+
+    const extraSession = buildPassingEvents();
+    for (let iteration = 0; iteration < 900; iteration += 1) {
+        extraSession.push({
+            schemaVersion: 1,
+            kind: "request",
+            timestamp: new Date(
+                Date.parse("2026-07-30T00:00:00.000Z") +
+                    iteration * 2000,
+            ).toISOString(),
+            phase: "after",
+            sessionId: "operator-99",
+            requestType: "operator_poll",
+            iteration,
+            durationMs: 80,
+            status: 200,
+            outcome: "ok",
+        });
+    }
+    const extraResult = evaluateLoadGate(await loadPlan(), extraSession);
+    assert(!extraResult.passed);
+    assert(
+        extraResult.failures.some((failure) =>
+            failure.includes("unexpected session")
+        ),
+    );
+});
+
+Deno.test("401 with outcome ok violates operation success semantics", async () => {
+    const events = buildPassingEvents();
+    const request = events.find((event) => event.kind === "request");
+    assert(request?.kind === "request");
+    request.status = 401;
+    request.outcome = "ok";
+    const result = evaluateLoadGate(await loadPlan(), events);
+    assert(!result.passed);
+    assert(
+        result.failures.some((failure) => failure.includes("status/outcome")),
+    );
+});
+
+Deno.test("telemetry coverage must contain the complete request interval", async () => {
+    const events = buildPassingEvents().map((event) => ({
+        ...event,
+        timestamp: event.kind === "request"
+            ? "2026-07-30T00:45:00.000Z"
+            : "2026-07-30T00:00:00.000Z",
+    }));
+    const result = evaluateLoadGate(
+        await loadPlan(),
+        events as LoadEvidenceEvent[],
+    );
+    assert(!result.passed);
+    assert(
+        result.failures.some((failure) =>
+            failure.includes("telemetry coverage gap")
+        ),
+    );
 });

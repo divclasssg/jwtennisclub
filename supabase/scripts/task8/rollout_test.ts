@@ -14,6 +14,11 @@ import {
     writeEvidence,
     writeEvidenceManifest,
 } from "./rollout_lib.ts";
+import {
+    appendStageEvidence,
+    commandStreamEvidence,
+    expectedIdentityDigest,
+} from "./stage_evidence_lib.ts";
 
 function assert(
     condition: unknown,
@@ -130,9 +135,11 @@ Deno.test("evidence root must be canonical and outside both Git roots", async ()
     try {
         const backendRoot = `${sandbox}/backend`;
         const clientRoot = `${sandbox}/client`;
+        const toolRoot = `${sandbox}/tool`;
         const outsideRoot = `${sandbox}/evidence`;
         await Deno.mkdir(`${backendRoot}/nested`, { recursive: true });
         await Deno.mkdir(clientRoot);
+        await Deno.mkdir(toolRoot);
         await Deno.mkdir(outsideRoot);
 
         await assertRejects(
@@ -141,17 +148,44 @@ Deno.test("evidence root must be canonical and outside both Git roots", async ()
                     `${backendRoot}/nested`,
                     backendRoot,
                     clientRoot,
+                    toolRoot,
                 ),
-            "outside both Git roots",
+            "outside backend, client, and tool Git roots",
         );
 
         const root = await ensureEvidenceRoot(
             outsideRoot,
             backendRoot,
             clientRoot,
+            toolRoot,
         );
         assertEquals(root, await Deno.realPath(outsideRoot));
         assertEquals((await Deno.stat(root)).mode! & 0o777, 0o700);
+    } finally {
+        await Deno.remove(sandbox, { recursive: true });
+    }
+});
+
+Deno.test("evidence root must also be outside the tool Git root", async () => {
+    const sandbox = await Deno.makeTempDir();
+    try {
+        const backendRoot = `${sandbox}/backend`;
+        const clientRoot = `${sandbox}/client`;
+        const toolRoot = `${sandbox}/tool`;
+        const evidenceRoot = `${toolRoot}/evidence`;
+        await Deno.mkdir(backendRoot);
+        await Deno.mkdir(clientRoot);
+        await Deno.mkdir(evidenceRoot, { recursive: true });
+        await assertRejects(
+            () =>
+                ensureEvidenceRoot(
+                    evidenceRoot,
+                    backendRoot,
+                    clientRoot,
+                    toolRoot,
+                ),
+            "outside backend, client, and tool Git roots",
+        );
     } finally {
         await Deno.remove(sandbox, { recursive: true });
     }
@@ -162,14 +196,17 @@ Deno.test("evidence writer redacts secrets, uses 0600, and hashes redacted files
     try {
         const backendRoot = `${sandbox}/backend`;
         const clientRoot = `${sandbox}/client`;
+        const toolRoot = `${sandbox}/tool`;
         const evidenceRoot = `${sandbox}/evidence`;
         await Deno.mkdir(backendRoot);
         await Deno.mkdir(clientRoot);
+        await Deno.mkdir(toolRoot);
         await Deno.mkdir(evidenceRoot);
         const root = await ensureEvidenceRoot(
             evidenceRoot,
             backendRoot,
             clientRoot,
+            toolRoot,
         );
 
         const file = await writeEvidence(root, "inventory.json", {
@@ -256,7 +293,7 @@ class FakeRunner implements RolloutCommandRunner {
     }
 }
 
-Deno.test("bootstrap rejects a PGSERVICE pointing at production before marker mutation", async () => {
+Deno.test("bootstrap rejects a validation endpoint with the production fingerprint", async () => {
     const runner = new FakeRunner();
     runner.identity = {
         ...validIdentity(),
@@ -277,7 +314,18 @@ Deno.test("bootstrap rejects a PGSERVICE pointing at production before marker mu
                 bootstrapCloneProvenance({
                     backendRoot,
                     clientRoot,
-                    psqlService: "wrong-service",
+                    validationTarget: {
+                        projectRef: validationRef,
+                        host: `db.${validationRef}.supabase.co`,
+                        user: "postgres",
+                        database: "postgres",
+                        sslMode: "verify-full",
+                    },
+                    managementProject: {
+                        id: validationRef,
+                        ref: validationRef,
+                        name: "approved-clone",
+                    },
                     validationRef,
                     productionSystemIdentifier,
                     sourceSnapshotAt: "2026-07-30T00:00:00.000Z",
@@ -310,35 +358,76 @@ async function rolloutFixture(
     const sandbox = await Deno.makeTempDir();
     const backendRoot = `${sandbox}/backend`;
     const clientRoot = `${sandbox}/client`;
+    const evidenceRoot = `${sandbox}/evidence`;
     await Deno.mkdir(`${backendRoot}/supabase/.temp`, { recursive: true });
     await Deno.mkdir(clientRoot);
+    await Deno.mkdir(evidenceRoot);
     await Deno.writeTextFile(
         `${backendRoot}/supabase/.temp/project-ref`,
         `${validationRef}\n`,
     );
     try {
+        const expectedIdentity = {
+            validationRef,
+            productionSystemIdentifier,
+            validationSystemIdentifier,
+            databaseOid: "16384",
+            markerDigest,
+            provenanceId: "clone-ticket-42",
+        };
+        let dryRunHash: string | undefined;
+        if (step === "db-apply" && approval !== undefined) {
+            const dryRun = await appendStageEvidence(evidenceRoot, {
+                schemaVersion: 1,
+                stage: "db-dry-run",
+                sequence: 0,
+                startedAt: "2026-07-30T00:00:00.000Z",
+                endedAt: "2026-07-30T00:00:01.000Z",
+                projectRef: validationRef,
+                identityDigest: await expectedIdentityDigest(expectedIdentity),
+                backendHead: BACKEND_PRODUCT_SHA,
+                clientHead: CLIENT_PRODUCT_SHA,
+                predecessorHash: null,
+                command: {
+                    program: "supabase",
+                    args: ["db", "push", "--linked", "--dry-run"],
+                },
+                stdout: commandStreamEvidence("dry run ok"),
+                stderr: commandStreamEvidence(""),
+                result: { passed: true, exitCode: 0 },
+            });
+            dryRunHash = dryRun.entryHash;
+            if (approval === "VALID_APPLY") {
+                approval =
+                    `APPLY:${validationRef}:${dryRunHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;
+            }
+        }
         await executeRolloutStep({
             step,
             backendRoot,
             clientRoot,
-            psqlService: "task8-validation",
-            expectedIdentity: {
-                validationRef,
-                productionSystemIdentifier,
-                validationSystemIdentifier,
-                databaseOid: "16384",
-                markerDigest,
-                provenanceId: "clone-ticket-42",
+            validationTarget: {
+                projectRef: validationRef,
+                host: `db.${validationRef}.supabase.co`,
+                user: "postgres",
+                database: "postgres",
+                sslMode: "verify-full",
             },
+            expectedIdentity,
+            evidenceRoot,
+            dryRunHash,
             approval,
             runner,
         });
+        return JSON.parse(
+            await Deno.readTextFile(`${evidenceRoot}/gate-ledger.json`),
+        );
     } finally {
         await Deno.remove(sandbox, { recursive: true });
     }
 }
 
-Deno.test("mismatched PGSERVICE identity stops before any remote mutation", async () => {
+Deno.test("mismatched direct-endpoint identity stops before any remote mutation", async () => {
     const runner = new FakeRunner();
     runner.identity = {
         ...validIdentity(),
@@ -389,12 +478,14 @@ Deno.test("mismatched provenance marker stops before any remote mutation", async
 
 Deno.test("dry-run is separate and apply requires an exact approval string", async () => {
     const dryRunner = new FakeRunner();
-    await rolloutFixture(dryRunner, "db-dry-run");
+    const ledger = await rolloutFixture(dryRunner, "db-dry-run");
     assert(
         dryRunner.invocations.some((invocation) =>
             invocation.args.join(" ").includes("db push --linked --dry-run")
         ),
     );
+    assertEquals(ledger.entries[0].stage, "db-dry-run");
+    assertEquals(ledger.entries[0].passed, true);
 
     const applyRunner = new FakeRunner();
     await assertRejects(
@@ -417,7 +508,7 @@ Deno.test("failed DB apply still runs identity-guarded baseline reset", async ()
             rolloutFixture(
                 runner,
                 "db-apply",
-                `APPLY:${validationRef}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`,
+                "VALID_APPLY",
             ),
         "synthetic push failure",
     );

@@ -29,9 +29,17 @@ export interface LoadPlan {
     };
     lockTelemetry: {
         requiredSource: "instrumented_lock_acquisition";
+        requiredInstrumentationPoint: "member_command_lock_acquisition";
         maximumResolutionMs: 10;
         samplesPerMemberCommand: 1;
         minimumCoverageSeconds: 1800;
+    };
+    cadenceToleranceMs: 250;
+    successStatusByRequestType: {
+        operator_poll: [200];
+        member_read: [200];
+        member_command: [200];
+        web: [200];
     };
     thresholds: {
         webP95RegressionRatio: 0.2;
@@ -59,6 +67,7 @@ type ResourceName = "cpu" | "connections";
 export interface RequestEvent {
     schemaVersion: 1;
     kind: "request";
+    timestamp: string;
     phase: "baseline" | "after";
     sessionId: string;
     requestType: RequestType;
@@ -72,14 +81,21 @@ export interface RequestEvent {
 export interface LockWaitEvent {
     schemaVersion: 1;
     kind: "lock_wait";
+    timestamp: string;
     operationId: string;
     lockWaitMs: number;
+    source: "instrumented_lock_acquisition";
+    instrumentationPoint: "member_command_lock_acquisition";
+    resolutionMs: number;
 }
 
 export interface TelemetryCapabilityEvent {
     schemaVersion: 1;
     kind: "telemetry_capability";
+    timestamp: string;
     source: "instrumented_lock_acquisition";
+    instrumentationPoint: "member_command_lock_acquisition";
+    collectorVersion: string;
     resolutionMs: number;
     coverageStartedAt: string;
     coverageEndedAt: string;
@@ -89,6 +105,7 @@ export interface TelemetryCapabilityEvent {
 export interface CounterEvent {
     schemaVersion: 1;
     kind: "counter";
+    timestamp: string;
     phase: "before" | "after";
     name: CounterName;
     value: number;
@@ -97,6 +114,7 @@ export interface CounterEvent {
 export interface ResourceEvent {
     schemaVersion: 1;
     kind: "resource";
+    timestamp: string;
     phase: "before" | "after";
     name: ResourceName;
     warningUsageRatio: number;
@@ -105,6 +123,7 @@ export interface ResourceEvent {
 export interface RecoveryEvent {
     schemaVersion: 1;
     kind: "recovery";
+    timestamp: string;
     restoreStartedAt: string;
     restoreHealthyAt: string;
     recoveryPointAt: string;
@@ -115,13 +134,22 @@ export interface RecoveryEvent {
     afterMatchChecksum: string;
 }
 
+export interface RunWindowEvent {
+    schemaVersion: 1;
+    kind: "run_window";
+    timestamp: string;
+    startedAt: string;
+    endedAt: string;
+}
+
 export type LoadEvidenceEvent =
     | RequestEvent
     | LockWaitEvent
     | TelemetryCapabilityEvent
     | CounterEvent
     | ResourceEvent
-    | RecoveryEvent;
+    | RecoveryEvent
+    | RunWindowEvent;
 
 export interface LoadGateMetrics {
     operatorPollCount: number;
@@ -146,6 +174,7 @@ const allowedFields: Record<LoadEvidenceEvent["kind"], Set<string>> = {
     request: new Set([
         "schemaVersion",
         "kind",
+        "timestamp",
         "phase",
         "sessionId",
         "requestType",
@@ -158,13 +187,20 @@ const allowedFields: Record<LoadEvidenceEvent["kind"], Set<string>> = {
     lock_wait: new Set([
         "schemaVersion",
         "kind",
+        "timestamp",
         "operationId",
         "lockWaitMs",
+        "source",
+        "instrumentationPoint",
+        "resolutionMs",
     ]),
     telemetry_capability: new Set([
         "schemaVersion",
         "kind",
+        "timestamp",
         "source",
+        "instrumentationPoint",
+        "collectorVersion",
         "resolutionMs",
         "coverageStartedAt",
         "coverageEndedAt",
@@ -173,6 +209,7 @@ const allowedFields: Record<LoadEvidenceEvent["kind"], Set<string>> = {
     counter: new Set([
         "schemaVersion",
         "kind",
+        "timestamp",
         "phase",
         "name",
         "value",
@@ -180,6 +217,7 @@ const allowedFields: Record<LoadEvidenceEvent["kind"], Set<string>> = {
     resource: new Set([
         "schemaVersion",
         "kind",
+        "timestamp",
         "phase",
         "name",
         "warningUsageRatio",
@@ -187,6 +225,7 @@ const allowedFields: Record<LoadEvidenceEvent["kind"], Set<string>> = {
     recovery: new Set([
         "schemaVersion",
         "kind",
+        "timestamp",
         "restoreStartedAt",
         "restoreHealthyAt",
         "recoveryPointAt",
@@ -195,6 +234,13 @@ const allowedFields: Record<LoadEvidenceEvent["kind"], Set<string>> = {
         "afterMemberChecksum",
         "beforeMatchChecksum",
         "afterMatchChecksum",
+    ]),
+    run_window: new Set([
+        "schemaVersion",
+        "kind",
+        "timestamp",
+        "startedAt",
+        "endedAt",
     ]),
 };
 
@@ -238,6 +284,10 @@ function validateParsedEvent(
         if (!allowedFields[kind as LoadEvidenceEvent["kind"]].has(field)) {
             throw new Error(`line ${line}: unknown field ${field}`);
         }
+    }
+    const timestamp = requireString(value.timestamp, "timestamp", line);
+    if (!Number.isFinite(Date.parse(timestamp))) {
+        throw new Error(`line ${line}: timestamp must be an ISO timestamp`);
     }
 
     if (kind === "request") {
@@ -295,6 +345,17 @@ function validateParsedEvent(
         if (requireFiniteNumber(value.lockWaitMs, "lockWaitMs", line) < 0) {
             throw new Error(`line ${line}: lockWaitMs cannot be negative`);
         }
+        if (value.source !== "instrumented_lock_acquisition") {
+            throw new Error(`line ${line}: invalid lock source`);
+        }
+        if (value.instrumentationPoint !== "member_command_lock_acquisition") {
+            throw new Error(`line ${line}: invalid lock instrumentation point`);
+        }
+        if (
+            requireFiniteNumber(value.resolutionMs, "resolutionMs", line) <= 0
+        ) {
+            throw new Error(`line ${line}: lock resolution must be positive`);
+        }
         return value as unknown as LockWaitEvent;
     }
 
@@ -302,6 +363,12 @@ function validateParsedEvent(
         if (value.source !== "instrumented_lock_acquisition") {
             throw new Error(`line ${line}: invalid telemetry source`);
         }
+        if (value.instrumentationPoint !== "member_command_lock_acquisition") {
+            throw new Error(
+                `line ${line}: invalid telemetry instrumentation point`,
+            );
+        }
+        requireString(value.collectorVersion, "collectorVersion", line);
         if (
             requireFiniteNumber(value.resolutionMs, "resolutionMs", line) <= 0
         ) {
@@ -358,6 +425,18 @@ function validateParsedEvent(
             );
         }
         return value as unknown as ResourceEvent;
+    }
+
+    if (kind === "run_window") {
+        for (const field of ["startedAt", "endedAt"]) {
+            const item = requireString(value[field], field, line);
+            if (!Number.isFinite(Date.parse(item))) {
+                throw new Error(
+                    `line ${line}: ${field} must be an ISO timestamp`,
+                );
+            }
+        }
+        return value as unknown as RunWindowEvent;
     }
 
     for (

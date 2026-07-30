@@ -7,6 +7,7 @@ import type {
     RecoveryEvent,
     RequestEvent,
     ResourceEvent,
+    RunWindowEvent,
     TelemetryCapabilityEvent,
 } from "./load_gate_lib.ts";
 
@@ -23,7 +24,13 @@ function assertFixedPlan(plan: LoadPlan): void {
         plan.member.iterationsPerSession !== 900 ||
         plan.member.readsPerSession !== 450 ||
         plan.member.commandsPerSession !== 450 ||
-        plan.web.iterationsPerPhase !== 900;
+        plan.web.iterationsPerPhase !== 900 ||
+        plan.cadenceToleranceMs !== 250 ||
+        plan.lockTelemetry.requiredInstrumentationPoint !==
+            "member_command_lock_acquisition" ||
+        Object.values(plan.successStatusByRequestType).some((value) =>
+            value.length !== 1 || value[0] !== 200
+        );
     if (invalid) {
         throw new Error("load plan does not match version 1 constants");
     }
@@ -36,14 +43,41 @@ function p95(values: number[]): number | null {
 }
 
 function minutesBetween(later: string, earlier: string): number | null {
-    const laterMs = Date.parse(later);
-    const earlierMs = Date.parse(earlier);
-    if (!Number.isFinite(laterMs) || !Number.isFinite(earlierMs)) return null;
-    return (laterMs - earlierMs) / 60_000;
+    const delta = Date.parse(later) - Date.parse(earlier);
+    return Number.isFinite(delta) ? delta / 60_000 : null;
 }
 
 function expectedSessionId(prefix: string, index: number): string {
     return `${prefix}${String(index).padStart(2, "0")}`;
+}
+
+function hasExactIterations(
+    requests: RequestEvent[],
+    count: number,
+): boolean {
+    const actual = [...new Set(requests.map((request) => request.iteration))]
+        .sort((left, right) => left - right);
+    return actual.length === count &&
+        actual.every((iteration, index) => iteration === index);
+}
+
+function validateCadence(
+    requests: RequestEvent[],
+    startMs: number,
+    cadenceMs: number,
+    toleranceMs: number,
+    label: string,
+    failures: string[],
+): void {
+    for (const request of requests) {
+        const expected = startMs + request.iteration * cadenceMs;
+        if (Math.abs(Date.parse(request.timestamp) - expected) > toleranceMs) {
+            failures.push(
+                `${label} violates the 30-minute ${cadenceMs}ms cadence`,
+            );
+            return;
+        }
+    }
 }
 
 export function evaluateLoadGate(
@@ -52,8 +86,37 @@ export function evaluateLoadGate(
 ): LoadGateResult {
     assertFixedPlan(plan);
     const failures: string[] = [];
+    const windows = events.filter(
+        (event): event is RunWindowEvent => event.kind === "run_window",
+    );
+    let runStartMs = Number.NaN;
+    let runEndMs = Number.NaN;
+    if (windows.length !== 1) {
+        failures.push("exactly one 30-minute run_window record is required");
+    } else {
+        runStartMs = Date.parse(windows[0].startedAt);
+        runEndMs = Date.parse(windows[0].endedAt);
+        if (runEndMs - runStartMs !== plan.durationSeconds * 1000) {
+            failures.push("run_window must be exactly 30-minute duration");
+        }
+    }
+
     const requests = events.filter(
         (event): event is RequestEvent => event.kind === "request",
+    );
+    const expectedOperators = new Set(
+        Array.from(
+            { length: plan.operator.sessionCount },
+            (_, index) =>
+                expectedSessionId(plan.operator.sessionPrefix, index + 1),
+        ),
+    );
+    const expectedMembers = new Set(
+        Array.from(
+            { length: plan.member.sessionCount },
+            (_, index) =>
+                expectedSessionId(plan.member.sessionPrefix, index + 1),
+        ),
     );
     const requestKeys = new Set<string>();
     for (const request of requests) {
@@ -67,17 +130,29 @@ export function evaluateLoadGate(
             failures.push(`duplicate request event ${key}`);
         }
         requestKeys.add(key);
+        const correctPair = (request.phase === "after" &&
+            request.requestType === "operator_poll" &&
+            expectedOperators.has(request.sessionId)) ||
+            (request.phase === "after" &&
+                ["member_read", "member_command"].includes(
+                    request.requestType,
+                ) &&
+                expectedMembers.has(request.sessionId)) ||
+            (request.requestType === "web" &&
+                request.sessionId === plan.web.sessionId);
+        if (!correctPair) {
+            failures.push(`unexpected session or operation ${key}`);
+        }
+        const allowed = plan.successStatusByRequestType[request.requestType];
         if (
-            request.status >= 500 ||
-            request.outcome === "timeout" ||
-            request.outcome === "failure"
+            !(allowed as readonly number[]).includes(request.status) ||
+            request.outcome !== "ok"
         ) {
-            failures.push(`request failure ${key}`);
+            failures.push(`status/outcome mismatch ${key}`);
         }
     }
 
-    for (let index = 1; index <= plan.operator.sessionCount; index += 1) {
-        const sessionId = expectedSessionId(plan.operator.sessionPrefix, index);
+    for (const sessionId of expectedOperators) {
         const sessionRequests = requests.filter((request) =>
             request.phase === "after" &&
             request.sessionId === sessionId &&
@@ -88,33 +163,50 @@ export function evaluateLoadGate(
                 `${sessionId} expected ${plan.operator.iterationsPerSession} operator_poll requests, got ${sessionRequests.length}`,
             );
         }
+        if (
+            !hasExactIterations(
+                sessionRequests,
+                plan.operator.iterationsPerSession,
+            )
+        ) failures.push(`${sessionId} operator iteration set is not exact`);
+        validateCadence(
+            sessionRequests,
+            runStartMs,
+            plan.operator.cadenceMs,
+            plan.cadenceToleranceMs,
+            sessionId,
+            failures,
+        );
     }
 
     const commandOperationIds = new Set<string>();
-    for (let index = 1; index <= plan.member.sessionCount; index += 1) {
-        const sessionId = expectedSessionId(plan.member.sessionPrefix, index);
+    const commandByOperationId = new Map<string, RequestEvent>();
+    for (const sessionId of expectedMembers) {
         const memberRequests = requests.filter((request) =>
             request.phase === "after" && request.sessionId === sessionId &&
-            (request.requestType === "member_read" ||
-                request.requestType === "member_command")
+            ["member_read", "member_command"].includes(request.requestType)
         );
         if (memberRequests.length !== plan.member.iterationsPerSession) {
             failures.push(
                 `${sessionId} expected ${plan.member.iterationsPerSession} member requests, got ${memberRequests.length}`,
             );
         }
-        const reads = memberRequests.filter((request) =>
-            request.requestType === "member_read"
+        if (
+            !hasExactIterations(
+                memberRequests,
+                plan.member.iterationsPerSession,
+            )
+        ) failures.push(`${sessionId} member iteration set is not exact`);
+        const reads = memberRequests.filter((event) =>
+            event.requestType === "member_read"
         );
-        const commands = memberRequests.filter((request) =>
-            request.requestType === "member_command"
+        const commands = memberRequests.filter((event) =>
+            event.requestType === "member_command"
         );
         if (
             reads.length !== plan.member.readsPerSession ||
             commands.length !== plan.member.commandsPerSession
-        ) {
-            failures.push(`${sessionId} member read/command mix is incomplete`);
-        }
+        ) failures.push(`${sessionId} member read/command mix is incomplete`);
         for (const request of memberRequests) {
             const expectedType = plan.member.requestSequence[
                 request.iteration % plan.member.requestSequence.length
@@ -125,19 +217,31 @@ export function evaluateLoadGate(
                 );
             }
             if (request.requestType === "member_command") {
-                if (!request.operationId) {
+                const expectedOperationId = `${plan.fixedSeed}-${sessionId}-${
+                    String(request.iteration).padStart(4, "0")
+                }`;
+                if (request.operationId !== expectedOperationId) {
                     failures.push(
-                        `${sessionId} command is missing operation ID`,
+                        `${sessionId} command operation ID is not deterministic`,
                     );
-                } else if (commandOperationIds.has(request.operationId)) {
+                } else if (commandOperationIds.has(expectedOperationId)) {
                     failures.push(
-                        `duplicate operation ID ${request.operationId}`,
+                        `duplicate operation ID ${expectedOperationId}`,
                     );
                 } else {
-                    commandOperationIds.add(request.operationId);
+                    commandOperationIds.add(expectedOperationId);
+                    commandByOperationId.set(expectedOperationId, request);
                 }
             }
         }
+        validateCadence(
+            memberRequests,
+            runStartMs,
+            plan.member.cadenceMs,
+            plan.cadenceToleranceMs,
+            sessionId,
+            failures,
+        );
     }
 
     const webBaseline = requests.filter((request) =>
@@ -161,7 +265,18 @@ export function evaluateLoadGate(
                 `web ${phase} expected ${plan.web.iterationsPerPhase} requests, got ${phaseRequests.length}`,
             );
         }
+        if (!hasExactIterations(phaseRequests, plan.web.iterationsPerPhase)) {
+            failures.push(`web ${phase} iteration set is not exact`);
+        }
     }
+    validateCadence(
+        webAfter,
+        runStartMs,
+        plan.web.cadenceMs,
+        plan.cadenceToleranceMs,
+        "web after",
+        failures,
+    );
 
     const webBaselineP95Ms = p95(webBaseline.map((event) => event.durationMs));
     const webAfterP95Ms = p95(webAfter.map((event) => event.durationMs));
@@ -172,15 +287,11 @@ export function evaluateLoadGate(
     if (
         webAfterP95Ms === null ||
         webAfterP95Ms > plan.thresholds.webAbsoluteP95Ms
-    ) {
-        failures.push("absolute web p95 exceeds 500ms or is missing");
-    }
+    ) failures.push("absolute web p95 exceeds 500ms or is missing");
     if (
         webP95RegressionRatio === null ||
         webP95RegressionRatio > plan.thresholds.webP95RegressionRatio + 1e-12
-    ) {
-        failures.push("web p95 regression exceeds 20% or is missing");
-    }
+    ) failures.push("web p95 regression exceeds 20% or is missing");
 
     const capabilities = events.filter(
         (event): event is TelemetryCapabilityEvent =>
@@ -192,18 +303,25 @@ export function evaluateLoadGate(
         );
     } else {
         const capability = capabilities[0];
-        const coverageMinutes = minutesBetween(
-            capability.coverageEndedAt,
-            capability.coverageStartedAt,
-        );
+        const coverageStartMs = Date.parse(capability.coverageStartedAt);
+        const coverageEndMs = Date.parse(capability.coverageEndedAt);
+        const requestTimes = requests.filter((request) =>
+            request.phase === "after"
+        ).map((request) => Date.parse(request.timestamp));
         if (
             capability.source !== plan.lockTelemetry.requiredSource ||
-            capability.resolutionMs > plan.lockTelemetry.maximumResolutionMs ||
-            coverageMinutes === null ||
-            coverageMinutes * 60 < plan.lockTelemetry.minimumCoverageSeconds
-        ) {
-            failures.push("lock telemetry capability is insufficient");
-        }
+            capability.instrumentationPoint !==
+                plan.lockTelemetry.requiredInstrumentationPoint ||
+            capability.resolutionMs >
+                plan.lockTelemetry.maximumResolutionMs ||
+            coverageEndMs - coverageStartMs <
+                plan.lockTelemetry.minimumCoverageSeconds * 1000
+        ) failures.push("lock telemetry capability is insufficient");
+        if (
+            requestTimes.length === 0 ||
+            coverageStartMs > Math.min(...requestTimes) ||
+            coverageEndMs < Math.max(...requestTimes)
+        ) failures.push("telemetry coverage gap in request interval");
     }
 
     const lockEvents = events.filter(
@@ -217,16 +335,18 @@ export function evaluateLoadGate(
             `expected ${expectedLockSamples} lock_wait samples, got ${lockEvents.length}`,
         );
     }
-    const lockOperationIds = new Set(
-        lockEvents.map((event) => event.operationId),
-    );
-    if (
-        lockOperationIds.size !== lockEvents.length ||
-        [...lockOperationIds].some((operationId) =>
-            !commandOperationIds.has(operationId)
-        )
-    ) {
-        failures.push("lock_wait samples do not map one-to-one to commands");
+    const lockOperationIds = new Set<string>();
+    for (const lock of lockEvents) {
+        const command = commandByOperationId.get(lock.operationId);
+        if (
+            lockOperationIds.has(lock.operationId) || !command ||
+            lock.source !== plan.lockTelemetry.requiredSource ||
+            lock.instrumentationPoint !==
+                plan.lockTelemetry.requiredInstrumentationPoint ||
+            lock.resolutionMs > plan.lockTelemetry.maximumResolutionMs ||
+            Date.parse(lock.timestamp) !== Date.parse(command.timestamp)
+        ) failures.push("lock_wait samples do not map one-to-one to commands");
+        lockOperationIds.add(lock.operationId);
     }
     const lockP95Ms = p95(lockEvents.map((event) => event.lockWaitMs));
     const lockMaxMs = lockEvents.length === 0
@@ -258,9 +378,7 @@ export function evaluateLoadGate(
         if (
             before.length !== 1 || after.length !== 1 ||
             after[0]?.value - before[0]?.value !== 0
-        ) {
-            failures.push(`${counterName} delta must be zero`);
-        }
+        ) failures.push(`${counterName} delta must be zero`);
     }
 
     for (const resourceName of ["cpu", "connections"] as const) {
@@ -279,9 +397,7 @@ export function evaluateLoadGate(
         } else if (
             after[0].warningUsageRatio >=
                 plan.thresholds.resourceWarningUsageRatioExclusive
-        ) {
-            failures.push(`${resourceName} warning usage must be below 70%`);
-        }
+        ) failures.push(`${resourceName} warning usage must be below 70%`);
     }
 
     const recoveryEvents = events.filter(
@@ -304,21 +420,15 @@ export function evaluateLoadGate(
         if (
             rtoMinutes === null || rtoMinutes < 0 ||
             rtoMinutes > plan.thresholds.rtoMinutes
-        ) {
-            failures.push("RTO exceeds 60 minutes or is invalid");
-        }
+        ) failures.push("RTO exceeds 60 minutes or is invalid");
         if (
             rpoMinutes === null || rpoMinutes < 0 ||
             rpoMinutes > plan.thresholds.rpoMinutes
-        ) {
-            failures.push("RPO exceeds 15 minutes or is invalid");
-        }
+        ) failures.push("RPO exceeds 15 minutes or is invalid");
         if (
             recovery.beforeMemberChecksum !== recovery.afterMemberChecksum ||
             recovery.beforeMatchChecksum !== recovery.afterMatchChecksum
-        ) {
-            failures.push("restore before/after checksums do not match");
-        }
+        ) failures.push("restore before/after checksums do not match");
     }
 
     return {
@@ -326,19 +436,19 @@ export function evaluateLoadGate(
         failures,
         metrics: {
             operatorPollCount:
-                requests.filter((request) =>
-                    request.requestType === "operator_poll" &&
-                    request.phase === "after"
+                requests.filter((event) =>
+                    event.requestType === "operator_poll" &&
+                    event.phase === "after"
                 ).length,
             memberReadCount:
-                requests.filter((request) =>
-                    request.requestType === "member_read" &&
-                    request.phase === "after"
+                requests.filter((event) =>
+                    event.requestType === "member_read" &&
+                    event.phase === "after"
                 ).length,
             memberCommandCount:
-                requests.filter((request) =>
-                    request.requestType === "member_command" &&
-                    request.phase === "after"
+                requests.filter((event) =>
+                    event.requestType === "member_command" &&
+                    event.phase === "after"
                 ).length,
             webBaselineP95Ms,
             webAfterP95Ms,
