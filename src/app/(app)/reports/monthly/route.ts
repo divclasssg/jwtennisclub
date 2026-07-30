@@ -122,16 +122,14 @@ export async function GET(request: Request) {
       generatedBy,
     });
     const pdf = await renderMonthlyReportPdf(report);
-    const { error: auditError } = await supabase.from("audit_logs").insert({
-      actor_profile_id: user.id,
-      action: "monthly_report.generated",
-      table_name: "monthly_closings",
-      record_id: closing.id,
-      details: {
-        period_month: closing.periodMonth,
-        version: closing.version,
+    const { error: auditError } = await supabase.rpc(
+      "record_monthly_report_generation",
+      {
+        requested_closing_id: closing.id,
+        requested_period_month: closing.periodMonth,
+        requested_version: closing.version,
       },
-    });
+    );
 
     if (auditError) {
       return controlledResponse("PDF 생성 기록을 저장하지 못했습니다.", 500);

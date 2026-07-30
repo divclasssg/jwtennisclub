@@ -409,17 +409,41 @@ describe("monthly settlement closing migration", () => {
     }
   });
 
-  it("exposes only the three authenticated page and mutation RPCs", () => {
+  it("atomically locks the exact active closing and audits PDF generation before a response", () => {
+    const reportAudit = migrationFunctionBody("record_monthly_report_generation");
+
+    expect(reportAudit).toContain("security definer");
+    expect(reportAudit).toContain("set search_path = ''");
+    expect(reportAudit).toContain("profiles.id = auth.uid()");
+    expect(reportAudit).toContain("profiles.status = 'active'");
+    expect(reportAudit).toContain("closings.id = requested_closing_id");
+    expect(reportAudit).toContain("closings.period_month = requested_period_month");
+    expect(reportAudit).toContain("closings.version = requested_version");
+    expect(reportAudit).toContain("closings.status = 'closed'");
+    expect(reportAudit).toContain("for update");
+    expect(reportAudit).toContain("insert into public.audit_logs");
+    expect(reportAudit).toContain("'monthly_report.generated'");
+    expect(reportAudit).toContain("'period_month'");
+    expect(reportAudit).toContain("'version'");
+    expect(reportAudit).toContain("return true");
+  });
+
+  it("exposes only the four authenticated page, mutation, and PDF-audit RPCs", () => {
     for (const signature of [
       "get_monthly_settlement_page(date)",
       "close_monthly_settlement(date)",
       "reopen_monthly_settlement(date)",
+      "record_monthly_report_generation(uuid, date, integer)",
     ]) {
-      expect(migrationSql).toContain(
-        `revoke execute on function public.${signature} from public, anon`,
+      expect(migrationSql).toMatch(
+        new RegExp(
+          `revoke execute on function public\\.${signature.replace(/[()]/g, "\\$&")}\\s+from public, anon(?:, authenticated, service_role)?`,
+        ),
       );
-      expect(migrationSql).toContain(
-        `grant execute on function public.${signature} to authenticated`,
+      expect(migrationSql).toMatch(
+        new RegExp(
+          `grant execute on function public\\.${signature.replace(/[()]/g, "\\$&")}\\s+to authenticated`,
+        ),
       );
     }
   });

@@ -53,7 +53,9 @@ const mocks = vi.hoisted(() => {
     data: null,
     error: null,
   };
-  let auditResult: { error: { message: string } | null } = { error: null };
+  let generationAuditResult: { error: { message: string } | null } = {
+    error: null,
+  };
   let authenticated = true;
 
   const closingsQuery = {
@@ -67,9 +69,6 @@ const mocks = vi.hoisted(() => {
       Promise.resolve({ data: { display_name: "김생성" }, error: null }),
     ),
     select: vi.fn(() => profilesQuery),
-  };
-  const auditQuery = {
-    insert: vi.fn(() => Promise.resolve(auditResult)),
   };
   const supabase = {
     auth: {
@@ -89,20 +88,24 @@ const mocks = vi.hoisted(() => {
     from: vi.fn((table: string) => {
       if (table === "monthly_closings") return closingsQuery;
       if (table === "profiles") return profilesQuery;
-      if (table === "audit_logs") return auditQuery;
-
       throw new Error(`Unexpected raw source table: ${table}`);
+    }),
+    rpc: vi.fn((functionName: string) => {
+      if (functionName === "record_monthly_report_generation") {
+        return Promise.resolve({ data: true, ...generationAuditResult });
+      }
+
+      throw new Error(`Unexpected RPC: ${functionName}`);
     }),
   };
 
   return {
-    auditQuery,
     closingsQuery,
     renderMonthlyReportPdf: vi.fn(() =>
       Promise.resolve(Buffer.from("%PDF monthly report")),
     ),
-    setAuditResult(result: { error: { message: string } | null }) {
-      auditResult = result;
+    setGenerationAuditResult(result: { error: { message: string } | null }) {
+      generationAuditResult = result;
     },
     setAuthenticated(value: boolean) {
       authenticated = value;
@@ -130,7 +133,7 @@ describe("monthly report route", () => {
     vi.setSystemTime(new Date("2026-08-03T12:00:00Z"));
     vi.clearAllMocks();
     mocks.setAuthenticated(true);
-    mocks.setAuditResult({ error: null });
+    mocks.setGenerationAuditResult({ error: null });
     mocks.setClosingResult({ data: activeClosing, error: null });
   });
 
@@ -138,7 +141,7 @@ describe("monthly report route", () => {
     vi.useRealTimers();
   });
 
-  it("renders an active stored closing, audits it, and returns the stable filename", async () => {
+  it("renders an active stored closing, atomically verifies and audits it, then returns the stable filename", async () => {
     const response = await GET(
       new Request("http://localhost/reports/monthly?month=2026-07"),
     );
@@ -158,16 +161,18 @@ describe("monthly report route", () => {
         closingLedgerBalance: 395000,
       }),
     );
-    expect(mocks.auditQuery.insert).toHaveBeenCalledWith({
-      actor_profile_id: "operator-id",
-      action: "monthly_report.generated",
-      table_name: "monthly_closings",
-      record_id: activeClosing.id,
-      details: {
-        period_month: "2026-07-01",
-        version: 2,
+    expect(mocks.supabase.rpc).toHaveBeenCalledWith(
+      "record_monthly_report_generation",
+      {
+        requested_closing_id: activeClosing.id,
+        requested_period_month: "2026-07-01",
+        requested_version: 2,
       },
-    });
+    );
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("audit_logs");
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("fee_payments");
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("members");
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("expenses");
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(response.headers.get("content-disposition")).toContain(
       "jw-tennis-club-2026-07-report.pdf",
@@ -197,7 +202,7 @@ describe("monthly report route", () => {
     expect(response.status).toBe(403);
     expect(await response.text()).toBe("이 월의 PDF 생성 기간이 아직 시작되지 않았습니다.");
     expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
-    expect(mocks.auditQuery.insert).not.toHaveBeenCalled();
+    expect(mocks.supabase.rpc).not.toHaveBeenCalled();
   });
 
   it("returns a controlled response when no active closing exists", async () => {
@@ -212,14 +217,15 @@ describe("monthly report route", () => {
     expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
   });
 
-  it("does not return a PDF when audit logging fails", async () => {
-    mocks.setAuditResult({ error: { message: "audit insert failed" } });
+  it("does not return a PDF when the atomic closing verification and audit RPC fails", async () => {
+    mocks.setGenerationAuditResult({ error: { message: "closing reopened" } });
 
     const response = await GET(
       new Request("http://localhost/reports/monthly?month=2026-07"),
     );
 
     expect(response.status).toBe(500);
+    expect(response.headers.get("content-type")).not.toBe("application/pdf");
     expect(await response.text()).toBe("PDF 생성 기록을 저장하지 못했습니다.");
   });
 });

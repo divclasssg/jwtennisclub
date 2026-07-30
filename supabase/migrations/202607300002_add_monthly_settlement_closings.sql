@@ -773,6 +773,82 @@ begin
 end;
 $$;
 
+create or replace function public.record_monthly_report_generation(
+  requested_closing_id uuid,
+  requested_period_month date,
+  requested_version integer
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_profile_id uuid;
+  active_closing public.monthly_closings%rowtype;
+begin
+  if requested_closing_id is null
+    or requested_period_month is null
+    or requested_period_month <> pg_catalog.date_trunc(
+      'month', requested_period_month
+    )::date
+    or requested_version is null
+    or requested_version < 1
+  then
+    raise exception 'monthly report closing identity invalid'
+      using errcode = '22023';
+  end if;
+
+  select profiles.id
+  into actor_profile_id
+  from public.profiles as profiles
+  where profiles.id = auth.uid()
+    and profiles.status = 'active'
+  for share;
+
+  if actor_profile_id is null then
+    raise exception 'active operator required'
+      using errcode = '42501';
+  end if;
+
+  select closings.*
+  into active_closing
+  from public.monthly_closings as closings
+  where closings.id = requested_closing_id
+    and closings.period_month = requested_period_month
+    and closings.version = requested_version
+    and closings.status = 'closed'
+  for update;
+
+  if not found then
+    raise exception 'active monthly settlement closing not found'
+      using errcode = 'P0002';
+  end if;
+
+  insert into public.audit_logs (
+    actor_profile_id,
+    action,
+    table_name,
+    record_id,
+    details,
+    created_at
+  )
+  values (
+    actor_profile_id,
+    'monthly_report.generated',
+    'monthly_closings',
+    active_closing.id::text,
+    pg_catalog.jsonb_build_object(
+      'period_month', active_closing.period_month,
+      'version', active_closing.version
+    ),
+    pg_catalog.clock_timestamp()
+  );
+
+  return true;
+end;
+$$;
+
 revoke execute on function public.build_monthly_settlement_snapshot(date)
 from public, anon, authenticated, service_role;
 
@@ -782,6 +858,10 @@ revoke execute on function public.close_monthly_settlement(date) from public, an
 grant execute on function public.close_monthly_settlement(date) to authenticated;
 revoke execute on function public.reopen_monthly_settlement(date) from public, anon;
 grant execute on function public.reopen_monthly_settlement(date) to authenticated;
+revoke execute on function public.record_monthly_report_generation(uuid, date, integer)
+from public, anon, authenticated, service_role;
+grant execute on function public.record_monthly_report_generation(uuid, date, integer)
+to authenticated;
 
 notify pgrst, 'reload schema';
 commit;
