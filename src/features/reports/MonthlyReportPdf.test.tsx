@@ -47,7 +47,12 @@ describe("renderMonthlyReportPdf", () => {
     const pdf = await renderMonthlyReportPdf(report);
 
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
-    expect(await countDarkTitlePixels(pdf)).toBeGreaterThan(100);
+    const darkPixelCounts = await getRenderedDarkPixelCounts(pdf);
+    expect(darkPixelCounts.titleAndMeta).toBeGreaterThan(500);
+    expect(darkPixelCounts.memberCards).toBeGreaterThan(300);
+    expect(darkPixelCounts.feeCards).toBeGreaterThan(1000);
+    expect(darkPixelCounts.tables).toBeGreaterThan(1000);
+    expect(darkPixelCounts.notices).toBeGreaterThan(500);
 
     const text = await extractPdfText(pdf);
     expect(text).toContain("마감 버전");
@@ -100,7 +105,7 @@ async function extractPdfText(pdf: Buffer) {
   }
 }
 
-async function countDarkTitlePixels(pdf: Buffer) {
+async function getRenderedDarkPixelCounts(pdf: Buffer) {
   const directory = await mkdtemp(path.join(tmpdir(), "jw-tennis-report-render-"));
   const inputPath = path.join(directory, "report.pdf");
   const outputPath = path.join(directory, "report");
@@ -126,21 +131,36 @@ async function countDarkTitlePixels(pdf: Buffer) {
       .split(" ")
       .map(Number);
     const pixelStart = headerEnd + 5;
-    const titlePixels = ppm.subarray(pixelStart, pixelStart + width * 190 * 3);
-    let count = 0;
 
-    for (let index = 0; index < titlePixels.length; index += 3) {
-      if (
-        titlePixels[index] < 100 &&
-        titlePixels[index + 1] < 100 &&
-        titlePixels[index + 2] < 100
-      ) {
-        count += 1;
-      }
-    }
-
-    return count;
+    return {
+      titleAndMeta: countDarkPixels(ppm, pixelStart, width, 50, 180),
+      memberCards: countDarkPixels(ppm, pixelStart, width, 180, 320),
+      feeCards: countDarkPixels(ppm, pixelStart, width, 320, 620),
+      tables: countDarkPixels(ppm, pixelStart, width, 620, 1200),
+      notices: countDarkPixels(ppm, pixelStart, width, 1200, 1500),
+    };
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
+}
+
+function countDarkPixels(
+  ppm: Buffer,
+  pixelStart: number,
+  width: number,
+  top: number,
+  bottom: number,
+) {
+  let count = 0;
+
+  for (let y = top; y < bottom; y += 1) {
+    for (let x = 50; x < width - 50; x += 1) {
+      const index = pixelStart + (y * width + x) * 3;
+      if (ppm[index] < 100 && ppm[index + 1] < 100 && ppm[index + 2] < 100) {
+        count += 1;
+      }
+    }
+  }
+
+  return count;
 }

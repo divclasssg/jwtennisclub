@@ -15,14 +15,14 @@ import {
 import { formatSettlementBalance } from "@/features/settlements/settlement-summary";
 import { formatExpenseCategory } from "@/features/expenses/expense-model";
 
-const notoSansKrFontPath = path.join(
+const notoSansCjkKrFontPath = path.join(
   process.cwd(),
-  "src/features/reports/fonts/NotoSansKR-Regular.ttf",
+  "src/features/reports/fonts/NotoSansCJKkr-Regular.otf",
 );
 
 Font.register({
   family: "Noto Sans KR",
-  src: notoSansKrFontPath,
+  src: notoSansCjkKrFontPath,
 });
 
 const styles = StyleSheet.create({
