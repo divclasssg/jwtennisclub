@@ -145,6 +145,8 @@ export default async function SettlementsPage({
               type="month"
             />
           </FormField>
+          <input name="sort" type="hidden" value={sortState.key} />
+          <input name="direction" type="hidden" value={sortState.direction} />
           <Button type="submit">조회</Button>
           {canDownload ? (
             <ActionLink href={`/reports/monthly?month=${monthValue}`} size="compact">

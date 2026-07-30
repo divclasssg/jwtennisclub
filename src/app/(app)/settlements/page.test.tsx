@@ -117,6 +117,24 @@ describe("SettlementsPage", () => {
     expect(screen.queryByRole("link", { name: "PDF 다운로드" })).not.toBeInTheDocument();
   });
 
+  it("preserves the validated category sort state when looking up another month", async () => {
+    render(
+      await SettlementsPage({
+        searchParams: Promise.resolve({
+          month: "2026-07",
+          sort: "amount",
+          direction: "desc",
+        }),
+      }),
+    );
+
+    const filterForm = screen.getByRole("form", {
+      name: "정산 검색 필터",
+    }) as HTMLFormElement;
+    expect(filterForm.elements.namedItem("sort")).toHaveValue("amount");
+    expect(filterForm.elements.namedItem("direction")).toHaveValue("desc");
+  });
+
   it("renders the active closing snapshot, metadata, reopen action, and eligible PDF link", async () => {
     pageState.data = {
       preview: buildSnapshot({
