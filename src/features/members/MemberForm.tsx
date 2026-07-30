@@ -107,6 +107,19 @@ export function MemberForm({
             required
           />
         </FormField>
+        <div>
+          <FormField label="활동 시작 월" labelVisible>
+            <TextInput
+              aria-describedby="activity-start-month-help"
+              defaultValue={(candidate?.activityStartMonth ?? "").slice(0, 7)}
+              min={(candidate?.joinedDate ?? member?.joinedDate ?? "").slice(0, 7)}
+              name="activityStartMonth"
+              required
+              type="month"
+            />
+          </FormField>
+          <small id="activity-start-month-help">가입 월 또는 그 이후의 월을 선택하세요.</small>
+        </div>
         <FormField label="상태" labelVisible>
           <SelectInput defaultValue={candidate?.status ?? member?.status ?? "active"} name="status">
             {MEMBER_STATUSES.map((status) => (

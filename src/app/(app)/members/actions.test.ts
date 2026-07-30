@@ -31,6 +31,7 @@ function memberFormData(confirmation?: "phone-reuse" | "name-without-phone") {
   formData.set("groupId", "group-a");
   formData.set("status", "active");
   formData.set("joinedDate", "2026-07-01");
+  formData.set("activityStartMonth", "2026-07-01");
   if (confirmation) formData.set("duplicateConfirmation", confirmation);
   return formData;
 }
@@ -72,6 +73,7 @@ describe("member actions", () => {
         name: "홍길동",
         phone_number: "01012345678",
         group_id: "group-a",
+        activity_start_month: "2026-07-01",
       }),
       duplicate_confirmation: null,
     });
