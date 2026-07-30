@@ -6,80 +6,55 @@ import {
   SummaryCard,
   SummaryGrid,
 } from "@/components/molecules";
-import { DataPanel, DataTable, parseSortState, SortableTableHeader, stableSortRows } from "@/components/organisms";
-import { ManagementPageTemplate } from "@/components/templates";
-import { createClient } from "@/lib/supabase/server";
-import { getNextPeriodMonth, isExpenseCategory } from "@/features/expenses/expense-model";
 import {
-  buildSettlementSummary,
+  DataPanel,
+  DataTable,
+  parseSortState,
+  SortableTableHeader,
+  stableSortRows,
+} from "@/components/organisms";
+import { ManagementPageTemplate } from "@/components/templates";
+import { closeMonthlySettlement, reopenMonthlySettlement } from "./actions";
+import {
+  canDownloadMonthlyReport,
+  parseMonthlySettlementPage,
+  type MonthlySettlementExpenseCategoryRow,
+} from "@/features/settlements/settlement-snapshot";
+import {
   formatCurrency,
   formatExpenseCategory,
   formatPeriodMonth,
   formatSettlementBalance,
   normalizeSettlementFilters,
-  type SettlementExpenseInput,
-  type SettlementFeePaymentInput,
   type SettlementSearchParams,
 } from "@/features/settlements/settlement-summary";
+import { createClient } from "@/lib/supabase/server";
 
 type SettlementsPageProps = {
-  searchParams: Promise<SettlementSearchParams>;
+  searchParams: Promise<SettlementSearchParams & {
+    error?: string | string[];
+    status?: string | string[];
+  }>;
 };
 
 const SETTLEMENT_SORT_KEYS = ["category", "count", "amount"] as const;
 type SettlementSortKey = (typeof SETTLEMENT_SORT_KEYS)[number];
 
-type FeePaymentDatabaseRow = {
-  amount: number;
-};
-
-type ExpenseDatabaseRow = {
-  amount: number;
-  category: string;
-};
-
-async function getSettlementFeePayments(
-  periodMonth: string,
-): Promise<SettlementFeePaymentInput[]> {
+async function getMonthlySettlementPage(periodMonth: string) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("fee_payments")
-    .select("id, amount")
-    .eq("period_month", periodMonth)
-    .order("amount", { ascending: false });
+  const { data, error } = await supabase.rpc("get_monthly_settlement_page", {
+    requested_period_month: periodMonth,
+  });
 
   if (error) {
-    throw new Error("월별 회비 수입을 불러오지 못했습니다.");
+    throw new Error("월별 정산 정보를 불러오지 못했습니다.");
   }
 
-  return ((data ?? []) as FeePaymentDatabaseRow[]).map((payment) => ({
-    amount: payment.amount,
-  }));
-}
-
-async function getSettlementExpenses(
-  periodMonth: string,
-): Promise<SettlementExpenseInput[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("expenses")
-    .select("id, category, amount")
-    .gte("expense_date", periodMonth)
-    .lt("expense_date", getNextPeriodMonth(periodMonth))
-    .order("amount", { ascending: false });
-
-  if (error) {
-    throw new Error("월별 지출을 불러오지 못했습니다.");
-  }
-
-  return ((data ?? []) as ExpenseDatabaseRow[]).map((expense) => ({
-    amount: expense.amount,
-    category: isExpenseCategory(expense.category) ? expense.category : "other",
-  }));
+  return parseMonthlySettlementPage(data);
 }
 
 function settlementSortValue(
-  row: ReturnType<typeof buildSettlementSummary>["expenseCategoryRows"][number],
+  row: MonthlySettlementExpenseCategoryRow,
   key: SettlementSortKey,
 ) {
   switch (key) {
@@ -89,33 +64,77 @@ function settlementSortValue(
   }
 }
 
+function getSettlementMessage(
+  params: SettlementSearchParams & {
+    error?: string | string[];
+    status?: string | string[];
+  },
+): { text: string; tone: "error" | "success" } | null {
+  const error = Array.isArray(params.error) ? params.error[0] : params.error;
+  const status = Array.isArray(params.status) ? params.status[0] : params.status;
+
+  if (error === "invalid-month") {
+    return { text: "정산 월 형식이 올바르지 않습니다.", tone: "error" };
+  }
+  if (error === "mutation-failed") {
+    return { text: "정산 상태를 변경하지 못했습니다. 다시 시도해 주세요.", tone: "error" };
+  }
+  if (status === "updated") {
+    return { text: "정산 상태를 변경했습니다.", tone: "success" };
+  }
+
+  return null;
+}
+
+function formatClosedDate(value: string) {
+  return value.slice(0, 10).replaceAll("-", ".");
+}
+
 export default async function SettlementsPage({
   searchParams,
 }: SettlementsPageProps) {
   const params = await searchParams;
   const filters = normalizeSettlementFilters(params);
-  const sortState = parseSortState(params, SETTLEMENT_SORT_KEYS, { key: "category", direction: "asc" });
+  const sortState = parseSortState(params, SETTLEMENT_SORT_KEYS, {
+    key: "category",
+    direction: "asc",
+  });
   const monthValue = filters.periodMonth.slice(0, 7);
-  const [feePayments, expenses] = await Promise.all([
-    getSettlementFeePayments(filters.periodMonth),
-    getSettlementExpenses(filters.periodMonth),
-  ]);
-  const summary = buildSettlementSummary({ feePayments, expenses });
+  const settlementPage = await getMonthlySettlementPage(filters.periodMonth);
+  const snapshot = settlementPage.activeClosing?.snapshot ?? settlementPage.preview;
   const sortedCategoryRows = stableSortRows(
-    summary.expenseCategoryRows,
+    snapshot.expenseCategoryRows,
     (row) => settlementSortValue(row, sortState.key),
     sortState.direction,
   );
   const sortSearchParams = { month: monthValue };
+  const feedback = getSettlementMessage(params);
+  const canDownload = Boolean(settlementPage.activeClosing) &&
+    canDownloadMonthlyReport(filters.periodMonth, new Date());
+
+  const mutationControls = settlementPage.canClose || settlementPage.canReopen ? (
+    <>
+      {settlementPage.canClose ? (
+        <form action={closeMonthlySettlement}>
+          <input name="month" type="hidden" value={monthValue} />
+          <input name="sort" type="hidden" value={sortState.key} />
+          <input name="direction" type="hidden" value={sortState.direction} />
+          <Button size="compact" type="submit">정산 마감</Button>
+        </form>
+      ) : null}
+      {settlementPage.canReopen ? (
+        <form action={reopenMonthlySettlement}>
+          <input name="month" type="hidden" value={monthValue} />
+          <input name="sort" type="hidden" value={sortState.key} />
+          <input name="direction" type="hidden" value={sortState.direction} />
+          <Button size="compact" type="submit" variant="danger">정산 재개</Button>
+        </form>
+      ) : null}
+    </>
+  ) : null;
 
   return (
     <ManagementPageTemplate
-      description={
-        <>
-          선택한 월의 회비 수입과 운영 지출을 합산해 공유용 월간 보고서의 기준
-          금액을 확인합니다.
-        </>
-      }
       filters={
         <FilterBar aria-label="정산 검색 필터" layout="single-control">
           <FormField label="정산 월">
@@ -127,9 +146,16 @@ export default async function SettlementsPage({
             />
           </FormField>
           <Button type="submit">조회</Button>
-          <ActionLink href={`/reports/monthly?month=${monthValue}`} size="compact">
-            PDF 다운로드
-          </ActionLink>
+          {canDownload ? (
+            <ActionLink href={`/reports/monthly?month=${monthValue}`} size="compact">
+              PDF 다운로드
+            </ActionLink>
+          ) : null}
+          {feedback ? (
+            <p aria-live="polite" role="status">
+              {feedback.text}
+            </p>
+          ) : null}
         </FilterBar>
       }
       kicker="월별 정산 요약"
@@ -169,30 +195,38 @@ export default async function SettlementsPage({
       summary={
         <DataPanel
           aria-label={`${formatPeriodMonth(filters.periodMonth)} 정산`}
+          headerSide={mutationControls}
           headerTitle={`${formatPeriodMonth(filters.periodMonth)} 정산`}
         >
           <SummaryGrid aria-label="정산 요약" columns={5} variant="divided">
-            <SummaryCard
-              label="회비 납부"
-              value={`${summary.feePaymentCount}건`}
-            />
-            <SummaryCard
-              label="지출"
-              value={`${summary.expenseCount}건`}
-            />
-            <SummaryCard
-              label="수입 합계"
-              value={`${formatCurrency(summary.incomeTotal)}원`}
-            />
-            <SummaryCard
-              label="지출 합계"
-              value={`${formatCurrency(summary.expenseTotal)}원`}
-            />
-            <SummaryCard
-              label="당월 귀속 수지"
-              value={formatSettlementBalance(summary.attributedNet)}
-            />
+            <SummaryCard label="월말 활동 회원" value={`${snapshot.activityMemberCount}명`} />
+            <SummaryCard label="회비 부과 대상" value={`${snapshot.feeTargetCount}명`} />
+            <SummaryCard label="완납 회원" value={`${snapshot.fullyPaidCount}명`} />
+            <SummaryCard label="미납 회원" value={`${snapshot.unpaidCount}명`} />
+            <SummaryCard label="운영 지출 건수" value={`${snapshot.expenseCount}건`} />
+            <SummaryCard label="총 청구액" value={`${formatCurrency(snapshot.billedTotal)}원`} />
+            <SummaryCard label="실제 회비 수납액" value={`${formatCurrency(snapshot.actualFeeIncome)}원`} />
+            <SummaryCard label="인정 납부액" value={`${formatCurrency(snapshot.recognizedPaidTotal)}원`} />
+            <SummaryCard label="조정 수납액" value={`${formatCurrency(snapshot.adjustmentIncome)}원`} />
+            <SummaryCard label="미납액" value={`${formatCurrency(snapshot.unpaidTotal)}원`} />
+            <SummaryCard label="운영 지출" value={`${formatCurrency(snapshot.expenseTotal)}원`} />
+            <SummaryCard label="당월 귀속 수지" value={formatSettlementBalance(snapshot.attributedNet)} />
+            <SummaryCard label="기초 장부 잔액" value={formatSettlementBalance(snapshot.openingLedgerBalance)} />
+            <SummaryCard label="기말 장부 잔액" value={formatSettlementBalance(snapshot.closingLedgerBalance)} />
+            {settlementPage.activeClosing ? (
+              <>
+                <SummaryCard label="마감 버전" value={`v${settlementPage.activeClosing.version}`} />
+                <SummaryCard label="마감일" value={formatClosedDate(settlementPage.activeClosing.closedAt)} />
+                <SummaryCard label="마감 처리자" value={settlementPage.activeClosing.closedBy} />
+              </>
+            ) : null}
           </SummaryGrid>
+          {snapshot.feeTargetCount === 0 ? (
+            <p>해당 월 회비 부과 대상 회원이 없습니다.</p>
+          ) : null}
+          {!settlementPage.activeClosing && settlementPage.closeBlockedReason ? (
+            <p>현재 이 정산은 마감할 수 없습니다.</p>
+          ) : null}
         </DataPanel>
       }
       title="월별 정산"
