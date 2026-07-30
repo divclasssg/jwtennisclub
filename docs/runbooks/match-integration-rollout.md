@@ -57,10 +57,11 @@ identity, stop—there is no name-only fallback.
 
 ## 2. Inventory and recovery capability
 
-Run `rollout.ts inventory`, then compose `inventory-v1.json` using
-`inventory-v1.schema.json` and run `rollout.ts validate-inventory`. Successful
-validation appends identity-bound `inventory-validated` and `recovery-validated`
-ledger stages. It requires:
+Run `rollout.ts inventory`; its raw output is manifest evidence, never a gate
+ledger stage. Then compose `inventory-v1.json` using `inventory-v1.schema.json`
+and run `rollout.ts validate-inventory`. Successful validation appends the
+identity-bound `inventory-validated` and `recovery-validated` stages. It
+requires:
 
 - migration version/name/statement hash and member count/hash;
 - Auth user/identity/provider counts plus instance ID, site URL, redirect hosts,
@@ -122,11 +123,13 @@ contract.
 
 Set `TASK8_IOS_CONFIG_FILE` to an external private file named exactly
 `Task8Supabase.plist`. The gate parses it with `plutil`, requires URL exactly
-`https://<clone-ref>.supabase.co` and an anon/publishable public key, rejects
-any existing local `Configuration/Supabase.plist`, and records only a digest of
-URL, key presence, and key class—never the key. It temporarily installs and
-removes the reviewed file while checking the clean pinned client around each
-command:
+`https://<clone-ref>.supabase.co` and an anon/publishable public key. It
+resolves the app's synchronized source root and built resource path from the
+Xcode project/build settings, rejects any existing
+`JWTennisMatch/Supabase.plist`, and records URL, key presence/class, and the
+key's SHA-256—never the key—inside the config digest. It removes the temporary
+input even after copy/chmod failure and verifies the matching resource exists
+inside the built app:
 
 ```bash
 cd "$CLIENT_ROOT/ios/JWTennisMatch"
@@ -142,12 +145,12 @@ Only after all prior gates pass may the owner run `release-enable`. This is a
 validation release for test traffic, not final rollout acceptance. The helper
 requires the distinct pre-release approval
 `RELEASE:<clone-ref>:<ledger-hash>:<manifest-hash>:<backend-head>:<client-head>`.
-The hash-chained pre-release ledger must contain exactly one passed, correctly
-ordered inventory validation, recovery/backup/PITR proof, lock capability, DB
-dry-run/apply, direct RPC, Edge delete-empty/deploy-ACTIVE, and iOS test/build
-stage for the same ref, identity digest, and pinned heads. Missing, stale,
-wrong-identity, duplicate, or reordered evidence fails. The helper then updates
-only `match.release_state`.
+The hash-chained pre-release ledger must be exactly the passed, ordered
+sequence: inventory validation, recovery/backup/PITR proof, lock capability, DB
+dry-run/apply, direct RPC, Edge delete-empty/deploy-ACTIVE, and iOS test/build,
+all for the same ref, identity digest, and pinned heads. Every entry is bound
+before sequence checking; foreign, unknown, missing, failed, duplicate, or
+reordered evidence fails. The helper then updates only `match.release_state`.
 
 Generate JSONL conforming to `evidence-event-v1.schema.json` and the immutable
 `load-plan-v1.json`: five operator sessions, 2-second cadence, 900 polls each;

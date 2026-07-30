@@ -499,6 +499,60 @@ Deno.test("dry-run is separate and apply requires an exact approval string", asy
     );
 });
 
+Deno.test("raw inventory is manifest evidence and never a release-ledger stage", async () => {
+    const runner = new FakeRunner();
+    const sandbox = await Deno.makeTempDir();
+    const backendRoot = `${sandbox}/backend`;
+    const clientRoot = `${sandbox}/client`;
+    const evidenceRoot = `${sandbox}/evidence`;
+    await Deno.mkdir(`${backendRoot}/supabase/.temp`, { recursive: true });
+    await Deno.mkdir(clientRoot);
+    await Deno.mkdir(evidenceRoot);
+    await Deno.writeTextFile(
+        `${backendRoot}/supabase/.temp/project-ref`,
+        `${validationRef}\n`,
+    );
+    try {
+        await executeRolloutStep({
+            step: "inventory",
+            backendRoot,
+            clientRoot,
+            validationTarget: {
+                projectRef: validationRef,
+                host: `db.${validationRef}.supabase.co`,
+                user: "postgres",
+                database: "postgres",
+                sslMode: "verify-full",
+            },
+            expectedIdentity: {
+                validationRef,
+                productionSystemIdentifier,
+                validationSystemIdentifier,
+                databaseOid: "16384",
+                markerDigest,
+                provenanceId: "clone-ticket-42",
+            },
+            evidenceRoot,
+            runner,
+        });
+        const manifest = JSON.parse(
+            await Deno.readTextFile(`${evidenceRoot}/manifest.json`),
+        );
+        assert(
+            manifest.files.some(
+                (entry: { path: string }) =>
+                    entry.path === "inventory-raw.json",
+            ),
+        );
+        await assertRejects(
+            () => Deno.readTextFile(`${evidenceRoot}/gate-ledger.json`),
+            "No such file or directory",
+        );
+    } finally {
+        await Deno.remove(sandbox, { recursive: true });
+    }
+});
+
 Deno.test("failed DB apply still runs identity-guarded baseline reset", async () => {
     const runner = new FakeRunner();
     runner.failDbPush = true;

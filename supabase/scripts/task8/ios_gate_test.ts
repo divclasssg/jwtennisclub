@@ -17,47 +17,88 @@ function assert(
 
 class FakeRunner implements RolloutCommandRunner {
     readonly invocations: CommandInvocation[] = [];
+    private clientRoot = "";
+
     constructor(
         private readonly configUrl = "https://abcdefghijklmnopqrst.supabase.co",
         private readonly publicKey = "sb_publishable_super-secret-task8-key",
         private readonly extractionFails = false,
     ) {}
 
-    run(invocation: CommandInvocation): Promise<CommandResult> {
+    bindClientRoot(clientRoot: string): void {
+        this.clientRoot = clientRoot;
+    }
+
+    async run(invocation: CommandInvocation): Promise<CommandResult> {
         this.invocations.push(invocation);
         const joined = [invocation.command, ...invocation.args].join(" ");
+        if (joined.includes("-showBuildSettings")) {
+            return {
+                code: 0,
+                stdout: [
+                    `SRCROOT = ${this.clientRoot}/ios/JWTennisMatch`,
+                    "TARGET_NAME = JWTennisMatch",
+                    `TARGET_BUILD_DIR = ${this.clientRoot}/build`,
+                    "WRAPPER_NAME = JWTennisMatch.app",
+                    "UNLOCALIZED_RESOURCES_FOLDER_PATH = JWTennisMatch.app",
+                ].join("\n"),
+                stderr: "",
+            };
+        }
         if (invocation.command === "plutil") {
             if (this.extractionFails) {
-                return Promise.resolve({
+                return {
                     code: 1,
                     stdout: "sb_publishable_must-not-leak\n",
                     stderr: "",
-                });
+                };
+            }
+            const path = invocation.args.at(-1)!;
+            try {
+                await Deno.stat(path);
+            } catch {
+                return { code: 1, stdout: "", stderr: "" };
             }
             const stdout = invocation.args.includes("SUPABASE_URL")
                 ? this.configUrl
                 : this.publicKey;
-            return Promise.resolve({
+            return {
                 code: 0,
                 stdout: `${stdout}\n`,
                 stderr: "",
-            });
+            };
         }
         if (joined.includes("rev-parse HEAD")) {
-            return Promise.resolve({
+            return {
                 code: 0,
                 stdout: `${CLIENT_PRODUCT_SHA}\n`,
                 stderr: "",
-            });
+            };
         }
         if (joined.includes("status --porcelain")) {
-            return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+            return { code: 0, stdout: "", stderr: "" };
         }
-        return Promise.resolve({
+        if (invocation.command === "xcodebuild") {
+            const input =
+                `${this.clientRoot}/ios/JWTennisMatch/JWTennisMatch/Supabase.plist`;
+            try {
+                await Deno.stat(input);
+            } catch {
+                return {
+                    code: 1,
+                    stdout: "",
+                    stderr: "actual synchronized-root plist is missing",
+                };
+            }
+            const app = `${this.clientRoot}/build/JWTennisMatch.app`;
+            await Deno.mkdir(app, { recursive: true });
+            await Deno.copyFile(input, `${app}/Supabase.plist`);
+        }
+        return {
             code: 0,
             stdout: "** TEST/BUILD SUCCEEDED **\n",
             stderr: "",
-        });
+        };
     }
 }
 
@@ -92,13 +133,38 @@ async function setupIosGate(
     const evidenceRoot = `${root}/evidence`;
     const configPath = `${root}/Task8Supabase.plist`;
     await Deno.mkdir(
-        `${clientRoot}/ios/JWTennisMatch/Configuration`,
+        `${clientRoot}/ios/JWTennisMatch/JWTennisMatch`,
         { recursive: true },
+    );
+    await Deno.mkdir(
+        `${clientRoot}/ios/JWTennisMatch/JWTennisMatch.xcodeproj`,
+    );
+    await Deno.writeTextFile(
+        `${clientRoot}/ios/JWTennisMatch/JWTennisMatch.xcodeproj/project.pbxproj`,
+        `// !$*UTF8*$!
+{
+objects = {
+        111111111111111111111111 /* JWTennisMatch */ = {
+            isa = PBXFileSystemSynchronizedRootGroup;
+            path = JWTennisMatch;
+            sourceTree = "<group>";
+        };
+        222222222222222222222222 /* JWTennisMatch */ = {
+            isa = PBXNativeTarget;
+            fileSystemSynchronizedGroups = (
+                111111111111111111111111 /* JWTennisMatch */,
+            );
+            name = JWTennisMatch;
+        };
+};
+}
+`,
     );
     await Deno.mkdir(evidenceRoot);
     await Deno.writeTextFile(configPath, "<plist>test-only</plist>\n", {
         mode: 0o600,
     });
+    runner.bindClientRoot(clientRoot);
     return {
         root,
         clientRoot,
@@ -127,7 +193,8 @@ Deno.test("iOS gate runs exact test then build and appends ordered evidence", as
     try {
         await runIosGates(setup.options);
         const xcode = runner.invocations.filter((invocation) =>
-            invocation.command === "xcodebuild"
+            invocation.command === "xcodebuild" &&
+            ["test", "build"].includes(invocation.args[0])
         );
         assert(xcode.length === 2);
         assert(xcode[0].args[0] === "test");
@@ -156,7 +223,7 @@ Deno.test("iOS gate runs exact test then build and appends ordered evidence", as
         let localConfigExists = true;
         try {
             await Deno.lstat(
-                `${setup.clientRoot}/ios/JWTennisMatch/Configuration/Supabase.plist`,
+                `${setup.clientRoot}/ios/JWTennisMatch/JWTennisMatch/Supabase.plist`,
             );
         } catch (error) {
             if (error instanceof Deno.errors.NotFound) {
@@ -184,7 +251,7 @@ Deno.test("iOS gate rejects missing Task8 config and any existing local Supabase
     const local = await setupIosGate(new FakeRunner());
     try {
         await Deno.writeTextFile(
-            `${local.clientRoot}/ios/JWTennisMatch/Configuration/Supabase.plist`,
+            `${local.clientRoot}/ios/JWTennisMatch/JWTennisMatch/Supabase.plist`,
             "<plist>production-local</plist>\n",
         );
         await assertRejects(
@@ -252,6 +319,107 @@ Deno.test("iOS gate discards plist parser output on failure", async () => {
         }
         assert(message.includes("could not be parsed"), message);
         assert(!message.includes("must-not-leak"), message);
+    } finally {
+        await Deno.remove(setup.root, { recursive: true });
+    }
+});
+
+Deno.test("iOS evidence fingerprints same-class public key replacement without storing it", async () => {
+    const digests: string[] = [];
+    for (
+        const publicKey of [
+            "sb_publishable_first-task8-key",
+            "sb_publishable_replaced-task8-key",
+        ]
+    ) {
+        const setup = await setupIosGate(
+            new FakeRunner(
+                "https://abcdefghijklmnopqrst.supabase.co",
+                publicKey,
+            ),
+        );
+        try {
+            await runIosGates(setup.options);
+            const ledger = JSON.parse(
+                await Deno.readTextFile(
+                    `${setup.evidenceRoot}/gate-ledger.json`,
+                ),
+            );
+            const evidence = await Deno.readTextFile(
+                `${setup.evidenceRoot}/${ledger.entries[0].file}`,
+            );
+            assert(!evidence.includes(publicKey));
+            digests.push(JSON.parse(evidence).result.configDigestSha256);
+        } finally {
+            await Deno.remove(setup.root, { recursive: true });
+        }
+    }
+    assert(
+        digests[0] !== digests[1],
+        "same-class public key replacement must change the config digest",
+    );
+});
+
+Deno.test("iOS gate removes the copied config after chmod failure", async () => {
+    const setup = await setupIosGate(new FakeRunner());
+    const localConfig =
+        `${setup.clientRoot}/ios/JWTennisMatch/JWTennisMatch/Supabase.plist`;
+    let cleanupAttempts = 0;
+    try {
+        await assertRejects(
+            () =>
+                runIosGates(
+                    {
+                        ...setup.options,
+                        fileOps: {
+                            copyFile: Deno.copyFile,
+                            chmod: () => {
+                                throw new Error("injected chmod failure");
+                            },
+                            remove: async (path: string) => {
+                                cleanupAttempts += 1;
+                                await Deno.remove(path);
+                            },
+                        },
+                    } as Parameters<typeof runIosGates>[0],
+                ),
+            "injected chmod failure",
+        );
+        assert(cleanupAttempts === 1, "cleanup was not attempted");
+        await assertRejects(
+            () => Deno.lstat(localConfig),
+            "No such file or directory",
+        );
+    } finally {
+        await Deno.remove(setup.root, { recursive: true });
+    }
+});
+
+Deno.test("iOS gate preserves the primary failure when cleanup sees NotFound", async () => {
+    const setup = await setupIosGate(new FakeRunner());
+    let cleanupAttempts = 0;
+    try {
+        await assertRejects(
+            () =>
+                runIosGates(
+                    {
+                        ...setup.options,
+                        fileOps: {
+                            copyFile: Deno.copyFile,
+                            chmod: async (path: string) => {
+                                await Deno.remove(path);
+                                throw new Error("injected chmod failure");
+                            },
+                            remove: async (path: string) => {
+                                cleanupAttempts += 1;
+                                await Deno.remove(path);
+                            },
+                        },
+                    } as Parameters<typeof runIosGates>[0],
+                ),
+            "injected chmod failure",
+        );
+        assert(cleanupAttempts === 1, "cleanup was not attempted");
     } finally {
         await Deno.remove(setup.root, { recursive: true });
     }

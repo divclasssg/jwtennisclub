@@ -338,33 +338,28 @@ export async function verifyReleaseApproval(
     identityDigest: string,
 ): Promise<void> {
     const { ledger, ledgerHash } = await verifiedLedger(root);
-    const manifestHash = await verifiedManifest(root);
-    let previousIndex = -1;
-    for (const stage of RELEASE_STAGES) {
-        const candidates = ledger.entries.filter((entry) =>
-            entry.stage === stage
-        );
-        if (candidates.length === 0) {
-            throw new Error(`missing release gate: ${stage}`);
-        }
+    for (const entry of ledger.entries) {
         if (
-            candidates.some((entry) =>
-                !entry.passed ||
-                entry.projectRef !== projectRef ||
-                entry.identityDigest !== identityDigest ||
-                entry.backendHead !== BACKEND_PRODUCT_SHA ||
-                entry.clientHead !== CLIENT_PRODUCT_SHA
-            )
-        ) throw new Error(`wrong-identity release gate: ${stage}`);
-        if (candidates.length !== 1) {
-            throw new Error(`duplicate release gate: ${stage}`);
+            entry.projectRef !== projectRef ||
+            entry.identityDigest !== identityDigest ||
+            entry.backendHead !== BACKEND_PRODUCT_SHA ||
+            entry.clientHead !== CLIENT_PRODUCT_SHA
+        ) {
+            throw new Error("release ledger entry identity mismatch");
         }
-        const index = ledger.entries.indexOf(candidates[0]);
-        if (index <= previousIndex) {
-            throw new Error(`reordered release gate: ${stage}`);
+        if (!entry.passed) {
+            throw new Error("release ledger contains a failed stage");
         }
-        previousIndex = index;
     }
+    if (
+        ledger.entries.length !== RELEASE_STAGES.length ||
+        ledger.entries.some((entry, index) =>
+            entry.stage !== RELEASE_STAGES[index]
+        )
+    ) {
+        throw new Error("release ledger stage sequence mismatch");
+    }
+    const manifestHash = await verifiedManifest(root);
     const expected =
         `RELEASE:${projectRef}:${ledgerHash}:${manifestHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;
     if (approval !== expected) {

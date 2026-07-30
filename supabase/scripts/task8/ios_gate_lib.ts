@@ -25,6 +25,13 @@ export interface IosGateOptions {
     configPath: string;
     expectedIdentity: ExpectedDatabaseIdentity;
     runner: RolloutCommandRunner;
+    fileOps?: IosFileOps;
+}
+
+export interface IosFileOps {
+    copyFile(source: string, destination: string): Promise<void>;
+    chmod(path: string, mode: number): Promise<void>;
+    remove(path: string): Promise<void>;
 }
 
 interface RedactedIosConfig {
@@ -32,7 +39,20 @@ interface RedactedIosConfig {
     url: string;
     publicKeyPresent: true;
     publicKeyClass: "publishable" | "anon-jwt";
+    publicKeySha256: string;
 }
+
+interface ResolvedIosPaths {
+    projectRoot: string;
+    sourceConfigPath: string;
+    builtConfigPath: string;
+}
+
+const DEFAULT_FILE_OPS: IosFileOps = {
+    copyFile: (source, destination) => Deno.copyFile(source, destination),
+    chmod: (path, mode) => Deno.chmod(path, mode),
+    remove: (path) => Deno.remove(path),
+};
 
 async function checked(
     runner: RolloutCommandRunner,
@@ -117,13 +137,17 @@ async function inspectConfig(
     if (url !== expectedUrl) {
         throw new Error(`Task8 config must use exact validation Supabase URL`);
     }
-    const publicKeyClass = classifyPublicKey(
-        await extractPlistValue(options, path, "SUPABASE_ANON_KEY"),
+    const publicKey = await extractPlistValue(
+        options,
+        path,
+        "SUPABASE_ANON_KEY",
     );
+    const publicKeyClass = classifyPublicKey(publicKey);
     const descriptor = {
         url,
         publicKeyPresent: true as const,
         publicKeyClass,
+        publicKeySha256: await sha256(publicKey),
     };
     return {
         ...descriptor,
@@ -168,7 +192,7 @@ async function assertMissing(path: string): Promise<void> {
 }
 
 function xcodeInvocation(
-    options: IosGateOptions,
+    projectRoot: string,
     action: "test" | "build",
 ): CommandInvocation {
     return {
@@ -182,8 +206,157 @@ function xcodeInvocation(
             "-destination",
             "platform=iOS Simulator,name=iPhone 17 Pro",
         ],
-        cwd: `${options.clientRoot}/ios/JWTennisMatch`,
+        cwd: projectRoot,
     };
+}
+
+function buildSettingsInvocation(clientRoot: string): CommandInvocation {
+    return {
+        command: "xcodebuild",
+        args: [
+            "-showBuildSettings",
+            "-project",
+            "JWTennisMatch.xcodeproj",
+            "-scheme",
+            "JWTennisMatch",
+            "-destination",
+            "platform=iOS Simulator,name=iPhone 17 Pro",
+        ],
+        cwd: resolve(clientRoot, "ios/JWTennisMatch"),
+    };
+}
+
+function absoluteBuildSetting(projectRoot: string, value: string): string {
+    return isAbsolute(value) ? resolve(value) : resolve(projectRoot, value);
+}
+
+async function synchronizedSourceRoot(
+    projectRoot: string,
+    targetName: string,
+): Promise<string> {
+    const projectFile = resolve(
+        projectRoot,
+        "JWTennisMatch.xcodeproj/project.pbxproj",
+    );
+    const body = await Deno.readTextFile(projectFile);
+    const objects = new Map<string, string>();
+    for (
+        const match of body.matchAll(
+            /^\s*([A-F0-9]{24}) \/\* .*? \*\/ = \{\n([\s\S]*?)^\s*\};/gm,
+        )
+    ) {
+        objects.set(match[1], match[2]);
+    }
+    const target = [...objects.values()].find((value) =>
+        /^\s*isa = PBXNativeTarget;\s*$/m.test(value) &&
+        new RegExp(
+            `^\\s*name = ${
+                targetName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            };\\s*$`,
+            "m",
+        ).test(value)
+    );
+    const synchronized = target?.match(
+        /fileSystemSynchronizedGroups = \(([\s\S]*?)\);/,
+    )?.[1].match(/[A-F0-9]{24}/g);
+    if (!target || synchronized?.length !== 1) {
+        throw new Error("target must have one synchronized source root");
+    }
+    const rootGroup = objects.get(synchronized[0]);
+    const rootPath = rootGroup?.match(/^\s*path = "?([^";]+)"?;\s*$/m)?.[1];
+    if (
+        !rootGroup ||
+        !/^\s*isa = PBXFileSystemSynchronizedRootGroup;\s*$/m.test(
+            rootGroup,
+        ) ||
+        !/^\s*sourceTree = "<group>";\s*$/m.test(rootGroup) ||
+        !rootPath
+    ) {
+        throw new Error("target synchronized source root is invalid");
+    }
+    const resolvedRoot = resolve(projectRoot, rootPath);
+    const relativeRoot = relative(projectRoot, resolvedRoot);
+    if (
+        relativeRoot === "" ||
+        relativeRoot.startsWith("..") ||
+        isAbsolute(relativeRoot)
+    ) {
+        throw new Error("target synchronized source root escapes project");
+    }
+    return resolvedRoot;
+}
+
+async function resolveIosPaths(
+    options: IosGateOptions,
+): Promise<ResolvedIosPaths> {
+    const invocation = buildSettingsInvocation(options.clientRoot);
+    const result = await checked(options.runner, invocation);
+    const settings = new Map<string, string>();
+    for (const line of result.stdout.split(/\r?\n/)) {
+        const match = line.match(/^\s*([A-Z0-9_]+) = (.+?)\s*$/);
+        if (match) settings.set(match[1], match[2]);
+    }
+    const required = (name: string): string => {
+        const value = settings.get(name);
+        if (!value) throw new Error(`missing Xcode build setting: ${name}`);
+        return value;
+    };
+    const projectRoot = absoluteBuildSetting(
+        invocation.cwd,
+        required("SRCROOT"),
+    );
+    const expectedProjectRoot = resolve(
+        options.clientRoot,
+        "ios/JWTennisMatch",
+    );
+    const targetName = required("TARGET_NAME");
+    const wrapperName = required("WRAPPER_NAME");
+    const resourcesPath = required("UNLOCALIZED_RESOURCES_FOLDER_PATH");
+    if (
+        projectRoot !== expectedProjectRoot ||
+        basename(targetName) !== targetName ||
+        basename(wrapperName) !== wrapperName ||
+        wrapperName !== `${targetName}.app` ||
+        resourcesPath !== wrapperName
+    ) {
+        throw new Error("unexpected Xcode synchronized-root build settings");
+    }
+    const synchronizedRoot = await synchronizedSourceRoot(
+        projectRoot,
+        targetName,
+    );
+    return {
+        projectRoot,
+        sourceConfigPath: resolve(synchronizedRoot, "Supabase.plist"),
+        builtConfigPath: resolve(
+            absoluteBuildSetting(
+                projectRoot,
+                required("TARGET_BUILD_DIR"),
+            ),
+            resourcesPath,
+            "Supabase.plist",
+        ),
+    };
+}
+
+async function assertRegularFile(path: string, label: string): Promise<void> {
+    try {
+        if ((await Deno.stat(path)).isFile) return;
+    } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
+    throw new Error(`${label} is missing`);
+}
+
+async function removeIfPresent(
+    fileOps: IosFileOps,
+    path: string,
+): Promise<void> {
+    try {
+        await fileOps.remove(path);
+    } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
 }
 
 async function append(
@@ -223,15 +396,14 @@ async function append(
 export async function runIosGates(options: IosGateOptions): Promise<void> {
     const sourceConfigPath = await task8ConfigPath(options);
     const sourceConfig = await inspectConfig(options, sourceConfigPath);
-    const localConfigPath = resolve(
-        options.clientRoot,
-        "ios/JWTennisMatch/Configuration/Supabase.plist",
-    );
+    const paths = await resolveIosPaths(options);
+    const localConfigPath = paths.sourceConfigPath;
+    const fileOps = options.fileOps ?? DEFAULT_FILE_OPS;
     await assertMissing(localConfigPath);
     await assertClientCheckout(options);
-    await Deno.copyFile(sourceConfigPath, localConfigPath);
-    await Deno.chmod(localConfigPath, 0o600);
     try {
+        await fileOps.copyFile(sourceConfigPath, localConfigPath);
+        await fileOps.chmod(localConfigPath, 0o600);
         for (
             const [action, stage] of [
                 ["test", "ios-test"],
@@ -245,13 +417,23 @@ export async function runIosGates(options: IosGateOptions): Promise<void> {
                     "Task8 Supabase config changed before iOS gate",
                 );
             }
-            const invocation = xcodeInvocation(options, action);
+            const invocation = xcodeInvocation(paths.projectRoot, action);
             const startedAt = new Date().toISOString();
             const result = await checked(options.runner, invocation);
             const after = await inspectConfig(options, localConfigPath);
             if (after.digestSha256 !== sourceConfig.digestSha256) {
                 throw new Error(
                     "Task8 Supabase config changed during iOS gate",
+                );
+            }
+            await assertRegularFile(
+                paths.builtConfigPath,
+                "built app Supabase.plist",
+            );
+            const built = await inspectConfig(options, paths.builtConfigPath);
+            if (built.digestSha256 !== sourceConfig.digestSha256) {
+                throw new Error(
+                    "built app Supabase.plist does not match Task8 config",
                 );
             }
             await assertClientCheckout(options);
@@ -265,7 +447,7 @@ export async function runIosGates(options: IosGateOptions): Promise<void> {
             );
         }
     } finally {
-        await Deno.remove(localConfigPath);
+        await removeIfPresent(fileOps, localConfigPath);
     }
     await assertClientCheckout(options);
 }

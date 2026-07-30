@@ -193,7 +193,7 @@ Deno.test("release rejects a ledger without inventory, recovery, and lock prereq
                     ref,
                     identityDigest,
                 ),
-            "missing release gate: inventory-validated",
+            "release ledger stage sequence mismatch",
         );
     } finally {
         await Deno.remove(root, { recursive: true });
@@ -242,7 +242,101 @@ Deno.test("release rejects an extra required stage bound to another clone identi
                     ref,
                     identityDigest,
                 ),
-            "wrong-identity release gate: recovery-validated",
+            "release ledger entry identity mismatch",
+        );
+    } finally {
+        await Deno.remove(root, { recursive: true });
+    }
+});
+
+Deno.test("release validates a foreign raw inventory entry before stage allowlisting", async () => {
+    const root = await Deno.makeTempDir();
+    try {
+        const required: GateStage[] = [
+            "inventory-validated",
+            "recovery-validated",
+            "lock-capability",
+            "db-dry-run",
+            "db-apply",
+            "direct-rpc",
+            "edge-delete-empty",
+            "edge-deploy-active",
+            "ios-test",
+            "ios-build",
+        ];
+        let predecessor: string | null = null;
+        let sequence = 0;
+        for (const stage of required) {
+            const written = await append(root, stage, sequence, predecessor);
+            predecessor = written.entryHash;
+            sequence += 1;
+        }
+        const polluted = await append(
+            root,
+            "inventory",
+            sequence,
+            predecessor,
+            {
+                projectRef: otherRef,
+                identityDigest: otherIdentityDigest,
+            },
+        );
+        const approval =
+            `RELEASE:${ref}:${polluted.ledgerHash}:${polluted.manifestHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;
+        await assertRejects(
+            () =>
+                verifyReleaseApproval(
+                    root,
+                    approval,
+                    ref,
+                    identityDigest,
+                ),
+            "release ledger entry identity mismatch",
+        );
+    } finally {
+        await Deno.remove(root, { recursive: true });
+    }
+});
+
+Deno.test("release rejects a same-identity non-allowlisted ledger stage", async () => {
+    const root = await Deno.makeTempDir();
+    try {
+        const required: GateStage[] = [
+            "inventory-validated",
+            "recovery-validated",
+            "lock-capability",
+            "db-dry-run",
+            "db-apply",
+            "direct-rpc",
+            "edge-delete-empty",
+            "edge-deploy-active",
+            "ios-test",
+            "ios-build",
+        ];
+        let predecessor: string | null = null;
+        let sequence = 0;
+        for (const stage of required) {
+            const written = await append(root, stage, sequence, predecessor);
+            predecessor = written.entryHash;
+            sequence += 1;
+        }
+        const polluted = await append(
+            root,
+            "inventory",
+            sequence,
+            predecessor,
+        );
+        const approval =
+            `RELEASE:${ref}:${polluted.ledgerHash}:${polluted.manifestHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;
+        await assertRejects(
+            () =>
+                verifyReleaseApproval(
+                    root,
+                    approval,
+                    ref,
+                    identityDigest,
+                ),
+            "release ledger stage sequence mismatch",
         );
     } finally {
         await Deno.remove(root, { recursive: true });
@@ -314,7 +408,7 @@ Deno.test("release approval rejects missing, stale, and reordered gate evidence"
                         ref,
                         identityDigest,
                     ),
-                "missing release gate",
+                "release ledger stage sequence mismatch",
             );
         } finally {
             await Deno.remove(missingRoot, { recursive: true });
@@ -361,7 +455,7 @@ Deno.test("release approval rejects missing, stale, and reordered gate evidence"
                         ref,
                         identityDigest,
                     ),
-                "reordered release gate",
+                "release ledger stage sequence mismatch",
             );
         } finally {
             await Deno.remove(reorderedRoot, { recursive: true });

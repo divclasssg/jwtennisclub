@@ -27,6 +27,7 @@ import {
     verifyApplyApproval,
     verifyReleaseApproval,
 } from "./stage_evidence_lib.ts";
+import { writeEvidence, writeEvidenceManifest } from "./evidence_lib.ts";
 
 export {
     BACKEND_PRODUCT_SHA,
@@ -456,17 +457,33 @@ export async function executeRolloutStep(
             options,
             "task8_inventory.sql",
         );
-        await appendCommandStage(
-            options,
-            "inventory",
+        await writeEvidence(
+            options.evidenceRoot,
+            "inventory-raw.json",
             {
-                command: "psql",
-                args: [task8Script("task8_inventory.sql")],
-                cwd: backendRoot,
+                schemaVersion: 1,
+                kind: "inventory-raw",
+                startedAt,
+                endedAt: new Date().toISOString(),
+                projectRef: options.expectedIdentity.validationRef,
+                identityDigest: await expectedIdentityDigest(
+                    options.expectedIdentity,
+                ),
+                backendHead: BACKEND_PRODUCT_SHA,
+                clientHead: CLIENT_PRODUCT_SHA,
+                command: {
+                    program: "psql",
+                    args: [task8Script("task8_inventory.sql")],
+                },
+                stdout: commandStreamEvidence(result.stdout),
+                stderr: commandStreamEvidence(result.stderr),
+                result: {
+                    passed: true,
+                    exitCode: result.code,
+                },
             },
-            result,
-            startedAt,
         );
+        await writeEvidenceManifest(options.evidenceRoot);
         return;
     }
     if (options.step === "lock-capability") {
