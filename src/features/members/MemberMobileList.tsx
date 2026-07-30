@@ -6,7 +6,9 @@ import {
   formatMemberPosition,
   formatMemberStatus,
   formatPauseStartMonth,
+  isMemberActivityPending,
 } from "./member-list";
+import { getCurrentPeriodMonth } from "@/features/fees/fee-model";
 import type { MemberListRow } from "./member-directory";
 import type { MemberStatus } from "./member-model";
 import styles from "./MemberMobileList.module.scss";
@@ -29,6 +31,8 @@ function getMemberStatusTone(status: MemberStatus) {
 }
 
 export function MemberMobileList({ canUpdate = true, members }: MemberMobileListProps) {
+  const currentPeriodMonth = getCurrentPeriodMonth();
+
   return (
     <ul aria-label="모바일 회원 목록" className={styles["member-mobile-list"]}>
       {members.map((member) => (
@@ -40,6 +44,9 @@ export function MemberMobileList({ canUpdate = true, members }: MemberMobileList
                 <Badge tone={getMemberStatusTone(member.status)}>
                   {formatMemberStatus(member.status)}
                 </Badge>
+                {isMemberActivityPending(member, currentPeriodMonth) ? (
+                  <Badge tone="muted">활동 예정</Badge>
+                ) : null}
               </div>
             </div>
             {canUpdate ? <Link
@@ -64,6 +71,9 @@ export function MemberMobileList({ canUpdate = true, members }: MemberMobileList
             </p>
             <p className={styles["member-mobile-detail"]}>
               가입일 {formatDate(member.joinedDate)}
+            </p>
+            <p className={styles["member-mobile-detail"]}>
+              활동 시작 {formatPauseStartMonth(member.activityStartMonth)}
             </p>
           </div>
         </li>

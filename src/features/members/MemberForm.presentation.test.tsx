@@ -46,6 +46,7 @@ describe("MemberForm presentation", () => {
           joinedDate: "2026-07-01",
           withdrawnDate: null,
           pauseStartMonth: "2026-08-01",
+          activityStartMonth: "2026-07-01",
           memo: null,
           phoneNumber: null,
           groupId: null,
@@ -56,7 +57,7 @@ describe("MemberForm presentation", () => {
     );
 
     expect(screen.getByLabelText("휴회 시작 월")).toHaveValue("2026-08");
-    expect(screen.getByLabelText("활동 시작 월")).toHaveValue("");
+    expect(screen.getByLabelText("활동 시작 월")).toHaveValue("2026-07");
     expect(screen.getByLabelText("활동 시작 월")).toHaveAttribute("min", "2026-07");
   });
 });

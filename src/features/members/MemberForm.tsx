@@ -111,7 +111,7 @@ export function MemberForm({
           <FormField label="활동 시작 월" labelVisible>
             <TextInput
               aria-describedby="activity-start-month-help"
-              defaultValue={(candidate?.activityStartMonth ?? "").slice(0, 7)}
+              defaultValue={(candidate?.activityStartMonth ?? member?.activityStartMonth ?? "").slice(0, 7)}
               min={(candidate?.joinedDate ?? member?.joinedDate ?? "").slice(0, 7)}
               name="activityStartMonth"
               required

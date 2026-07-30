@@ -22,6 +22,7 @@ export type MemberListRow = {
   joinedDate: string;
   withdrawnDate: string | null;
   pauseStartMonth: string | null;
+  activityStartMonth: string | null;
   memo: string | null;
 };
 
@@ -55,6 +56,7 @@ type MemberDatabaseRow = {
   joined_date: string;
   withdrawn_date: string | null;
   pause_start_month?: string | null;
+  activity_start_month?: string | null;
   memo?: string | null;
 };
 
@@ -93,6 +95,7 @@ export function mapMemberRow(row: MemberDatabaseRow): MemberListRow {
     joinedDate: row.joined_date,
     withdrawnDate: row.withdrawn_date,
     pauseStartMonth: row.pause_start_month ?? null,
+    activityStartMonth: row.activity_start_month ?? null,
     memo: row.memo ?? null,
   };
 }
@@ -176,4 +179,13 @@ export function formatDate(value: string | null) {
 
 export function formatPauseStartMonth(value: string | null) {
   return value ? value.slice(0, 7).replace("-", ".") : "-";
+}
+
+export function isMemberActivityPending(
+  member: Pick<MemberListRow, "activityStartMonth">,
+  periodMonth: string,
+) {
+  return Boolean(
+    member.activityStartMonth && member.activityStartMonth > periodMonth,
+  );
 }

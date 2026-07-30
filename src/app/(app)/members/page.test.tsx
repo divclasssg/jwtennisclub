@@ -20,6 +20,7 @@ const member = {
   joinedDate: "2026-07-01",
   withdrawnDate: null,
   pauseStartMonth: null,
+  activityStartMonth: "2026-07-01",
   memo: null,
 };
 
@@ -62,6 +63,7 @@ describe("MembersPage", () => {
       "상태",
       "휴회 시작",
       "가입일",
+      "활동 시작",
       "관리",
     ]);
     expect(within(table).getByRole("cell", { name: "운영진" })).toBeInTheDocument();
@@ -142,6 +144,20 @@ describe("MembersPage", () => {
     expect(within(table).getByRole("cell", { name: "2026.08" })).toBeInTheDocument();
     const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
     expect(within(mobileList).getByText("휴회 시작 2026.08")).toBeInTheDocument();
+  });
+
+  it("shows a presentation-only pending label for a future activity start", async () => {
+    loadMemberDirectoryPage.mockResolvedValue({
+      members: [{ ...member, activityStartMonth: "2099-08-01" }],
+      canCreate: true,
+      canUpdate: true,
+    });
+
+    render(await MembersPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getAllByText("활동 예정")).toHaveLength(2);
+    expect(screen.getByRole("table")).toHaveTextContent("2099.08");
+    expect(screen.getByRole("list", { name: "모바일 회원 목록" })).toHaveTextContent("활동 시작 2099.08");
   });
 
   it("hides member management links without create and update permissions", async () => {
