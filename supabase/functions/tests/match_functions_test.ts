@@ -2,6 +2,7 @@ import { callRpc, readBearerToken, RpcHTTPError } from "../_shared/auth.ts";
 import {
     AdminCommandSchema,
     GameDayCommandSchema,
+    MatchInputSchema,
 } from "../_shared/contracts.ts";
 import {
     featureUnavailableResponse,
@@ -628,6 +629,70 @@ Deno.test("matcher endpoint returns the preserved deterministic suggestion", asy
     );
 });
 
+Deno.test("matcher input accepts 32 members and rejects 33 members", () => {
+    const input = (memberCount: number) => ({
+        members: Array.from({ length: memberCount }, (_, index) => ({
+            id: uuid(index + 1),
+            games: 0,
+            waitRank: index,
+            gender: index % 2 === 0 ? "female" as const : "male" as const,
+            grade: 1,
+        })),
+        completedMatches: [],
+        inProgressMemberIds: [],
+    });
+
+    assertEquals(MatchInputSchema.safeParse(input(32)).success, true);
+    assertEquals(MatchInputSchema.safeParse(input(33)).success, false);
+});
+
+Deno.test("matcher endpoint rejects oversized database input with stable 400", async () => {
+    const response = await handleMatchRecommendation(
+        new Request("http://edge.test", {
+            method: "POST",
+            headers: bearerHeaders,
+            body: JSON.stringify({ gameDayId: uuid(20), courtNumber: 1 }),
+        }),
+        {
+            release: () => Promise.resolve(true),
+            authorize: () => Promise.resolve(true),
+            loadInput: () =>
+                Promise.resolve({
+                    members: Array.from({ length: 33 }, (_, index) => ({
+                        id: uuid(index + 1),
+                        games: 0,
+                        waitRank: index,
+                        gender: index % 2 === 0
+                            ? "female" as const
+                            : "male" as const,
+                        grade: 1,
+                    })),
+                    completedMatches: [],
+                    inProgressMemberIds: [],
+                }),
+        },
+    );
+
+    assertEquals(response.status, 400);
+    assertEquals(await response.json(), { error: "invalid_request" });
+});
+
+Deno.test("matcher remains deterministic at the 32-member product cap", () => {
+    const result = recommendMatch({
+        members: Array.from({ length: 32 }, (_, index) => ({
+            id: uuid(index + 1),
+            games: index < 4 ? 0 : 1,
+            waitRank: index,
+            gender: index % 2 === 0 ? "female" : "male",
+            grade: 1,
+        })),
+        completedMatches: [],
+        inProgressMemberIds: [],
+    });
+
+    assertEquals(result.selected, [uuid(1), uuid(2), uuid(3), uuid(4)]);
+});
+
 for (const fixture of matchingCases as MatchingCase[]) {
     Deno.test(`matching contract: ${fixture.name}`, () => {
         const result = recommendMatch(fixture.input);
@@ -705,6 +770,100 @@ Deno.test("member-link keeps match and rate outcomes indistinguishable", async (
         assertEquals(response.status, 202);
         assertEquals(await response.json(), { accepted: true });
     }
+});
+
+Deno.test("member-link maps limiter release shutdown to exact feature unavailable", async () => {
+    const response = await handleMemberLink(
+        new Request("http://edge.test", {
+            method: "POST",
+            headers: bearerHeaders,
+            body: JSON.stringify({
+                legalName: "회원",
+                phoneSuffix: "1234",
+            }),
+        }),
+        {
+            release: () => Promise.resolve(true),
+            authorize: () => Promise.resolve(true),
+            consumeRate: () =>
+                Promise.reject(
+                    new RpcHTTPError(
+                        400,
+                        '{"code":"55000","message":"match traffic is disabled"}',
+                    ),
+                ),
+            requestLink: () => Promise.resolve({ matched: false }),
+        },
+    );
+
+    assertEquals(response.status, 503);
+    assertEquals(await response.json(), {
+        error: {
+            code: "feature_unavailable",
+            message: "Match service is temporarily unavailable.",
+        },
+    });
+});
+
+Deno.test("member-link fails closed on limiter infrastructure errors", async () => {
+    const response = await handleMemberLink(
+        new Request("http://edge.test", {
+            method: "POST",
+            headers: bearerHeaders,
+            body: JSON.stringify({
+                legalName: "회원",
+                phoneSuffix: "1234",
+            }),
+        }),
+        {
+            release: () => Promise.resolve(true),
+            authorize: () => Promise.resolve(true),
+            consumeRate: () =>
+                Promise.reject(new Error("Vault configuration unavailable")),
+            requestLink: () => Promise.resolve({ matched: false }),
+        },
+    );
+
+    assertEquals(response.status, 503);
+    assertEquals(await response.json(), {
+        error: {
+            code: "infrastructure_unavailable",
+            message: "Match service is temporarily unavailable.",
+        },
+    });
+});
+
+Deno.test("member-link exposes a fixed error for invalid limiter proof", async () => {
+    const response = await handleMemberLink(
+        new Request("http://edge.test", {
+            method: "POST",
+            headers: bearerHeaders,
+            body: JSON.stringify({
+                legalName: "회원",
+                phoneSuffix: "1234",
+            }),
+        }),
+        {
+            release: () => Promise.resolve(true),
+            authorize: () => Promise.resolve(true),
+            consumeRate: () =>
+                Promise.reject(
+                    new RpcHTTPError(
+                        400,
+                        '{"code":"42501","message":"secret diagnostic"}',
+                    ),
+                ),
+            requestLink: () => Promise.resolve({ matched: false }),
+        },
+    );
+
+    assertEquals(response.status, 403);
+    assertEquals(await response.json(), {
+        error: {
+            code: "invalid_rate_limit_proof",
+            message: "Request could not be verified.",
+        },
+    });
 });
 
 Deno.test("approved member read preserves the public-only response", async () => {

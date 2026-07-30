@@ -21,6 +21,24 @@ export function featureUnavailableResponse(): Response {
     }, { status: 503 });
 }
 
+export function infrastructureUnavailableResponse(): Response {
+    return Response.json({
+        error: {
+            code: "infrastructure_unavailable",
+            message: "Match service is temporarily unavailable.",
+        },
+    }, { status: 503 });
+}
+
+export function invalidRateLimitProofResponse(): Response {
+    return Response.json({
+        error: {
+            code: "invalid_rate_limit_proof",
+            message: "Request could not be verified.",
+        },
+    }, { status: 403 });
+}
+
 export function simpleError(code: string, status: number): Response {
     return Response.json({ error: code }, { status });
 }

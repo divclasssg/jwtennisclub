@@ -1,6 +1,6 @@
 begin;
 
-select plan(33);
+select plan(49);
 
 select has_function(
   'public',
@@ -17,7 +17,7 @@ select has_function(
 select has_function(
   'public',
   'get_match_recommendation_input',
-  array['uuid', 'integer'],
+  array['uuid', 'integer', 'integer'],
   'the deterministic matcher input RPC exists'
 );
 select has_function(
@@ -54,14 +54,15 @@ select ok(
     from unnest(array[
       'public.get_match_release_state()',
       'public.consume_member_link_edge_rate(text,timestamp with time zone,text)',
-      'public.get_match_recommendation_input(uuid,integer)',
+      'public.get_match_recommendation_input(uuid,integer,integer)',
       'public.get_member_read(text,uuid)'
     ]) as signature(name)
-    where not pg_catalog.has_function_privilege(
-      'authenticated',
-      signature.name,
-      'EXECUTE'
-    )
+    where pg_catalog.to_regprocedure(signature.name) is null
+      or not pg_catalog.has_function_privilege(
+        'authenticated',
+        pg_catalog.to_regprocedure(signature.name),
+        'EXECUTE'
+      )
   ),
   'authenticated callers may execute every Edge support RPC'
 );
@@ -73,14 +74,15 @@ select ok(
     cross join unnest(array[
       'public.get_match_release_state()',
       'public.consume_member_link_edge_rate(text,timestamp with time zone,text)',
-      'public.get_match_recommendation_input(uuid,integer)',
+      'public.get_match_recommendation_input(uuid,integer,integer)',
       'public.get_member_read(text,uuid)'
     ]) as signature(name)
-    where pg_catalog.has_function_privilege(
-      role_name.name,
-      signature.name,
-      'EXECUTE'
-    )
+    where pg_catalog.to_regprocedure(signature.name) is not null
+      and pg_catalog.has_function_privilege(
+        role_name.name,
+        pg_catalog.to_regprocedure(signature.name),
+        'EXECUTE'
+      )
   ),
   'public, anonymous, and service roles receive no Edge support execute grant'
 );
@@ -163,7 +165,7 @@ select
   null,
   date '2026-07-01',
   null
-from pg_catalog.generate_series(1, 5) as value;
+from pg_catalog.generate_series(1, 33) as value;
 
 insert into match.grades (id, name, strength)
 values ('d5200000-0000-0000-0000-000000000001', 'Edge Grade', 505);
@@ -182,7 +184,7 @@ select
     else 'female'::match.gender_type
   end,
   'd5200000-0000-0000-0000-000000000001'
-from pg_catalog.generate_series(1, 5) as value;
+from pg_catalog.generate_series(1, 33) as value;
 
 insert into match.member_links (
   id,
@@ -213,6 +215,14 @@ values (
   'Edge Season',
   date '2026-07-01'
 );
+insert into match.seasons (id, name, starts_on, ends_on, active)
+values (
+  'd5400000-0000-0000-0000-000000000002',
+  'Previous Edge Season',
+  date '2026-06-01',
+  date '2026-06-30',
+  false
+);
 insert into match.game_days (
   id,
   season_id,
@@ -234,7 +244,25 @@ select
   'd5500000-0000-0000-0000-000000000001',
   ('d5100000-0000-0000-0000-' || lpad(value::text, 12, '0'))::uuid,
   true
-from pg_catalog.generate_series(1, 5) as value;
+from pg_catalog.generate_series(1, 32) as value;
+insert into match.game_days (
+  id,
+  season_id,
+  played_on,
+  status,
+  active_courts,
+  created_by,
+  completed_at
+)
+values (
+  'd5500000-0000-0000-0000-000000000002',
+  'd5400000-0000-0000-0000-000000000002',
+  date '2026-06-30',
+  'completed',
+  1,
+  'd5000000-0000-0000-0000-000000000003',
+  pg_catalog.clock_timestamp() - interval '30 days'
+);
 insert into match.matches (
   id,
   game_day_id,
@@ -261,6 +289,38 @@ insert into match.match_players (
 )
 select
   'd5600000-0000-0000-0000-000000000001',
+  ('d5100000-0000-0000-0000-' || lpad(value::text, 12, '0'))::uuid,
+  value,
+  case when value <= 2 then 1 else 2 end,
+  'd5200000-0000-0000-0000-000000000001',
+  505
+from pg_catalog.generate_series(1, 4) as value;
+insert into match.matches (
+  id,
+  game_day_id,
+  court_number,
+  status,
+  winner_team,
+  completed_at
+)
+values (
+  'd5600000-0000-0000-0000-000000000002',
+  'd5500000-0000-0000-0000-000000000002',
+  1,
+  'completed',
+  2,
+  pg_catalog.clock_timestamp() - interval '30 days'
+);
+insert into match.match_players (
+  match_id,
+  member_id,
+  slot,
+  team,
+  grade_id_snapshot,
+  grade_strength_snapshot
+)
+select
+  'd5600000-0000-0000-0000-000000000002',
   ('d5100000-0000-0000-0000-' || lpad(value::text, 12, '0'))::uuid,
   value,
   case when value <= 2 then 1 else 2 end,
@@ -297,7 +357,7 @@ select is(
 );
 select is(
   public.get_member_read('all', null)->'summary'->>'games',
-  '1',
+  '2',
   'member-read summary derives completed match count'
 );
 select is(
@@ -305,6 +365,99 @@ select is(
   '1',
   'member-read summary derives wins'
 );
+select is(
+  public.get_member_read('current', null)->'summary'->>'games',
+  '1',
+  'current member-read summary uses only the active season'
+);
+select is(
+  public.get_member_read(
+    'season',
+    'd5400000-0000-0000-0000-000000000002'
+  )->'summary'->>'games',
+  '1',
+  'season member-read summary uses only the requested season'
+);
+select is(
+  public.get_member_read('all', null)->'partners'->0->>'games',
+  '2',
+  'all member-read partners span both seasons'
+);
+select is(
+  public.get_member_read('current', null)->'partners'->0->>'games',
+  '1',
+  'current member-read partners use only the active season'
+);
+select is(
+  public.get_member_read(
+    'season',
+    'd5400000-0000-0000-0000-000000000002'
+  )->'partners'->0->>'games',
+  '1',
+  'season member-read partners use only the requested season'
+);
+select is(
+  pg_catalog.jsonb_array_length(
+    public.get_member_read('all', null)->'matchHistory'
+  ),
+  2,
+  'all member-read history spans both seasons'
+);
+select is(
+  pg_catalog.jsonb_array_length(
+    public.get_member_read('current', null)->'matchHistory'
+  ),
+  1,
+  'current member-read history uses only the active season'
+);
+select is(
+  pg_catalog.jsonb_array_length(
+    public.get_member_read(
+      'season',
+      'd5400000-0000-0000-0000-000000000002'
+    )->'matchHistory'
+  ),
+  1,
+  'season member-read history uses only the requested season'
+);
+select is(
+  public.get_member_read('all', null)
+    ->'leaderboards'->'games'->0->>'games',
+  '2',
+  'all member-read leaderboards span both seasons'
+);
+select is(
+  public.get_member_read('current', null)
+    ->'leaderboards'->'games'->0->>'games',
+  '1',
+  'current member-read leaderboards use only the active season'
+);
+select is(
+  public.get_member_read(
+    'season',
+    'd5400000-0000-0000-0000-000000000002'
+  )->'leaderboards'->'games'->0->>'games',
+  '1',
+  'season member-read leaderboards use only the requested season'
+);
+reset role;
+update match.seasons set active = false;
+set local role authenticated;
+select is(
+  pg_catalog.jsonb_build_array(
+    public.get_member_read('current', null)->'summary'->'games',
+    public.get_member_read('current', null)->'partners',
+    public.get_member_read('current', null)->'matchHistory',
+    public.get_member_read('current', null)->'leaderboards'->'games'
+  ),
+  '[0, [], [], []]'::jsonb,
+  'current member-read is stably empty when no active season exists'
+);
+reset role;
+update match.seasons
+set active = true
+where id = 'd5400000-0000-0000-0000-000000000001';
+set local role authenticated;
 select ok(
   public.get_member_read('all', null)::text !~
     'Private Canonical|legalName|phoneSuffix|phoneNumber|memberCode|gender|grade',
@@ -370,8 +523,8 @@ select is(
       1
     )->'members'
   ),
-  5,
-  'operator matcher input includes checked-in eligible members'
+  32,
+  'operator matcher input accepts the 32-member product cap'
 );
 select is(
   pg_catalog.jsonb_array_length(
@@ -396,6 +549,46 @@ select throws_ok(
 );
 reset role;
 
+select pg_catalog.set_config(
+  'request.jwt.claim.sub',
+  'd5000000-0000-0000-0000-000000000003',
+  true
+);
+set local role authenticated;
+select throws_ok(
+  $$
+    select public.get_match_recommendation_input(
+      'd5500000-0000-0000-0000-000000000001',
+      1,
+      33
+    )
+  $$,
+  '22023',
+  'match recommendation limit must be between 4 and 32',
+  'matcher input rejects requested limits above the product cap'
+);
+reset role;
+insert into match.attendances (game_day_id, member_id, checked_in)
+values (
+  'd5500000-0000-0000-0000-000000000001',
+  'd5100000-0000-0000-0000-000000000033',
+  true
+);
+set local role authenticated;
+select throws_ok(
+  $$
+    select public.get_match_recommendation_input(
+      'd5500000-0000-0000-0000-000000000001',
+      1,
+      32
+    )
+  $$,
+  '22023',
+  'match recommendation member limit exceeded',
+  'matcher input rejects a 33-member checked-in population'
+);
+reset role;
+
 do $vault_setup$
 begin
   perform vault.create_secret(
@@ -412,6 +605,54 @@ select pg_catalog.set_config(
   'd5000000-0000-0000-0000-000000000001',
   true
 );
+set local role authenticated;
+
+select throws_ok(
+  $$
+    select public.consume_member_link_edge_rate(
+      pg_catalog.encode(
+        extensions.digest('release-off-origin', 'sha256'),
+        'hex'
+      ),
+      date_trunc('hour', clock_timestamp()),
+      pg_catalog.encode(
+        extensions.hmac(
+          pg_catalog.convert_to(
+            'v1' || chr(31)
+              || extract(
+                epoch from date_trunc('hour', clock_timestamp())
+              )::bigint::text
+              || chr(31)
+              || pg_catalog.encode(
+                extensions.digest('release-off-origin', 'sha256'),
+                'hex'
+              ),
+            'utf8'
+          ),
+          pg_catalog.convert_to(
+            'task-five-edge-rate-secret',
+            'utf8'
+          ),
+          'sha256'
+        ),
+        'hex'
+      )
+    )
+  $$,
+  '55000',
+  'match traffic is disabled',
+  'release shutdown is authoritative immediately before limiter writes'
+);
+reset role;
+select is(
+  (select count(*)::integer from match.member_link_edge_limits),
+  0,
+  'release-off limiter attempts consume no shared capacity'
+);
+update match.release_state
+set traffic_enabled = true,
+    enabled_at = pg_catalog.clock_timestamp()
+where singleton;
 set local role authenticated;
 
 select throws_ok(

@@ -5,6 +5,7 @@ import {
     callRpc,
     readBearerToken,
     type RpcCaller,
+    RpcHTTPError,
 } from "../_shared/auth.ts";
 import {
     type MemberLinkRequest,
@@ -12,6 +13,8 @@ import {
 } from "../_shared/contracts.ts";
 import {
     featureUnavailableResponse,
+    infrastructureUnavailableResponse,
+    invalidRateLimitProofResponse,
     isReleaseDisabledError,
     readReleaseState,
     type ReleaseReader,
@@ -137,8 +140,12 @@ export async function handleMemberLink(
     if (!parsed.success) return simpleError("invalid_request", 400);
     try {
         if (!await dependencies.consumeRate(request)) return accepted();
-    } catch {
-        return accepted();
+    } catch (error) {
+        if (isReleaseDisabledError(error)) return featureUnavailableResponse();
+        if (error instanceof RpcHTTPError && error.code === "42501") {
+            return invalidRateLimitProofResponse();
+        }
+        return infrastructureUnavailableResponse();
     }
     try {
         await dependencies.requestLink(parsed.data, request);

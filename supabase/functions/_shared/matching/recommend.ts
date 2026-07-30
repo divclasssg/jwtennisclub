@@ -39,23 +39,23 @@ function history(matches: readonly CompletedMatch[]) {
     }
     return { partners, opponents };
 }
-function combinations(members: readonly MatchMember[]) {
-    const result: MatchMember[][] = [];
+function* combinations(
+    members: readonly MatchMember[],
+): Generator<[MatchMember, MatchMember, MatchMember, MatchMember]> {
     for (let a = 0; a < members.length - 3; a++) {
         for (let b = a + 1; b < members.length - 2; b++) {
             for (let c = b + 1; c < members.length - 1; c++) {
                 for (let d = c + 1; d < members.length; d++) {
-                    result.push([
+                    yield [
                         members[a],
                         members[b],
                         members[c],
                         members[d],
-                    ]);
+                    ];
                 }
             }
         }
     }
-    return result;
 }
 function partitions([a, b, c, d]: MatchMember[]): Teams[] {
     return [[[a, b], [c, d]], [[a, c], [b, d]], [[a, d], [b, c]]];

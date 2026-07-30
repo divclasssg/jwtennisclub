@@ -356,7 +356,7 @@ export const MatchInputSchema = z.object({
             gender: GenderSchema,
             grade: z.number().int().positive(),
         }).strict(),
-    ),
+    ).max(32),
     completedMatches: z.array(
         z.object({
             team1: z.tuple([UuidSchema, UuidSchema]),

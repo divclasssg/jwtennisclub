@@ -36,6 +36,7 @@ const defaultDependencies: MatchRecommendationDependencies = {
         callRpc(request, "get_match_recommendation_input", {
             requested_game_day_id: gameDayId,
             requested_court_number: courtNumber,
+            requested_limit: 32,
         }),
 };
 
@@ -67,13 +68,17 @@ export async function handleMatchRecommendation(
     const parsed = MatchRecommendationRequestSchema.safeParse(input);
     if (!parsed.success) return simpleError("invalid_request", 400);
     try {
-        const matchInput = MatchInputSchema.parse(
+        const matchInputResult = MatchInputSchema.safeParse(
             await dependencies.loadInput(
                 parsed.data.gameDayId,
                 parsed.data.courtNumber,
                 request,
             ),
         );
+        if (!matchInputResult.success) {
+            return simpleError("invalid_request", 400);
+        }
+        const matchInput = matchInputResult.data;
         return Response.json(recommendMatch(matchInput));
     } catch (error) {
         return rpcErrorResponse(error, "recommendation_failed", 409);

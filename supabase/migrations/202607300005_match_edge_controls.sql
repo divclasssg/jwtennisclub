@@ -95,6 +95,7 @@ declare
   service_hash bytea;
   origin_attempts integer := 0;
   service_attempts integer := 0;
+  release_enabled boolean;
 begin
   if requester_id is null then
     raise exception 'authentication required'
@@ -156,6 +157,16 @@ begin
   if coalesce(origin_attempts, 0) >= 20
      or coalesce(service_attempts, 0) >= 100 then
     return '{"allowed":false}'::pg_catalog.jsonb;
+  end if;
+
+  select release_state.traffic_enabled
+  into release_enabled
+  from match.release_state as release_state
+  where release_state.singleton
+  for update;
+  if not coalesce(release_enabled, false) then
+    raise exception 'match traffic is disabled'
+      using errcode = '55000';
   end if;
 
   insert into match.member_link_edge_limits (
@@ -241,9 +252,12 @@ begin
 end;
 $$;
 
+drop function if exists public.get_match_recommendation_input(uuid, integer);
+
 create or replace function public.get_match_recommendation_input(
   requested_game_day_id uuid,
-  requested_court_number integer
+  requested_court_number integer,
+  requested_limit integer default 32
 )
 returns jsonb
 language plpgsql
@@ -257,6 +271,12 @@ begin
   if not public.has_permission('matches.view') then
     raise exception 'matches.view permission required'
       using errcode = '42501';
+  end if;
+  if requested_limit is null
+     or requested_limit < 4
+     or requested_limit > 32 then
+    raise exception 'match recommendation limit must be between 4 and 32'
+      using errcode = '22023';
   end if;
   if not exists (
     select 1
@@ -372,13 +392,25 @@ begin
     )
   )
   into result;
+  if pg_catalog.jsonb_array_length(result->'members') > requested_limit then
+    raise exception 'match recommendation member limit exceeded'
+      using errcode = '22023';
+  end if;
   return result;
 end;
 $$;
 
-revoke all on function public.get_match_recommendation_input(uuid, integer)
+revoke all on function public.get_match_recommendation_input(
+  uuid,
+  integer,
+  integer
+)
 from public, anon, authenticated, service_role;
-grant execute on function public.get_match_recommendation_input(uuid, integer)
+grant execute on function public.get_match_recommendation_input(
+  uuid,
+  integer,
+  integer
+)
 to authenticated;
 
 create or replace function match.member_match_read(
@@ -457,6 +489,8 @@ declare
   active_day_id uuid;
   active_courts integer;
   active_updated_at timestamptz;
+  current_season_id uuid;
+  scoped_season_id uuid;
 begin
   select links.member_id, profiles.public_alias
   into viewer_member_id, viewer_alias
@@ -479,6 +513,18 @@ begin
       using errcode = '22023';
   end if;
 
+  select seasons.id
+  into current_season_id
+  from match.seasons as seasons
+  where seasons.active
+  order by seasons.starts_on desc, seasons.created_at desc, seasons.id
+  limit 1;
+  scoped_season_id := case
+    when requested_scope = 'current' then current_season_id
+    when requested_scope = 'season' then requested_season_id
+    else null
+  end;
+
   with scoped_results as (
     select
       players.member_id,
@@ -499,8 +545,11 @@ begin
       and matches.winner_team is not null
       and players.member_id = viewer_member_id
       and (
-        requested_scope in ('all', 'current')
-        or game_days.season_id = requested_season_id
+        requested_scope = 'all'
+        or (
+          scoped_season_id is not null
+          and game_days.season_id = scoped_season_id
+        )
       )
   )
   select pg_catalog.jsonb_build_object(
@@ -535,8 +584,11 @@ begin
       and matches.winner_team is not null
       and players.member_id = viewer_member_id
       and (
-        requested_scope in ('all', 'current')
-        or game_days.season_id = requested_season_id
+        requested_scope = 'all'
+        or (
+          scoped_season_id is not null
+          and game_days.season_id = scoped_season_id
+        )
       )
   ),
   grouped as (
@@ -597,8 +649,11 @@ begin
       and matches.winner_team is not null
       and players.member_id = viewer_member_id
       and (
-        requested_scope in ('all', 'current')
-        or game_days.season_id = requested_season_id
+        requested_scope = 'all'
+        or (
+          scoped_season_id is not null
+          and game_days.season_id = scoped_season_id
+        )
       )
   )
   select coalesce(
@@ -631,8 +686,11 @@ begin
     where matches.status = 'completed'::match.match_status
       and matches.winner_team is not null
       and (
-        requested_scope in ('all', 'current')
-        or game_days.season_id = requested_season_id
+        requested_scope = 'all'
+        or (
+          scoped_season_id is not null
+          and game_days.season_id = scoped_season_id
+        )
       )
   ),
   totals as (
@@ -737,6 +795,7 @@ begin
   into active_day_id, active_courts, active_updated_at
   from match.game_days as game_days
   where game_days.status = 'active'::match.game_day_status
+    and game_days.season_id = current_season_id
   order by game_days.played_on desc, game_days.created_at desc, game_days.id
   limit 1;
 
