@@ -28,7 +28,6 @@
 
 - `supabase/migrations/202607300001_add_member_activity_start_month.sql` — nullable transition column, validation, member save/directory RPC changes, and meeting roster eligibility changes.
 - `supabase/migrations/202607300002_add_monthly_settlement_closings.sql` — closing schema, snapshot builder, page/close/reopen RPCs, RLS, locking, ledger chaining, and audit logging.
-- `supabase/migrations/202607300003_require_member_activity_start_month.sql` — guarded final `NOT NULL` constraint for use only after operator-confirmed backfill.
 - `src/features/members/member-activity-start-migration.test.ts` — executable migration-contract tests for member, fee, and meeting boundaries.
 - `src/features/settlements/settlement-snapshot.ts` — TypeScript snapshot/page contracts, parsers, date eligibility, and presentation formatters.
 - `src/features/settlements/settlement-snapshot.test.ts` — parser, invariant, date eligibility, and presentation tests.
@@ -242,7 +241,6 @@ git commit -m "feat: capture member activity start month"
 
 **Files:**
 - Create: `supabase/migrations/202607300001_add_member_activity_start_month.sql`
-- Create: `supabase/migrations/202607300003_require_member_activity_start_month.sql`
 - Create: `src/features/members/member-activity-start-migration.test.ts`
 - Modify: `src/app/(app)/fees/page.tsx`
 - Modify: `src/app/(app)/fees/page.test.tsx`
@@ -253,7 +251,7 @@ git commit -m "feat: capture member activity start month"
 
 **Interfaces:**
 - Produces: nullable transition column `members.activity_start_month date`.
-- Produces: guarded final migration that refuses `NOT NULL` while any rows are missing.
+- Defers: the final `NOT NULL` migration until operator-confirmed production backfill is complete.
 - Updates: `save_member_with_contact`, `get_member_directory_page`, `sync_preparing_meeting_roster`, `ensure_locked_meeting_roster`, and `prepare_club_meeting_month`.
 - Updates: fee page/action queries to require `activity_start_month <= period_month`.
 
@@ -270,7 +268,7 @@ expect(sql).toContain("(member_data->>'activity_start_month')::date");
 expect(sql).toContain("members.activity_start_month <= requested_period_month");
 ```
 
-Require the final migration to raise before `SET NOT NULL` when null rows exist. Add fee query tests for `.lte("activity_start_month", periodMonth)`.
+Require the transition migration and settlement close contract to reject missing activity start months. Add fee query tests for `.lte("activity_start_month", periodMonth)`.
 
 - [ ] **Step 2: Run migration and fee tests and verify RED**
 
@@ -318,22 +316,7 @@ notify pgrst, 'reload schema';
 commit;
 ```
 
-The final constraint migration must use a guarded block:
-
-```sql
-do $$
-begin
-  if exists (
-    select 1 from public.members where activity_start_month is null
-  ) then
-    raise exception 'member activity start month backfill is incomplete';
-  end if;
-end;
-$$;
-
-alter table public.members
-  alter column activity_start_month set not null;
-```
+Do not create the final `NOT NULL` migration in this implementation. A migration present under `supabase/migrations` would be picked up by normal deployment before the operator-confirmed backfill. The close RPC in Task 5 remains the enforcement boundary until a later, post-backfill migration is intentionally created.
 
 - [ ] **Step 4: Update fee reads and writes**
 
@@ -352,7 +335,7 @@ Run the Step 2 command. Expected: all activity, fee, and meeting migration-contr
 - [ ] **Step 6: Commit the migration and eligibility wiring**
 
 ```bash
-git add supabase/migrations/202607300001_add_member_activity_start_month.sql supabase/migrations/202607300003_require_member_activity_start_month.sql src/features/members/member-activity-start-migration.test.ts src/features/members/member-pause-month-migration.test.ts src/features/meetings/meeting-migration.test.ts 'src/app/(app)/fees' src/features/fees
+git add supabase/migrations/202607300001_add_member_activity_start_month.sql src/features/members/member-activity-start-migration.test.ts src/features/members/member-pause-month-migration.test.ts src/features/meetings/meeting-migration.test.ts 'src/app/(app)/fees' src/features/fees
 git commit -m "feat: apply activity start month across operations"
 ```
 
@@ -868,8 +851,8 @@ Expected: Next.js 16.2.10 production build succeeds and includes members, fees, 
 
 Verify:
 
-- migration order is activity column → closing schema → guarded `NOT NULL`;
-- `202607300003` is not applied before operator-confirmed backfill;
+- migration order is activity column → closing schema;
+- the final `NOT NULL` migration does not exist yet and is created only after operator-confirmed backfill;
 - closing RPC rejects null activity months;
 - snapshot JSON contains no member or receipt identifiers;
 - RLS allows active-operator reads and blocks direct writes;
