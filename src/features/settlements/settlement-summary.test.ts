@@ -41,6 +41,7 @@ describe("buildSettlementSummary", () => {
     expect(summary).toEqual({
       incomeTotal: 110000,
       expenseTotal: 150000,
+      attributedNet: -40000,
       balance: -40000,
       feePaymentCount: 3,
       expenseCount: 3,
