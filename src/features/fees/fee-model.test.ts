@@ -6,6 +6,8 @@ import {
   formatCurrency,
   formatPeriodMonth,
   getPeriodMonthEnd,
+  isMemberActiveForPeriod,
+  isMemberFeeTargetForPeriod,
   normalizePeriodMonth,
 } from "./fee-model";
 import { isMemberEligibleForPeriod } from "@/features/members/member-model";
@@ -42,6 +44,78 @@ describe("fee model", () => {
     );
     expect(isMemberEligibleForPeriod(pausedInAugust, "2026-07-01")).toBe(true);
     expect(isMemberEligibleForPeriod(pausedInAugust, "2026-08-01")).toBe(false);
+  });
+
+  it("uses the activity start month for activity and fee eligibility", () => {
+    const startsInAugust = {
+      status: "active" as const,
+      joinedDate: "2026-07-20",
+      withdrawnDate: null,
+      pauseStartMonth: null,
+      activityStartMonth: "2026-08-01",
+    };
+
+    expect(isMemberActiveForPeriod(startsInAugust, "2026-07-01")).toBe(false);
+    expect(isMemberActiveForPeriod(startsInAugust, "2026-08-01")).toBe(true);
+    expect(
+      isMemberFeeTargetForPeriod(
+        { ...startsInAugust, memberCode: "#0020" },
+        "2026-08-01",
+      ),
+    ).toBe(true);
+    expect(
+      isMemberFeeTargetForPeriod(
+        { ...startsInAugust, memberCode: "#0000" },
+        "2026-08-01",
+      ),
+    ).toBe(false);
+  });
+
+  it("applies pause and withdrawal boundaries to monthly activity", () => {
+    expect(
+      isMemberActiveForPeriod(
+        {
+          status: "paused",
+          withdrawnDate: null,
+          pauseStartMonth: "2026-08-01",
+          activityStartMonth: "2026-07-01",
+        },
+        "2026-07-01",
+      ),
+    ).toBe(true);
+    expect(
+      isMemberActiveForPeriod(
+        {
+          status: "paused",
+          withdrawnDate: null,
+          pauseStartMonth: "2026-08-01",
+          activityStartMonth: "2026-07-01",
+        },
+        "2026-08-01",
+      ),
+    ).toBe(false);
+    expect(
+      isMemberActiveForPeriod(
+        {
+          status: "withdrawn",
+          withdrawnDate: "2026-07-31",
+          pauseStartMonth: null,
+          activityStartMonth: "2026-07-01",
+        },
+        "2026-07-01",
+      ),
+    ).toBe(false);
+    expect(
+      isMemberActiveForPeriod(
+        {
+          status: "withdrawn",
+          withdrawnDate: "2026-08-01",
+          pauseStartMonth: null,
+          activityStartMonth: "2026-07-01",
+        },
+        "2026-07-01",
+      ),
+    ).toBe(true);
   });
 });
 

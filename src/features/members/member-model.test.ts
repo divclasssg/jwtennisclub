@@ -33,6 +33,7 @@ describe("member model", () => {
       joinedDate: "2026-01-01",
       withdrawnDate: null,
       pauseStartMonth: null,
+      activityStartMonth: "2026-01-01",
       memo: null,
       createdBy: null,
       updatedBy: null,
@@ -62,6 +63,7 @@ describe("member model", () => {
         joinedDate: "2026-07-01",
         withdrawnDate: null,
         pauseStartMonth: null,
+        activityStartMonth: "2026-07-01",
       }),
     ).toContain("탈퇴 회원은 탈퇴일이 필요합니다.");
   });
@@ -73,6 +75,7 @@ describe("member model", () => {
         joinedDate: "2026-07-01",
         withdrawnDate: "2026-07-02",
         pauseStartMonth: null,
+        activityStartMonth: "2026-07-01",
       }),
     ).toContain("활동중 또는 휴회 회원은 탈퇴일을 비워야 합니다.");
   });
@@ -84,6 +87,7 @@ describe("member model", () => {
         joinedDate: "2026-01-01",
         withdrawnDate: "2026-07-01",
         pauseStartMonth: null,
+        activityStartMonth: "2026-01-01",
       }),
     ).toEqual([]);
   });
@@ -95,6 +99,7 @@ describe("member model", () => {
         joinedDate: "2026-07-02",
         withdrawnDate: "2026-07-01",
         pauseStartMonth: null,
+        activityStartMonth: "2026-07-01",
       }),
     ).toContain("탈퇴일은 가입일보다 빠를 수 없습니다.");
   });
@@ -106,6 +111,7 @@ describe("member model", () => {
         joinedDate: "2026-07-01",
         withdrawnDate: null,
         pauseStartMonth: null,
+        activityStartMonth: "2026-07-01",
       }),
     ).toContain("휴회 회원은 휴회 시작 월이 필요합니다.");
   });
@@ -117,6 +123,7 @@ describe("member model", () => {
         joinedDate: "2026-07-01",
         withdrawnDate: null,
         pauseStartMonth: "2026-08-01",
+        activityStartMonth: "2026-07-01",
       }),
     ).toContain("활동중 또는 탈퇴 회원은 휴회 시작 월을 비워야 합니다.");
   });
@@ -130,6 +137,7 @@ describe("member model", () => {
           joinedDate: "2026-07-01",
           withdrawnDate: status === "withdrawn" ? "2026-07-02" : null,
           pauseStartMonth: "",
+          activityStartMonth: "2026-07-01",
         }),
       ).toContain("활동중 또는 탈퇴 회원은 휴회 시작 월을 비워야 합니다.");
     },
@@ -144,6 +152,25 @@ describe("member model", () => {
     expect(isMemberEligibleForPeriod(pausedInAugust, "2026-07-01")).toBe(true);
     expect(isMemberEligibleForPeriod(pausedInAugust, "2026-08-01")).toBe(false);
     expect(isMemberEligibleForPeriod(pausedInAugust, "2026-09-01")).toBe(false);
+  });
+
+  it.each([
+    ["requires an activity start month", null, "활동 시작 월이 필요합니다."],
+    [
+      "rejects an activity start month before the joined month",
+      "2026-06-01",
+      "활동 시작 월은 가입 월보다 빠를 수 없습니다.",
+    ],
+  ])("%s", (_description, activityStartMonth, expectedError) => {
+    expect(
+      validateMemberLifecycle({
+        status: "active",
+        joinedDate: "2026-07-20",
+        withdrawnDate: null,
+        pauseStartMonth: null,
+        activityStartMonth,
+      }),
+    ).toContain(expectedError);
   });
 });
 

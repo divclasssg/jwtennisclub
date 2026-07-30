@@ -1,3 +1,5 @@
+import type { MemberRecord } from "@/features/members/member-model";
+
 export const DEFAULT_MONTHLY_FEE_AMOUNT = 30000;
 export const FEE_EXEMPT_MEMBER_CODE = "#0000";
 
@@ -56,6 +58,38 @@ export function getPeriodMonthEnd(periodMonth: string) {
   const endDay = String(end.getDate()).padStart(2, "0");
 
   return `${end.getFullYear()}-${endMonth}-${endDay}`;
+}
+
+export function isMemberActiveForPeriod(
+  member: Pick<
+    MemberRecord,
+    "status" | "withdrawnDate" | "pauseStartMonth" | "activityStartMonth"
+  >,
+  periodMonth: string,
+) {
+  const periodEnd = getPeriodMonthEnd(periodMonth);
+  if (!member.activityStartMonth || member.activityStartMonth > periodMonth) {
+    return false;
+  }
+  if (member.withdrawnDate && member.withdrawnDate <= periodEnd) return false;
+  if (
+    member.status === "paused" &&
+    member.pauseStartMonth &&
+    member.pauseStartMonth <= periodMonth
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function isMemberFeeTargetForPeriod(
+  member: Parameters<typeof isMemberActiveForPeriod>[0] & { memberCode: string },
+  periodMonth: string,
+) {
+  return (
+    member.memberCode !== FEE_EXEMPT_MEMBER_CODE &&
+    isMemberActiveForPeriod(member, periodMonth)
+  );
 }
 
 export function buildFeeEligibilityFilter(periodMonth: string) {
