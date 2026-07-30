@@ -646,7 +646,7 @@ Deno.test("matcher input accepts 32 members and rejects 33 members", () => {
     assertEquals(MatchInputSchema.safeParse(input(33)).success, false);
 });
 
-Deno.test("matcher endpoint rejects oversized database input with stable 400", async () => {
+Deno.test("matcher endpoint maps malformed RPC success data to fixed 502", async () => {
     const response = await handleMatchRecommendation(
         new Request("http://edge.test", {
             method: "POST",
@@ -670,6 +670,30 @@ Deno.test("matcher endpoint rejects oversized database input with stable 400", a
                     completedMatches: [],
                     inProgressMemberIds: [],
                 }),
+        },
+    );
+
+    assertEquals(response.status, 502);
+    assertEquals(await response.json(), { error: "invalid_upstream_response" });
+});
+
+Deno.test("matcher endpoint keeps database member-cap errors at stable 400", async () => {
+    const response = await handleMatchRecommendation(
+        new Request("http://edge.test", {
+            method: "POST",
+            headers: bearerHeaders,
+            body: JSON.stringify({ gameDayId: uuid(20), courtNumber: 1 }),
+        }),
+        {
+            release: () => Promise.resolve(true),
+            authorize: () => Promise.resolve(true),
+            loadInput: () =>
+                Promise.reject(
+                    new RpcHTTPError(
+                        400,
+                        '{"code":"22023","message":"match recommendation member limit exceeded"}',
+                    ),
+                ),
         },
     );
 
@@ -805,32 +829,44 @@ Deno.test("member-link maps limiter release shutdown to exact feature unavailabl
     });
 });
 
-Deno.test("member-link fails closed on limiter infrastructure errors", async () => {
-    const response = await handleMemberLink(
-        new Request("http://edge.test", {
-            method: "POST",
-            headers: bearerHeaders,
-            body: JSON.stringify({
-                legalName: "회원",
-                phoneSuffix: "1234",
+Deno.test("member-link fails closed on every non-release limiter error", async () => {
+    const failures = [
+        new RpcHTTPError(
+            500,
+            '{"code":"58000","message":"Edge rate-limit infrastructure is unavailable"}',
+        ),
+        new RpcHTTPError(
+            500,
+            '{"code":"55000","message":"unrelated configuration failure"}',
+        ),
+        new Error("Vault configuration unavailable"),
+    ];
+    for (const failure of failures) {
+        const response = await handleMemberLink(
+            new Request("http://edge.test", {
+                method: "POST",
+                headers: bearerHeaders,
+                body: JSON.stringify({
+                    legalName: "회원",
+                    phoneSuffix: "1234",
+                }),
             }),
-        }),
-        {
-            release: () => Promise.resolve(true),
-            authorize: () => Promise.resolve(true),
-            consumeRate: () =>
-                Promise.reject(new Error("Vault configuration unavailable")),
-            requestLink: () => Promise.resolve({ matched: false }),
-        },
-    );
+            {
+                release: () => Promise.resolve(true),
+                authorize: () => Promise.resolve(true),
+                consumeRate: () => Promise.reject(failure),
+                requestLink: () => Promise.resolve({ matched: false }),
+            },
+        );
 
-    assertEquals(response.status, 503);
-    assertEquals(await response.json(), {
-        error: {
-            code: "infrastructure_unavailable",
-            message: "Match service is temporarily unavailable.",
-        },
-    });
+        assertEquals(response.status, 503);
+        assertEquals(await response.json(), {
+            error: {
+                code: "infrastructure_unavailable",
+                message: "Match service is temporarily unavailable.",
+            },
+        });
+    }
 });
 
 Deno.test("member-link exposes a fixed error for invalid limiter proof", async () => {

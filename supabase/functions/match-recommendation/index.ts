@@ -76,7 +76,7 @@ export async function handleMatchRecommendation(
             ),
         );
         if (!matchInputResult.success) {
-            return simpleError("invalid_request", 400);
+            return simpleError("invalid_upstream_response", 502);
         }
         const matchInput = matchInputResult.data;
         return Response.json(recommendMatch(matchInput));

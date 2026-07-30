@@ -1,6 +1,6 @@
 begin;
 
-select plan(49);
+select plan(50);
 
 select has_function(
   'public',
@@ -586,6 +586,26 @@ select throws_ok(
   '22023',
   'match recommendation member limit exceeded',
   'matcher input rejects a 33-member checked-in population'
+);
+reset role;
+
+select pg_catalog.set_config(
+  'request.jwt.claim.sub',
+  'd5000000-0000-0000-0000-000000000001',
+  true
+);
+set local role authenticated;
+select throws_ok(
+  $$
+    select public.consume_member_link_edge_rate(
+      repeat('a', 64),
+      date_trunc('hour', clock_timestamp()),
+      repeat('b', 64)
+    )
+  $$,
+  '58000',
+  'Edge rate-limit infrastructure is unavailable',
+  'missing Vault limiter configuration has a distinct stable error'
 );
 reset role;
 

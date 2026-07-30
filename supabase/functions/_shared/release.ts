@@ -44,7 +44,15 @@ export function simpleError(code: string, status: number): Response {
 }
 
 export function isReleaseDisabledError(error: unknown): boolean {
-    return error instanceof RpcHTTPError && error.code === "55000";
+    if (!(error instanceof RpcHTTPError) || error.code !== "55000") {
+        return false;
+    }
+    try {
+        const value = JSON.parse(error.responseBody) as { message?: unknown };
+        return value.message === "match traffic is disabled";
+    } catch {
+        return false;
+    }
 }
 
 export function rpcErrorResponse(

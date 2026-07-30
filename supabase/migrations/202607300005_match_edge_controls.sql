@@ -45,8 +45,8 @@ declare
   key_material text;
 begin
   if pg_catalog.to_regclass('vault.decrypted_secrets') is null then
-    raise exception 'Edge rate-limit key is unavailable'
-      using errcode = '55000';
+    raise exception 'Edge rate-limit infrastructure is unavailable'
+      using errcode = '58000';
   end if;
 
   begin
@@ -64,8 +64,8 @@ begin
   end;
 
   if nullif(key_material, '') is null then
-    raise exception 'Edge rate-limit key is unavailable'
-      using errcode = '55000';
+    raise exception 'Edge rate-limit infrastructure is unavailable'
+      using errcode = '58000';
   end if;
   return key_material;
 end;
