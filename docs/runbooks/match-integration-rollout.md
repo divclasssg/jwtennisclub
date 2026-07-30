@@ -1,199 +1,153 @@
 # Match integration cloned-project rollout
 
-Status: `BLOCKED_PRECONDITION` (draft only; no remote rollout was run)
+Status: `BLOCKED_PRECONDITION`; no remote rollout was run.
 
-- backend: `1fc16f34442b60083a003292d59fdc95c5afec0b`
-- client: `ab1a6f0a41f4ce62a9a69ada7408627190a34e2e`
+This runbook applies only to an approved disposable clone. Production
+`jwtennisclub` (`ydiusirreirhbvlftegp`) is hard denied. Project creation, cost,
+production changes, and deployment require separate authority.
 
-This runbook is only for an existing, disposable clone of the web project. The
-production project is `jwtennisclub` (`ydiusirreirhbvlftegp`) and is a hard-deny
-target. Creating a project, incurring cost, or changing production requires
-separate explicit approval.
+## 1. Pin identity and custody
 
-## 1. Preconditions and evidence custody
+Use three distinct locations:
 
-The operator must prove all of the following before linking the CLI:
+- `TOOL_ROOT`: this reviewed helper checkout;
+- `BACKEND_ROOT`: clean exact product HEAD
+  `1fc16f34442b60083a003292d59fdc95c5afec0b`;
+- `CLIENT_ROOT`: clean exact product HEAD
+  `ab1a6f0a41f4ce62a9a69ada7408627190a34e2e`.
 
-1. `supabase projects list` contains the supplied validation ref and name.
-2. The ref differs from `ydiusirreirhbvlftegp`, and the dashboard identifies the
-   project as a non-production clone.
-3. Clone provenance records the source snapshot and timestamp.
-4. The clone has isolated Auth users, callback URLs, Storage, and credentials.
-5. A named owner approves destructive testing on that exact clone.
+Set `TASK8_EVIDENCE_ROOT` to an encrypted durable directory outside both Git
+roots. The helper canonicalizes paths, sets `umask 077`, requires directory
+mode `0700`, writes redacted `0600` files, and hashes them in `manifest.json`.
+Keep credentials, tokens, member rows, and service keys outside evidence.
 
-Use an encrypted, durable directory outside every Git checkout, mode `0700`;
-evidence files must be `0600`. Do not store bearer tokens, database URLs,
-passwords, HMAC keys, raw member rows, or service-role keys in evidence.
+First capture the server-derived production fingerprint read-only:
 
 ```bash
-test -n "$TASK8_VALIDATION_REF"
-test "$TASK8_VALIDATION_REF" != "ydiusirreirhbvlftegp"
-test -n "$TASK8_EVIDENCE_ROOT"
-test -d "$TASK8_EVIDENCE_ROOT"
-test "$(stat -f '%Lp' "$TASK8_EVIDENCE_ROOT")" = "700"
-git rev-parse --show-toplevel
-git rev-parse HEAD
-supabase projects list > "$TASK8_EVIDENCE_ROOT/projects-before.json"
+cd "$TOOL_ROOT"
+TASK8_PRODUCTION_REF=ydiusirreirhbvlftegp \
+TASK8_PRODUCTION_PGSERVICE=task8-production-readonly \
+deno run --allow-read --allow-write --allow-run --allow-env --allow-sys \
+  supabase/scripts/task8/rollout.ts capture-production
 ```
 
-Stop unless two people compare the CLI record, dashboard identity, and clone
-provenance. Keep database access in an external `PGSERVICEFILE`. Link after:
+Stop unless the clone owner supplies its exact 20-letter ref, source snapshot,
+isolated Auth/redirects/Storage/credentials, and approval IDs. Link only
+`BACKEND_ROOT`; whitespace cannot disguise production. Bootstrap the immutable
+marker with exact approval:
+
+```text
+BOOTSTRAP:<clone-ref>:<production-system-id>:<provenance-id>:1fc16f34442b60083a003292d59fdc95c5afec0b:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
+```
+
+Run `rollout.ts bootstrap-provenance`. It independently reads
+`pg_control_system().system_identifier`, database OID/name, denies the
+production fingerprint, and records clone ref/source fingerprint/snapshot/
+provenance as a digest. If hosted PostgreSQL cannot expose this identity,
+stop—there is no name-only fallback.
+
+## 2. Inventory and recovery capability
+
+Run `rollout.ts inventory`, then compose `inventory-v1.json` using
+`inventory-v1.schema.json` and run `rollout.ts validate-inventory`. It requires:
+
+- migration version/name/statement hash and member count/hash;
+- Auth user/identity/provider counts plus site URL, redirect hosts, JWT expiry,
+  and explicit production isolation;
+- public/match table counts/hashes, Storage bucket config/object counts, and
+  database function identity arguments/definition hashes;
+- exact deployed version/status for `admin-command`, `game-day-command`,
+  `game-day-snapshot`, `match-recommendation`, `member-link`, `member-read`,
+  and `operator-read`;
+- physical-backup/PITR status, newest recovery point, restore start/healthy
+  timestamps, latest restored operation, and before/after member/match hashes.
+
+Stop unless RPO is `<=15m`, the admin connection can prepare and reset the
+database baseline, and `rollout.ts lock-capability` passes. That gate requires
+approved instrumented lock acquisition with `lock_wait_ms` resolution
+`<=10ms`; `pg_stat_activity` polling is not accepted as lock-duration evidence.
+
+## 3. DB dry-run and apply
+
+`db-dry-run` is read-only and separate from apply. Review and retain its
+transcript. Every helper checks clean product HEADs, linked clone ref,
+server fingerprint, database OID, and provenance marker before and after SQL.
+
+Apply requires this exact value:
+
+```text
+APPLY:<clone-ref>:1fc16f34442b60083a003292d59fdc95c5afec0b:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
+```
+
+Run `rollout.ts db-apply` with an admin-capable `TASK8_PGSERVICE`. It prepares
+the member baseline, revalidates, runs linked DB push, revalidates, and resets
+the baseline in `finally`. Any failed gate aborts.
+
+## 4. RPC, Edge, and iOS gates
+
+With external view/operate/manage JWTs, test this direct-RPC matrix while
+release is off:
+
+- reads: `get_match_release_state`, `get_match_operator_read`,
+  `get_match_game_day_snapshot`, `get_match_member_directory`,
+  `get_member_read`, `get_match_recommendation_input`;
+- commands: `apply_game_day_command`, `apply_admin_command`,
+  `request_member_link`, `consume_member_link_edge_rate`;
+- every role: valid result, unauthenticated, forbidden, malformed, release-off
+  SQLSTATE `55000`, idempotent replay, and conflict where applicable.
+
+Before first write, delete exactly the seven Edge Functions listed in §2 and
+assert the inventory is empty; run `rollout.ts removal-proof`; redeploy the
+same seven and assert exact names, versions, and `ACTIVE` status. With release
+off all endpoints must return the fixed 503 contract.
+
+Build from `CLIENT_ROOT` using the real project path:
 
 ```bash
-supabase link --project-ref "$TASK8_VALIDATION_REF"
-test "$(tr -d '\r\n' < supabase/.temp/project-ref)" = \
-  "$TASK8_VALIDATION_REF"
+cd "$CLIENT_ROOT/ios/JWTennisMatch"
+xcodebuild test -project JWTennisMatch.xcodeproj -scheme JWTennisMatch \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+xcodebuild build -project JWTennisMatch.xcodeproj -scheme JWTennisMatch \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-## 2. Read-only inventory and baseline
+## 5. Release transaction and deterministic load
 
-Capture before-state and a same-load web latency baseline. The SQL emits only
-aggregates and object names; review output before retaining it.
+Only after all prior gates pass may the owner run `release-enable`. The helper
+updates only `match.release_state` in one transaction and proves every other
+match table retained its exact count/hash.
 
-```bash
-supabase migration list --linked \
-  > "$TASK8_EVIDENCE_ROOT/migrations-before.txt"
-supabase functions list --project-ref "$TASK8_VALIDATION_REF" \
-  > "$TASK8_EVIDENCE_ROOT/functions-before.json"
-supabase backups list --project-ref "$TASK8_VALIDATION_REF" \
-  > "$TASK8_EVIDENCE_ROOT/backups-before.json"
-supabase db dump --linked --schema public,auth,storage \
-  --file "$TASK8_EVIDENCE_ROOT/schema-before.sql"
-psql "service=$TASK8_PGSERVICE" -X -v ON_ERROR_STOP=1 \
-  > "$TASK8_EVIDENCE_ROOT/inventory-before.txt" <<'SQL'
-select version from supabase_migrations.schema_migrations order by version;
-select count(*) as member_count,
-       encode(extensions.digest(coalesce(string_agg(
-         member_code || ':' || id::text, ',' order by member_code, id
-       ), ''), 'sha256'), 'hex') as member_checksum
-from public.members;
-select count(*) as auth_user_count from auth.users;
-select schemaname, tablename
-from pg_catalog.pg_tables
-where schemaname in ('public', 'auth', 'storage', 'match')
-order by schemaname, tablename;
-select count(*) as storage_bucket_count from storage.buckets;
-select count(*) as storage_object_count from storage.objects;
-select routine_schema, routine_name
-from information_schema.routines
-where routine_schema in ('public', 'match') order by 1, 2;
-select extname, extversion from pg_extension order by extname;
-select datname, numbackends, xact_commit, xact_rollback, deadlocks
-from pg_stat_database where datname = current_database();
-SQL
-```
+Generate JSONL conforming to `evidence-event-v1.schema.json` and the immutable
+`load-plan-v1.json`: five operator sessions, 2-second cadence, 900 polls each;
+25 member sessions, 2-second cadence, 900 alternating requests each (450 reads
+and 450 commands); 900 web requests before and after. Each of 11,250 member
+commands needs one explicit instrumented `lock_wait_ms` sample.
 
-Record backup/PITR coverage and the newest recoverable timestamp. Stop if it
-cannot support RPO `<=15m`. Run the existing web workload against the clone for
-30 minutes and save request-level durations as `web-baseline.ndjson`; do not
-include cookies, tokens, bodies, or PII.
+Run `load_gate.ts load-plan-v1.json evidence.jsonl`. It fails on missing,
+duplicate, malformed, or extra events. Required boundaries are:
 
-## 3. DB objects, direct RPCs, and removal proof
+- web p95 regression `<=20%` and absolute p95 `<=500ms`;
+- lock p95 `<=100ms`, maximum `<=1000ms`;
+- deadlock, timeout, server 5xx, and web-transaction-failure deltas all zero;
+- CPU and connection warning ratios each `<70%`;
+- restore RTO `<=60m`, RPO `<=15m`, and equal before/after hashes.
 
-Keep traffic disabled. Review the dry-run, then install private baseline
-settings and apply migrations only to the validated link:
+## 6. Disable and rollback rules
 
-```bash
-supabase db push --linked --dry-run \
-  > "$TASK8_EVIDENCE_ROOT/db-push-dry-run.txt"
-psql "service=$TASK8_PGSERVICE" -X -v ON_ERROR_STOP=1 \
-  -f supabase/scripts/prepare_match_baseline.local.sql
-supabase db push --linked
-psql "service=$TASK8_PGSERVICE" -X -v ON_ERROR_STOP=1 \
-  -f supabase/scripts/reset_match_baseline.local.sql
-psql "service=$TASK8_PGSERVICE" -X -v ON_ERROR_STOP=1 \
-  -v task8_validation_ref="$TASK8_VALIDATION_REF" \
-  -f supabase/scripts/prove_match_guarded_removal.sql
-```
+After the first successful command, require non-null `first_write_at`.
+`release-disable` again proves domain counts/hashes unchanged. Edge endpoints
+must return 503. `removal-proof` must then refuse before deletion.
 
-With external view, operate, and manage test JWTs, call public RPCs directly.
-Prove valid reads, 401/403, release state `false`, and command rejection with
-SQLSTATE `55000`. Do not run a successful command yet.
-
-Before the first write, delete and redeploy the seven Edge Functions on the
-validated ref to prove the external removal path. Then run the checked-in proof
-above. It locks release state, requires traffic off/no first write/empty match
-tables, simulates removal of jobs, permissions, RPCs, and schema, checks member
-checksum, and always ends with `ROLLBACK`. Save the transcript; any failed
-assertion stops rollout.
-
-## 4. Edge Functions, iOS build, and release flag
-
-Provision versioned member-link Vault secrets and an identical limiter value in
-Vault `match_edge_rate_limit_hmac` and Edge `MATCH_EDGE_RATE_LIMIT_SECRET`. Keep
-inputs outside Git. Confirm both cron jobs and that hosted `remoteAddr`
-distinguishes test origins.
-
-```bash
-supabase functions deploy operator-read game-day-snapshot game-day-command \
-  match-recommendation admin-command member-link member-read \
-  --project-ref "$TASK8_VALIDATION_REF"
-supabase functions list --project-ref "$TASK8_VALIDATION_REF" \
-  > "$TASK8_EVIDENCE_ROOT/functions-after.json"
-```
-
-While release remains off, all seven Edge endpoints must return the fixed 503
-contract. Point a local, Git-ignored `Supabase.plist` at the clone and run:
-
-```bash
-xcodebuild test -project ios/JWTennisMatch/JWTennisMatch.xcodeproj \
-  -scheme JWTennisMatch -destination \
-  'platform=iOS Simulator,name=iPhone 17 Pro'
-xcodebuild build -project ios/JWTennisMatch/JWTennisMatch.xcodeproj \
-  -scheme JWTennisMatch -destination \
-  'platform=iOS Simulator,name=iPhone 17 Pro'
-```
-
-Only after DB, RPC, Edge, web, and iOS pass may the owner set
-`traffic_enabled = true` with `enabled_at` in one transaction. Record approver,
-timestamp, and null `first_write_at`. Never enable production here.
-
-## 5. Thirty-minute load and metric gates
-
-Run five operator sessions polling every two seconds and 25 concurrent member
-read/valid-idempotent-command sessions for 30 minutes. External fixtures hold
-tokens and payloads. Emit only timestamp, route, status, duration, operation ID,
-and error class. In parallel, sample once per second:
-
-```sql
-select clock_timestamp(), count(*) filter (where wait_event_type = 'Lock'),
-       max(clock_timestamp() - query_start)
-         filter (where wait_event_type = 'Lock'),
-       count(*) filter (where state <> 'idle')
-from pg_stat_activity where datname = current_database();
-```
-
-Capture Supabase CPU, connection, and plan-warning usage from the dashboard.
-Re-run the identical web baseline workload as `web-after.ndjson`. Stop unless:
-
-- web p95 regression is `<=20%` and absolute web p95 is `<=500ms`;
-- lock-wait p95 is `<=100ms` and maximum is `<=1s`;
-- deadlocks, timeouts, 5xx, and web transaction failures are all zero;
-- each resource warning ratio is `<70%`;
-- all expected operator/member iterations completed.
-
-## 6. Disable, refusal, and recovery
-
-After the first successful command, confirm `first_write_at` is non-null.
-Disable traffic in one transaction, verify all Edge endpoints return 503, and
-compare match row counts/checksums before and after disable. Data must be
-unchanged.
-
-Re-run the guarded-removal transaction. It must refuse before any `DROP` or
-permission deletion because `first_write_at` is set. Preserve its error
-transcript. Do not remove schemas, functions, secrets, jobs, or data.
-
-Perform an approved restore rehearsal on the disposable target. Require RTO
-`<=60m` and RPO `<=15m`. Finish with a redacted evidence-hash manifest, paired
-SHAs, approvers, results, and unresolved warnings.
+Before first write only, `removal-proof` locks release state, requires traffic
+off/no first write/empty match tables, simulates job/permission/RPC/schema
+removal, proves the web member hash unchanged, revalidates identity, and always
+rolls back. Actual Edge deletion must have the seven-function empty-inventory
+postcondition; actual removal requires separate approval.
 
 ## 7. Current blocker
 
-On 2026-07-30 the authenticated CLI exposed no identified validation clone. The
-canonical backend worktree was unlinked. Only production and two unrelated
-inactive projects were visible, with no clone provenance or local credentials.
-No remote mutation was attempted.
-
-Minimum user decision: either provide the ref and access path for an existing
-non-production clone, or separately approve creation and cost of a disposable
-validation project. Production approval is not a substitute.
+On 2026-07-30, the authenticated CLI exposed production and two unrelated
+inactive projects, but no proven clone or isolated access path. Therefore no
+project creation, link, deploy, load, release change, or remote mutation was
+performed. Supply an approved existing clone and access path, or separately
+approve project creation and cost.

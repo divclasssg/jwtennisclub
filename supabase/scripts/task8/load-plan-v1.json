@@ -1,0 +1,49 @@
+{
+    "schemaVersion": 1,
+    "planId": "shared-match-clone-load-v1",
+    "fixedSeed": "20260730",
+    "durationSeconds": 1800,
+    "operator": {
+        "sessionPrefix": "operator-",
+        "sessionCount": 5,
+        "cadenceMs": 2000,
+        "iterationsPerSession": 900,
+        "requestType": "operator_poll"
+    },
+    "member": {
+        "sessionPrefix": "member-",
+        "sessionCount": 25,
+        "cadenceMs": 2000,
+        "iterationsPerSession": 900,
+        "requestSequence": [
+            "member_read",
+            "member_command"
+        ],
+        "readsPerSession": 450,
+        "commandsPerSession": 450
+    },
+    "web": {
+        "sessionId": "web-01",
+        "cadenceMs": 2000,
+        "iterationsPerPhase": 900,
+        "phases": [
+            "baseline",
+            "after"
+        ]
+    },
+    "lockTelemetry": {
+        "requiredSource": "instrumented_lock_acquisition",
+        "maximumResolutionMs": 10,
+        "samplesPerMemberCommand": 1,
+        "minimumCoverageSeconds": 1800
+    },
+    "thresholds": {
+        "webP95RegressionRatio": 0.2,
+        "webAbsoluteP95Ms": 500,
+        "lockP95Ms": 100,
+        "lockMaxMs": 1000,
+        "resourceWarningUsageRatioExclusive": 0.7,
+        "rtoMinutes": 60,
+        "rpoMinutes": 15
+    }
+}

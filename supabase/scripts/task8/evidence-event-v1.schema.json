@@ -1,0 +1,165 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://jwtennisclub.invalid/schemas/task8/evidence-event-v1.schema.json",
+    "title": "Task 8 load evidence event",
+    "oneOf": [
+        { "$ref": "#/$defs/request" },
+        { "$ref": "#/$defs/lockWait" },
+        { "$ref": "#/$defs/telemetryCapability" },
+        { "$ref": "#/$defs/counter" },
+        { "$ref": "#/$defs/resource" },
+        { "$ref": "#/$defs/recovery" }
+    ],
+    "$defs": {
+        "base": {
+            "type": "object",
+            "required": ["schemaVersion", "kind"],
+            "properties": {
+                "schemaVersion": { "const": 1 },
+                "kind": { "type": "string" }
+            }
+        },
+        "request": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "schemaVersion",
+                "kind",
+                "phase",
+                "sessionId",
+                "requestType",
+                "iteration",
+                "durationMs",
+                "status",
+                "outcome"
+            ],
+            "properties": {
+                "schemaVersion": { "const": 1 },
+                "kind": { "const": "request" },
+                "phase": { "enum": ["baseline", "after"] },
+                "sessionId": { "type": "string", "minLength": 1 },
+                "requestType": {
+                    "enum": [
+                        "operator_poll",
+                        "member_read",
+                        "member_command",
+                        "web"
+                    ]
+                },
+                "iteration": { "type": "integer", "minimum": 0 },
+                "operationId": { "type": "string", "minLength": 1 },
+                "durationMs": { "type": "number", "minimum": 0 },
+                "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+                "outcome": { "enum": ["ok", "timeout", "failure"] }
+            }
+        },
+        "lockWait": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["schemaVersion", "kind", "operationId", "lockWaitMs"],
+            "properties": {
+                "schemaVersion": { "const": 1 },
+                "kind": { "const": "lock_wait" },
+                "operationId": { "type": "string", "minLength": 1 },
+                "lockWaitMs": { "type": "number", "minimum": 0 }
+            }
+        },
+        "telemetryCapability": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "schemaVersion",
+                "kind",
+                "source",
+                "resolutionMs",
+                "coverageStartedAt",
+                "coverageEndedAt",
+                "approvalId"
+            ],
+            "properties": {
+                "schemaVersion": { "const": 1 },
+                "kind": { "const": "telemetry_capability" },
+                "source": { "const": "instrumented_lock_acquisition" },
+                "resolutionMs": { "type": "number", "exclusiveMinimum": 0 },
+                "coverageStartedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "coverageEndedAt": { "type": "string", "format": "date-time" },
+                "approvalId": { "type": "string", "minLength": 1 }
+            }
+        },
+        "counter": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["schemaVersion", "kind", "phase", "name", "value"],
+            "properties": {
+                "schemaVersion": { "const": 1 },
+                "kind": { "const": "counter" },
+                "phase": { "enum": ["before", "after"] },
+                "name": {
+                    "enum": [
+                        "deadlocks",
+                        "timeouts",
+                        "server5xx",
+                        "webTransactionFailures"
+                    ]
+                },
+                "value": { "type": "number", "minimum": 0 }
+            }
+        },
+        "resource": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "schemaVersion",
+                "kind",
+                "phase",
+                "name",
+                "warningUsageRatio"
+            ],
+            "properties": {
+                "schemaVersion": { "const": 1 },
+                "kind": { "const": "resource" },
+                "phase": { "enum": ["before", "after"] },
+                "name": { "enum": ["cpu", "connections"] },
+                "warningUsageRatio": { "type": "number", "minimum": 0 }
+            }
+        },
+        "recovery": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "schemaVersion",
+                "kind",
+                "restoreStartedAt",
+                "restoreHealthyAt",
+                "recoveryPointAt",
+                "latestRestoredOperationAt",
+                "beforeMemberChecksum",
+                "afterMemberChecksum",
+                "beforeMatchChecksum",
+                "afterMatchChecksum"
+            ],
+            "properties": {
+                "schemaVersion": { "const": 1 },
+                "kind": { "const": "recovery" },
+                "restoreStartedAt": { "type": "string", "format": "date-time" },
+                "restoreHealthyAt": { "type": "string", "format": "date-time" },
+                "recoveryPointAt": { "type": "string", "format": "date-time" },
+                "latestRestoredOperationAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "beforeMemberChecksum": { "$ref": "#/$defs/sha256" },
+                "afterMemberChecksum": { "$ref": "#/$defs/sha256" },
+                "beforeMatchChecksum": { "$ref": "#/$defs/sha256" },
+                "afterMatchChecksum": { "$ref": "#/$defs/sha256" }
+            }
+        },
+        "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+        }
+    }
+}
