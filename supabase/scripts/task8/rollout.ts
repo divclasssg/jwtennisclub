@@ -24,8 +24,10 @@ import {
 import {
     type BoundServerIdentity,
     captureBoundServerIdentity,
-    derivedProjectDbTarget,
+    configuredProjectDbTarget,
     fetchManagementProjectIdentity,
+    type ProjectDbTarget,
+    validateBoundServerIdentityRecord,
 } from "./connection_binding_lib.ts";
 import { runDirectRpcGate, runEdgeReplacementGate } from "./remote_gate_lib.ts";
 import { runIosGates } from "./ios_gate_lib.ts";
@@ -50,6 +52,13 @@ function strictEnv(name: string): string {
         throw new Error(`${name} must not contain surrounding whitespace`);
     }
     return value;
+}
+
+function rolloutDbTarget(projectRef: string): ProjectDbTarget {
+    return configuredProjectDbTarget(projectRef, {
+        poolerUrl: Deno.env.get("TASK8_DB_SESSION_POOLER_URL") ?? undefined,
+        sslRootCert: Deno.env.get("TASK8_DB_SSL_ROOT_CERT") ?? undefined,
+    });
 }
 
 async function readPrivateJson<T>(path: string): Promise<T> {
@@ -124,7 +133,7 @@ async function captureProduction(): Promise<void> {
     });
     const identity = await captureBoundServerIdentity({
         purpose: "production",
-        target: derivedProjectDbTarget(projectRef),
+        target: rolloutDbTarget(projectRef),
         managementProject,
         runner,
         cwd: backendRoot,
@@ -149,14 +158,8 @@ async function bootstrap(): Promise<void> {
     const production = await readPrivateJson<BoundServerIdentity>(
         env("TASK8_PRODUCTION_IDENTITY_FILE"),
     );
+    validateBoundServerIdentityRecord(production, "production");
     if (
-        production.projectRef !== PRODUCTION_REF ||
-        production.managementProjectId !== PRODUCTION_REF ||
-        production.host !== `db.${PRODUCTION_REF}.supabase.co` ||
-        production.user !== "postgres" ||
-        production.database !== "postgres" ||
-        production.sslMode !== "verify-full" ||
-        production.databaseName !== "postgres" ||
         production.serverFingerprintSha256 !==
             await sha256Text(production.systemIdentifier)
     ) {
@@ -173,7 +176,7 @@ async function bootstrap(): Promise<void> {
     const identity = await bootstrapCloneProvenance({
         backendRoot,
         clientRoot,
-        validationTarget: derivedProjectDbTarget(validationRef),
+        validationTarget: rolloutDbTarget(validationRef),
         managementProject,
         validationRef,
         productionSystemIdentifier: production.systemIdentifier,
@@ -214,7 +217,7 @@ async function runStep(step: RolloutStep): Promise<void> {
         step,
         backendRoot,
         clientRoot,
-        validationTarget: derivedProjectDbTarget(identity.validationRef),
+        validationTarget: rolloutDbTarget(identity.validationRef),
         expectedIdentity: identity,
         evidenceRoot,
         dryRunHash: step === "db-apply"
@@ -244,7 +247,7 @@ async function validateInventory(): Promise<void> {
         step: "inventory",
         backendRoot,
         clientRoot,
-        validationTarget: derivedProjectDbTarget(storedIdentity.validationRef),
+        validationTarget: rolloutDbTarget(storedIdentity.validationRef),
         expectedIdentity: storedIdentity,
         evidenceRoot,
         runner,
@@ -304,7 +307,7 @@ async function remoteGate(
         evidenceRoot,
         backendRoot,
         clientRoot,
-        target: derivedProjectDbTarget(identity.validationRef),
+        target: rolloutDbTarget(identity.validationRef),
         expectedIdentity: identity,
         authConfigRoot: env("TASK8_AUTH_CONFIG_ROOT"),
         payloadRoot: new URL("./rpc-fixtures", import.meta.url).pathname,

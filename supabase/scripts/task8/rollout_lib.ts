@@ -13,9 +13,11 @@ import {
 } from "./identity_lib.ts";
 import {
     boundPsqlInvocation,
+    boundSupabaseDbUrl,
     captureBoundServerIdentity,
     type ManagementProjectIdentity,
     type ProjectDbTarget,
+    validateLinkedPoolerState,
     validateProjectDbTarget,
 } from "./connection_binding_lib.ts";
 import {
@@ -138,15 +140,61 @@ async function assertCheckout(
         args: ["rev-parse", "HEAD"],
         cwd: root,
     });
-    if (head.stdout.trim() !== expectedSha) {
-        throw new Error(`${label} HEAD must equal ${expectedSha}`);
-    }
     const status = await runChecked(runner, {
         command: "git",
         args: ["status", "--porcelain", "--untracked-files=all"],
         cwd: root,
     });
-    if (status.stdout.trim() !== "") {
+    validateCheckoutState(head.stdout, status.stdout, expectedSha, label);
+    if (label === "backend product") {
+        const mutationInputs = await runChecked(runner, {
+            command: "git",
+            args: [
+                "status",
+                "--porcelain",
+                "--untracked-files=all",
+                "--ignored=matching",
+                "--",
+                "supabase/migrations",
+                "supabase/functions",
+                "supabase/config.toml",
+                "supabase/seed.sql",
+                "supabase/roles.sql",
+            ],
+            cwd: root,
+        });
+        if (mutationInputs.stdout.trim() !== "") {
+            throw new Error(
+                "backend product has ignored or untracked mutation input",
+            );
+        }
+    }
+}
+
+export function validateCheckoutState(
+    actualHead: string,
+    status: string,
+    expectedSha: string,
+    label: string,
+): void {
+    if (actualHead.trim() !== expectedSha) {
+        throw new Error(`${label} HEAD must equal ${expectedSha}`);
+    }
+    const allowedCliState = new Set([
+        "?? supabase/.temp/gotrue-version",
+        "?? supabase/.temp/linked-project.json",
+        "?? supabase/.temp/pooler-url",
+        "?? supabase/.temp/postgres-version",
+        "?? supabase/.temp/project-ref",
+        "?? supabase/.temp/rest-version",
+        "?? supabase/.temp/storage-migration",
+        "?? supabase/.temp/storage-version",
+    ]);
+    const dirty = status.split(/\r?\n/).filter((line) =>
+        line !== "" &&
+        !(label === "backend product" && allowedCliState.has(line))
+    );
+    if (dirty.length > 0) {
         throw new Error(`${label} checkout must be clean`);
     }
 }
@@ -428,15 +476,29 @@ export async function executeRolloutStep(
     ) {
         throw new Error("linked project ref mismatch");
     }
-    validateProjectDbTarget(options.validationTarget, "validation");
+    const validatedTarget = validateProjectDbTarget(
+        options.validationTarget,
+        "validation",
+    );
+    const connection = boundPsqlInvocation(validatedTarget, "validation");
+    const dbUrl = boundSupabaseDbUrl(validatedTarget, "validation");
+    if (validatedTarget.connectionMode === "supavisor-session") {
+        validateLinkedPoolerState(
+            validatedTarget,
+            await Deno.readTextFile(
+                `${backendRoot}/supabase/.temp/pooler-url`,
+            ),
+        );
+    }
 
     await readAndAssertIdentity(options);
 
     if (options.step === "db-dry-run") {
         const invocation = {
             command: "supabase",
-            args: ["db", "push", "--linked", "--dry-run"],
+            args: ["db", "push", "--db-url", dbUrl, "--dry-run"],
             cwd: backendRoot,
+            env: connection.env,
         };
         const startedAt = new Date().toISOString();
         const result = await runChecked(options.runner, invocation);
@@ -528,8 +590,9 @@ export async function executeRolloutStep(
         let pushResult: CommandResult | undefined;
         const pushInvocation = {
             command: "supabase",
-            args: ["db", "push", "--linked"],
+            args: ["db", "push", "--db-url", dbUrl],
             cwd: backendRoot,
+            env: connection.env,
         };
         const startedAt = new Date().toISOString();
         try {

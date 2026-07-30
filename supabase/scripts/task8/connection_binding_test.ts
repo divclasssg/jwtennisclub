@@ -1,8 +1,13 @@
 /// <reference lib="deno.ns" />
 
 import {
+    boundPsqlInvocation,
+    boundSupabaseDbUrl,
     captureBoundServerIdentity,
+    configuredProjectDbTarget,
+    derivedSupavisorSessionTarget,
     type ProjectDbTarget,
+    validateBoundServerIdentityRecord,
     validateProjectDbTarget,
 } from "./connection_binding_lib.ts";
 import type {
@@ -143,4 +148,141 @@ Deno.test("capture binds management identity to an exact derived endpoint", asyn
     assert(invocation.args.includes("--username=postgres"));
     assert(invocation.env?.PGSSLMODE === "verify-full");
     assert(!invocation.args.join(" ").includes("password"));
+});
+
+Deno.test("official Supavisor session URL binds the project ref and CA", () => {
+    const caPath = "/private/evidence/supabase-root-ca.crt";
+    const session = derivedSupavisorSessionTarget(
+        validationRef,
+        `postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`,
+        caPath,
+    );
+
+    const invocation = boundPsqlInvocation(session, "validation");
+
+    assert(
+        invocation.args.includes(
+            "--host=aws-1-ap-south-1.pooler.supabase.com",
+        ),
+    );
+    assert(
+        invocation.args.includes(`--username=postgres.${validationRef}`),
+    );
+    assert(invocation.args.includes("--port=5432"));
+    assert(invocation.env.PGSSLMODE === "verify-full");
+    assert(invocation.env.PGSSLROOTCERT === caPath);
+    assert(
+        boundSupabaseDbUrl(session, "validation") ===
+            `postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`,
+    );
+    assert(
+        boundSupabaseDbUrl(target(validationRef), "validation") ===
+            `postgresql://postgres@db.${validationRef}.supabase.co:5432/postgres`,
+    );
+});
+
+Deno.test("Supavisor binding rejects ambiguous or credential-bearing URLs", async () => {
+    const caPath = "/private/evidence/supabase-root-ca.crt";
+    for (
+        const [url, expected] of [
+            [
+                `postgresql://postgres.${validationRef}@pooler.example.com:5432/postgres`,
+                "official Supavisor session host",
+            ],
+            [
+                `postgresql://postgres.${productionRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`,
+                "pooler user",
+            ],
+            [
+                `postgresql://postgres.${validationRef}:secret@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`,
+                "must not contain a password",
+            ],
+            [
+                `postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:6543/postgres`,
+                "port must equal 5432",
+            ],
+            [
+                `postgresql://postgres.${validationRef}:@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`,
+                "canonical passwordless",
+            ],
+            [
+                `postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres?`,
+                "canonical passwordless",
+            ],
+            [
+                `postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres#`,
+                "canonical passwordless",
+            ],
+        ] as const
+    ) {
+        await assertRejects(
+            () =>
+                derivedSupavisorSessionTarget(
+                    validationRef,
+                    url,
+                    caPath,
+                ),
+            expected,
+        );
+    }
+});
+
+Deno.test("configured target requires pooler URL and CA as an atomic pair", async () => {
+    const url =
+        `postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`;
+    const caPath = "/private/evidence/supabase-root-ca.crt";
+
+    const direct = configuredProjectDbTarget(validationRef, {});
+    assert(direct.host === `db.${validationRef}.supabase.co`);
+
+    const session = configuredProjectDbTarget(validationRef, {
+        poolerUrl: url,
+        sslRootCert: caPath,
+    });
+    assert(session.connectionMode === "supavisor-session");
+
+    for (
+        const inputs of [
+            { poolerUrl: url },
+            { sslRootCert: caPath },
+            { poolerUrl: "", sslRootCert: "" },
+        ]
+    ) {
+        await assertRejects(
+            () => configuredProjectDbTarget(validationRef, inputs),
+            inputs.poolerUrl === ""
+                ? "must not be empty"
+                : "must be supplied together",
+        );
+    }
+});
+
+Deno.test("recorded Supavisor identity is rebound to the exact project ref", async () => {
+    const runner = new IdentityRunner();
+    const captured = await captureBoundServerIdentity({
+        purpose: "production",
+        target: derivedSupavisorSessionTarget(
+            productionRef,
+            `postgresql://postgres.${productionRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`,
+            "/private/evidence/supabase-root-ca.crt",
+        ),
+        managementProject: {
+            id: productionRef,
+            ref: productionRef,
+            name: "jwtennisclub",
+        },
+        runner,
+        cwd: Deno.cwd(),
+    });
+
+    validateBoundServerIdentityRecord(captured, "production");
+
+    await assertRejects(
+        () =>
+            validateBoundServerIdentityRecord({
+                ...captured,
+                user: `postgres.${validationRef}`,
+            }, "production"),
+        "pooler user",
+    );
 });

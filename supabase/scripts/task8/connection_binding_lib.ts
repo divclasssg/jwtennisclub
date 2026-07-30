@@ -5,6 +5,8 @@ import type { RolloutCommandRunner } from "./rollout_lib.ts";
 
 const PROJECT_REF_PATTERN = /^[a-z]{20}$/;
 const SYSTEM_IDENTIFIER_PATTERN = /^[0-9]{10,32}$/;
+const SUPAVISOR_SESSION_HOST_PATTERN =
+    /^aws-[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*\.pooler\.supabase\.com$/;
 
 export interface ProjectDbTarget {
     projectRef: string;
@@ -12,6 +14,8 @@ export interface ProjectDbTarget {
     user: string;
     database: string;
     sslMode: string;
+    connectionMode?: "direct" | "supavisor-session";
+    sslRootCert?: string;
 }
 
 export interface ManagementProjectIdentity {
@@ -25,9 +29,10 @@ export interface BoundServerIdentity {
     managementProjectId: string;
     managementProjectName: string;
     host: string;
-    user: "postgres";
+    user: string;
     database: "postgres";
     sslMode: "verify-full";
+    connectionMode?: "direct" | "supavisor-session";
     systemIdentifier: string;
     databaseOid: string;
     databaseName: "postgres";
@@ -44,6 +49,81 @@ export function derivedProjectDbTarget(projectRef: string): ProjectDbTarget {
         database: "postgres",
         sslMode: "verify-full",
     };
+}
+
+export function derivedSupavisorSessionTarget(
+    projectRef: string,
+    poolerUrl: string,
+    sslRootCert: string,
+): ProjectDbTarget {
+    const ref = strictString(projectRef, "project ref");
+    const rawUrl = strictString(poolerUrl, "pooler URL");
+    let url: URL;
+    try {
+        url = new URL(rawUrl);
+    } catch {
+        throw new Error("pooler URL must be a valid URL");
+    }
+    if (url.protocol !== "postgresql:") {
+        throw new Error("pooler URL protocol must equal postgresql");
+    }
+    if (!SUPAVISOR_SESSION_HOST_PATTERN.test(url.hostname)) {
+        throw new Error(
+            "pooler URL must use an official Supavisor session host",
+        );
+    }
+    if (url.port !== "5432") {
+        throw new Error("pooler URL port must equal 5432");
+    }
+    if (decodeURIComponent(url.username) !== `postgres.${ref}`) {
+        throw new Error("pooler user must equal postgres.<project-ref>");
+    }
+    if (url.password !== "") {
+        throw new Error("pooler URL must not contain a password");
+    }
+    if (url.pathname !== "/postgres" || url.search !== "" || url.hash !== "") {
+        throw new Error("pooler URL must target only the postgres database");
+    }
+    const canonical =
+        `postgresql://postgres.${ref}@${url.hostname}:5432/postgres`;
+    if (rawUrl !== canonical) {
+        throw new Error(
+            "pooler URL must use the canonical passwordless form",
+        );
+    }
+    return validateProjectDbTarget({
+        projectRef: ref,
+        host: url.hostname,
+        user: decodeURIComponent(url.username),
+        database: "postgres",
+        sslMode: "verify-full",
+        connectionMode: "supavisor-session",
+        sslRootCert,
+    }, ref === PRODUCTION_REF ? "production" : "validation");
+}
+
+export function configuredProjectDbTarget(
+    projectRef: string,
+    options: { poolerUrl?: string; sslRootCert?: string },
+): ProjectDbTarget {
+    const hasPoolerUrl = options.poolerUrl !== undefined;
+    const hasSslRootCert = options.sslRootCert !== undefined;
+    if (hasPoolerUrl !== hasSslRootCert) {
+        throw new Error(
+            "pooler URL and sslRootCert must be supplied together",
+        );
+    }
+    if (hasPoolerUrl && hasSslRootCert) {
+        if (options.poolerUrl === "" || options.sslRootCert === "") {
+            throw new Error("pooler URL and sslRootCert must not be empty");
+        }
+        return derivedSupavisorSessionTarget(
+            projectRef,
+            options.poolerUrl!,
+            options.sslRootCert!,
+        );
+    }
+    return derivedProjectDbTarget(projectRef);
 }
 
 function strictString(value: string, label: string): string {
@@ -70,13 +150,36 @@ export function validateProjectDbTarget(
         throw new Error("production project is forbidden");
     }
 
-    const expectedHost = `db.${projectRef}.supabase.co`;
+    const connectionMode = target.connectionMode ?? "direct";
     const host = strictString(target.host, "database host");
-    if (host !== expectedHost) {
-        throw new Error(`host must equal ${expectedHost}`);
-    }
-    if (strictString(target.user, "database user") !== "postgres") {
-        throw new Error("user must equal postgres");
+    const user = strictString(target.user, "database user");
+    let sslRootCert: string | undefined;
+    if (connectionMode === "direct") {
+        const expectedHost = `db.${projectRef}.supabase.co`;
+        if (host !== expectedHost) {
+            throw new Error(`host must equal ${expectedHost}`);
+        }
+        if (user !== "postgres") {
+            throw new Error("user must equal postgres");
+        }
+    } else if (connectionMode === "supavisor-session") {
+        if (!SUPAVISOR_SESSION_HOST_PATTERN.test(host)) {
+            throw new Error(
+                "host must equal an official Supavisor session host",
+            );
+        }
+        if (user !== `postgres.${projectRef}`) {
+            throw new Error("pooler user must equal postgres.<project-ref>");
+        }
+        sslRootCert = strictString(
+            target.sslRootCert ?? "",
+            "sslRootCert",
+        );
+        if (!sslRootCert.startsWith("/")) {
+            throw new Error("sslRootCert must be an absolute path");
+        }
+    } else {
+        throw new Error("unsupported database connection mode");
     }
     if (strictString(target.database, "database name") !== "postgres") {
         throw new Error("database must equal postgres");
@@ -87,9 +190,11 @@ export function validateProjectDbTarget(
     return {
         projectRef,
         host,
-        user: "postgres",
+        user,
         database: "postgres",
         sslMode: "verify-full",
+        connectionMode,
+        ...(sslRootCert ? { sslRootCert } : {}),
     };
 }
 
@@ -102,11 +207,38 @@ export function boundPsqlInvocation(
         args: [
             `--host=${bound.host}`,
             "--port=5432",
-            "--username=postgres",
+            `--username=${bound.user}`,
             "--dbname=postgres",
         ],
-        env: { PGSSLMODE: "verify-full" },
+        env: {
+            PGSSLMODE: "verify-full",
+            ...(bound.sslRootCert ? { PGSSLROOTCERT: bound.sslRootCert } : {}),
+        },
     };
+}
+
+export function boundSupabaseDbUrl(
+    target: ProjectDbTarget,
+    purpose: ConnectionPurpose,
+): string {
+    const bound = validateProjectDbTarget(target, purpose);
+    return `postgresql://${bound.user}@${bound.host}:5432/postgres`;
+}
+
+export function validateLinkedPoolerState(
+    target: ProjectDbTarget,
+    rawPoolerUrl: string,
+): void {
+    const bound = validateProjectDbTarget(target, "validation");
+    if (bound.connectionMode !== "supavisor-session") return;
+
+    const canonical = `postgresql://${bound.user}@${bound.host}:5432/postgres`;
+    const value = rawPoolerUrl.endsWith("\n")
+        ? rawPoolerUrl.slice(0, -1)
+        : rawPoolerUrl;
+    if (value !== canonical) {
+        throw new Error("linked pooler target mismatch");
+    }
 }
 
 async function sha256(value: string): Promise<string> {
@@ -197,14 +329,47 @@ export async function captureBoundServerIdentity(options: {
         managementProjectId: options.managementProject.id,
         managementProjectName: options.managementProject.name,
         host: target.host,
-        user: "postgres",
+        user: target.user,
         database: "postgres",
         sslMode: "verify-full",
+        connectionMode: target.connectionMode ?? "direct",
         systemIdentifier: identity.systemIdentifier,
         databaseOid: identity.databaseOid,
         databaseName: "postgres",
         serverFingerprintSha256: await sha256(identity.systemIdentifier),
     };
+}
+
+export function validateBoundServerIdentityRecord(
+    identity: BoundServerIdentity,
+    purpose: ConnectionPurpose,
+): void {
+    const connectionMode = identity.connectionMode ?? "direct";
+    validateProjectDbTarget({
+        projectRef: identity.projectRef,
+        host: identity.host,
+        user: identity.user,
+        database: identity.database,
+        sslMode: identity.sslMode,
+        connectionMode,
+        ...(connectionMode === "supavisor-session"
+            ? { sslRootCert: "/recorded-supabase-root-ca" }
+            : {}),
+    }, purpose);
+    if (
+        strictString(identity.managementProjectId, "management project id") !==
+            identity.projectRef ||
+        strictString(
+                identity.managementProjectName,
+                "management project name",
+            ) === "" ||
+        identity.databaseName !== "postgres" ||
+        !SYSTEM_IDENTIFIER_PATTERN.test(identity.systemIdentifier) ||
+        !/^[1-9][0-9]*$/.test(identity.databaseOid) ||
+        !/^[a-f0-9]{64}$/.test(identity.serverFingerprintSha256)
+    ) {
+        throw new Error("recorded database identity is invalid");
+    }
 }
 
 export async function fetchManagementProjectIdentity(options: {

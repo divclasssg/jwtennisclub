@@ -30,14 +30,52 @@ deno run --allow-read --allow-write --allow-run --allow-env --allow-sys \
   supabase/scripts/task8/rollout.ts capture-production
 ```
 
-The helper obtains Management API identity through `supabase projects list`,
-then connects only to `db.ydiusirreirhbvlftegp.supabase.co:5432` as
-database/user `postgres` with `sslmode=verify-full`. Supply the password through
-the process environment; never put it in an argument, URL, runbook, or evidence.
-Whitespace, poolers, aliases, ref/user mismatches, and a missing direct endpoint
-fail before SQL. `serverFingerprintSha256` is only
+The helper obtains Management API identity through `supabase projects list`.
+Its default connection is the exact direct endpoint
+`db.ydiusirreirhbvlftegp.supabase.co:5432`, database/user `postgres`, with
+`sslmode=verify-full`. Supply the password through the process environment;
+never put it in an argument, URL, runbook, or evidence.
+
+For each command, set both `PGPASSWORD` (psql) and
+`SUPABASE_DB_PASSWORD` (Supabase CLI) to that command's one project-specific
+password. Retrieve it from the approved secret store in the invoking shell and
+unset both variables immediately afterward. Never reuse production credentials
+for validation or validation credentials for production.
+
+On an IPv4-only operator network, the direct endpoint may be unreachable. The
+only permitted fallback is the Supabase CLI-derived **session** pooler URL on
+port `5432`, never the transaction pooler on `6543`. Download the Supabase root
+certificate from the project Database Settings SSL configuration, store it
+outside Git with mode `0600`, and set both variables as an atomic pair:
+
+```bash
+export TASK8_DB_SESSION_POOLER_URL='postgresql://postgres.<exact-ref>@aws-<cell>-<region>.pooler.supabase.com:5432/postgres'
+export TASK8_DB_SSL_ROOT_CERT='/absolute/private/path/prod-ca-2021.crt'
+```
+
+The URL must contain no password, query, or fragment. The helper requires the
+official `aws-<cell>-<region>.pooler.supabase.com` host, exact
+`postgres.<project-ref>` user, `postgres` database, port `5432`,
+`sslmode=verify-full`, and an absolute CA path. Supplying only one variable,
+using an alias, changing the user/ref, or using any other pooler fails before
+SQL. Set the URL to the production ref only for `capture-production`, then
+replace it with the validation project's CLI-derived URL for every clone
+command. Never reuse one project's pooler URL for the other.
+
+For clone commands, the helper also reads `BACKEND_ROOT/supabase/.temp` and
+requires its `project-ref` and canonical passwordless `pooler-url` to match the
+validated target before any `db push`. The actual dry-run and apply do not
+delegate target selection back to mutable linked state: they receive a
+canonical passwordless `--db-url` rebuilt from the already validated target.
+Both inherit `PGSSLMODE=verify-full` and `PGSSLROOTCERT`; the password remains
+environment-only. The clean-checkout gate permits only the eight known
+untracked Supabase CLI cache files under `.temp`. Any other non-ignored
+untracked or modified file fails closed, as does any ignored/untracked DB or
+Edge mutation input under the explicitly scanned Supabase paths.
+
+`serverFingerprintSha256` is only
 `SHA-256(pg_control_system().system_identifier)`. Separately,
-`sslmode=verify-full` verifies the TLS chain and hostname; no certificate
+`sslmode=verify-full` verifies the TLS chain and hostname; no server certificate
 fingerprint is captured or claimed.
 
 Stop unless the clone owner supplies its exact 20-letter ref, source snapshot,
@@ -76,7 +114,8 @@ requires:
 
 Validation requires `TASK8_IDENTITY_FILE` and `TASK8_PRODUCTION_INVENTORY_FILE`;
 the helper queries and validates live DB identity itself through the exact
-direct endpoint. Isolation is derived by comparing stored/live DB identity,
+bound direct or approved session-pooler target. Isolation is derived by
+comparing stored/live DB identity,
 production system identifier, Auth instance and network hosts, and Storage
 project refs. A supplied `isolated` boolean is not accepted. Every Edge status
 must equal `ACTIVE`.
@@ -100,9 +139,11 @@ APPLY:<clone-ref>:<db-dry-run-stage-hash>:1fc16f34442b60083a003292d59fdc95c5afec
 ```
 
 Set `TASK8_DRY_RUN_HASH` to that exact stage hash. The helper uses only the
-derived direct endpoint for identity SQL. It prepares the member baseline,
-rechecks clean trees and live identity immediately before and after linked DB
-push, and resets the baseline in `finally`. Any failed gate aborts.
+derived direct endpoint or strictly bound session-pooler target for identity
+SQL. It prepares the member baseline,
+rechecks clean trees and live identity immediately before and after the
+identity-bound `--db-url` push, and resets the baseline in `finally`. Any failed
+gate aborts.
 
 ## 4. RPC, Edge, and iOS gates
 

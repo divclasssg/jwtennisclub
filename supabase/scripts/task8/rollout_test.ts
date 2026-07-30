@@ -10,10 +10,16 @@ import {
     executeRolloutStep,
     normalizeProjectRef,
     type RolloutCommandRunner,
+    validateCheckoutState,
     validateDatabaseIdentity,
     writeEvidence,
     writeEvidenceManifest,
 } from "./rollout_lib.ts";
+import {
+    derivedProjectDbTarget,
+    derivedSupavisorSessionTarget,
+    type ProjectDbTarget,
+} from "./connection_binding_lib.ts";
 import {
     appendStageEvidence,
     commandStreamEvidence,
@@ -130,6 +136,101 @@ Deno.test("database identity requires a different server fingerprint and exact m
     );
 });
 
+Deno.test("checkout permits only the exact Supabase CLI link cache", async () => {
+    const allowed = [
+        "gotrue-version",
+        "linked-project.json",
+        "pooler-url",
+        "postgres-version",
+        "project-ref",
+        "rest-version",
+        "storage-migration",
+        "storage-version",
+    ].map((name) => `?? supabase/.temp/${name}`).join("\n");
+
+    validateCheckoutState(
+        BACKEND_PRODUCT_SHA,
+        allowed,
+        BACKEND_PRODUCT_SHA,
+        "backend product",
+    );
+    await assertRejects(
+        () =>
+            validateCheckoutState(
+                CLIENT_PRODUCT_SHA,
+                allowed,
+                CLIENT_PRODUCT_SHA,
+                "client product",
+            ),
+        "checkout must be clean",
+    );
+
+    for (
+        const dirty of [
+            `${allowed}\n?? supabase/.temp/unexpected`,
+            `${allowed}\n M src/app/page.tsx`,
+        ]
+    ) {
+        await assertRejects(
+            () =>
+                validateCheckoutState(
+                    BACKEND_PRODUCT_SHA,
+                    dirty,
+                    BACKEND_PRODUCT_SHA,
+                    "backend product",
+                ),
+            "checkout must be clean",
+        );
+    }
+});
+
+Deno.test("mutation input scan exposes an ignored migration in real Git", async () => {
+    const root = await Deno.makeTempDir();
+    try {
+        const git = async (args: string[]) => {
+            const result = await new Deno.Command("git", {
+                args,
+                cwd: root,
+                stdout: "piped",
+                stderr: "piped",
+            }).output();
+            assert(result.success, new TextDecoder().decode(result.stderr));
+            return new TextDecoder().decode(result.stdout);
+        };
+        await git(["init", "--quiet"]);
+        await Deno.mkdir(`${root}/supabase/migrations`, { recursive: true });
+        await Deno.writeTextFile(
+            `${root}/.git/info/exclude`,
+            "supabase/migrations/*.sql\n",
+        );
+        await Deno.writeTextFile(
+            `${root}/supabase/migrations/20990101000000_hidden.sql`,
+            "select 1;\n",
+        );
+
+        const status = await git([
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            "--ignored=matching",
+            "--",
+            "supabase/migrations",
+            "supabase/functions",
+            "supabase/config.toml",
+            "supabase/seed.sql",
+            "supabase/roles.sql",
+        ]);
+
+        assert(
+            status ===
+                "!! supabase/migrations/20990101000000_hidden.sql\n",
+            status,
+        );
+    } finally {
+        await Deno.remove(root, { recursive: true });
+    }
+});
+
 Deno.test("evidence root must be canonical and outside both Git roots", async () => {
     const sandbox = await Deno.makeTempDir();
     try {
@@ -233,6 +334,7 @@ Deno.test("evidence writer redacts secrets, uses 0600, and hashes redacted files
 class FakeRunner implements RolloutCommandRunner {
     readonly invocations: CommandInvocation[] = [];
     failDbPush = false;
+    ignoredMutationInput = false;
     identity = validIdentity();
 
     run(invocation: CommandInvocation): Promise<CommandResult> {
@@ -245,6 +347,16 @@ class FakeRunner implements RolloutCommandRunner {
                 stdout: invocation.cwd.endsWith("backend")
                     ? `${BACKEND_PRODUCT_SHA}\n`
                     : `${CLIENT_PRODUCT_SHA}\n`,
+                stderr: "",
+            });
+        }
+        if (
+            joined.includes("--ignored=matching") &&
+            this.ignoredMutationInput
+        ) {
+            return Promise.resolve({
+                code: 0,
+                stdout: "!! supabase/migrations/20990101000000_hidden.sql\n",
                 stderr: "",
             });
         }
@@ -279,7 +391,8 @@ class FakeRunner implements RolloutCommandRunner {
             });
         }
         if (
-            joined.includes("db push --linked") && !joined.includes("--dry-run")
+            joined.includes("db push --db-url") &&
+            !joined.includes("--dry-run")
         ) {
             if (this.failDbPush) {
                 return Promise.resolve({
@@ -354,6 +467,8 @@ async function rolloutFixture(
     runner: FakeRunner,
     step: "db-dry-run" | "db-apply" | "release-enable" | "removal-proof",
     approval?: string,
+    validationTarget: ProjectDbTarget = derivedProjectDbTarget(validationRef),
+    linkedPoolerUrl?: string,
 ) {
     const sandbox = await Deno.makeTempDir();
     const backendRoot = `${sandbox}/backend`;
@@ -366,6 +481,15 @@ async function rolloutFixture(
         `${backendRoot}/supabase/.temp/project-ref`,
         `${validationRef}\n`,
     );
+    if (validationTarget.connectionMode === "supavisor-session") {
+        await Deno.writeTextFile(
+            `${backendRoot}/supabase/.temp/pooler-url`,
+            `${
+                linkedPoolerUrl ??
+                    `postgresql://${validationTarget.user}@${validationTarget.host}:5432/postgres`
+            }\n`,
+        );
+    }
     try {
         const expectedIdentity = {
             validationRef,
@@ -390,7 +514,13 @@ async function rolloutFixture(
                 predecessorHash: null,
                 command: {
                     program: "supabase",
-                    args: ["db", "push", "--linked", "--dry-run"],
+                    args: [
+                        "db",
+                        "push",
+                        "--db-url",
+                        `postgresql://postgres@db.${validationRef}.supabase.co:5432/postgres`,
+                        "--dry-run",
+                    ],
                 },
                 stdout: commandStreamEvidence("dry run ok"),
                 stderr: commandStreamEvidence(""),
@@ -406,13 +536,7 @@ async function rolloutFixture(
             step,
             backendRoot,
             clientRoot,
-            validationTarget: {
-                projectRef: validationRef,
-                host: `db.${validationRef}.supabase.co`,
-                user: "postgres",
-                database: "postgres",
-                sslMode: "verify-full",
-            },
+            validationTarget,
             expectedIdentity,
             evidenceRoot,
             dryRunHash,
@@ -446,11 +570,104 @@ Deno.test("mismatched direct-endpoint identity stops before any remote mutation"
     assert(
         !runner.invocations.some((invocation) =>
             [invocation.command, ...invocation.args].join(" ").includes(
-                "db push --linked",
+                "db push",
             )
         ),
         "db push must not run after identity mismatch",
     );
+});
+
+Deno.test("Supavisor dry-run binds linked pooler state and TLS env", async () => {
+    const caPath = "/private/evidence/supabase-root-ca.crt";
+    const sessionTarget = derivedSupavisorSessionTarget(
+        validationRef,
+        `postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`,
+        caPath,
+    );
+    const runner = new FakeRunner();
+
+    await rolloutFixture(
+        runner,
+        "db-dry-run",
+        undefined,
+        sessionTarget,
+    );
+
+    const push = runner.invocations.find((invocation) =>
+        invocation.args.join(" ") ===
+            `db push --db-url postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres --dry-run`
+    );
+    assert(push, "dry-run push must execute");
+    assert(push.env?.PGSSLMODE === "verify-full");
+    assert(push.env?.PGSSLROOTCERT === caPath);
+});
+
+Deno.test("ignored mutation input stops before DB push", async () => {
+    const runner = new FakeRunner();
+    runner.ignoredMutationInput = true;
+
+    await assertRejects(
+        () => rolloutFixture(runner, "db-dry-run"),
+        "ignored or untracked mutation input",
+    );
+    assert(
+        !runner.invocations.some((invocation) =>
+            invocation.args.join(" ").includes("db push")
+        ),
+        "push must not run with ignored migration input",
+    );
+});
+
+Deno.test("Supavisor dry-run rejects mismatched linked pooler before push", async () => {
+    const sessionTarget = derivedSupavisorSessionTarget(
+        validationRef,
+        `postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`,
+        "/private/evidence/supabase-root-ca.crt",
+    );
+    const runner = new FakeRunner();
+
+    await assertRejects(
+        () =>
+            rolloutFixture(
+                runner,
+                "db-dry-run",
+                undefined,
+                sessionTarget,
+                `postgresql://postgres.${validationRef}@aws-9-ap-south-1.pooler.supabase.com:5432/postgres`,
+            ),
+        "linked pooler target mismatch",
+    );
+    assert(
+        !runner.invocations.some((invocation) =>
+            invocation.args.join(" ").includes("db push")
+        ),
+        "push must not run after linked pooler mismatch",
+    );
+});
+
+Deno.test("Supavisor apply passes the validated TLS env to push", async () => {
+    const caPath = "/private/evidence/supabase-root-ca.crt";
+    const sessionTarget = derivedSupavisorSessionTarget(
+        validationRef,
+        `postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`,
+        caPath,
+    );
+    const runner = new FakeRunner();
+
+    await rolloutFixture(
+        runner,
+        "db-apply",
+        "VALID_APPLY",
+        sessionTarget,
+    );
+
+    const push = runner.invocations.find((invocation) =>
+        invocation.args.join(" ") ===
+            `db push --db-url postgresql://postgres.${validationRef}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`
+    );
+    assert(push, "apply push must execute");
+    assert(push.env?.PGSSLMODE === "verify-full");
+    assert(push.env?.PGSSLROOTCERT === caPath);
 });
 
 Deno.test("mismatched provenance marker stops before any remote mutation", async () => {
@@ -481,7 +698,9 @@ Deno.test("dry-run is separate and apply requires an exact approval string", asy
     const ledger = await rolloutFixture(dryRunner, "db-dry-run");
     assert(
         dryRunner.invocations.some((invocation) =>
-            invocation.args.join(" ").includes("db push --linked --dry-run")
+            invocation.args.join(" ").includes(
+                `db push --db-url postgresql://postgres@db.${validationRef}.supabase.co:5432/postgres --dry-run`,
+            )
         ),
     );
     assertEquals(ledger.entries[0].stage, "db-dry-run");
@@ -494,7 +713,7 @@ Deno.test("dry-run is separate and apply requires an exact approval string", asy
     );
     assert(
         !applyRunner.invocations.some((invocation) =>
-            invocation.args.join(" ").includes("db push --linked")
+            invocation.args.join(" ").includes("db push")
         ),
     );
 });
@@ -571,7 +790,7 @@ Deno.test("failed DB apply still runs identity-guarded baseline reset", async ()
         [invocation.command, ...invocation.args].join(" ")
     );
     const pushIndex = commands.findIndex((command) =>
-        command.includes("db push --linked")
+        command.includes("db push --db-url")
     );
     const resetIndex = commands.findIndex((command) =>
         command.includes("task8_reset_baseline.sql")
