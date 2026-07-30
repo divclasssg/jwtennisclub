@@ -5,7 +5,7 @@
 ### Completed
 - 가입일과 별도로 활동 시작 월을 저장·검증하고, 미래 시작 회원을 회원 명단에서 `활동 예정`으로 표시했다. 활동 시작 월은 회비 대상, 정모 preparing/최초 locked 명단, 월말 활동 회원 수의 공통 시작 경계가 된다.
 - 회원별 회비 인정액·미납액 계산, 실제/인정/조정 수납액 조정식, 2026년 7월 기초 장부 잔액 0원과 월별 기말 잔액 승계, 마감·재개·버전 이력을 가진 정산 스냅샷을 구현했다.
-- 정산 화면과 회원 공유용 PDF가 활성 마감 스냅샷만 사용하도록 변경했다. PDF는 개인별 납부 정보, 회원 식별자, 영수증, 내부 메모를 제외하고 활동 회원 수·회비 현황·장부 잔액·전체 공개 지출 내역을 표시하며, PDF 생성 감사 RPC를 통해 감사 로그를 남긴다.
+- 정산 화면은 마감 전 원본 데이터 기반 미리보기를, 마감 후에는 활성 마감 스냅샷을 표시하도록 변경했다. 회원 공유용 PDF는 항상 활성 마감 스냅샷만 사용하며, 개인별 납부 정보·회원 식별자·영수증·내부 메모를 제외하고 활동 회원 수·회비 현황·장부 잔액·전체 공개 지출 내역을 표시한다. PDF 생성은 감사 RPC를 통해 감사 로그를 남긴다.
 
 ### Verification Evidence
 - 교차 기능 Vitest: `npm run test -- src/features/members src/features/fees src/features/meetings src/features/settlements src/features/reports 'src/app/(app)/members' 'src/app/(app)/fees' 'src/app/(app)/meetings' 'src/app/(app)/settlements' 'src/app/(app)/reports'` — 51개 파일, 416개 테스트 통과.

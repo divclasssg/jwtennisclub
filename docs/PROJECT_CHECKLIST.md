@@ -79,6 +79,7 @@
 - [ ] 백필이 완전하다고 확인한 뒤에만 별도 `activity_start_month NOT NULL` 마이그레이션 작성·적용
 - [ ] 2026년 7월을 기초 장부 잔액 0원으로 최초 마감한 뒤, 이후 월을 순서대로 마감
 - [ ] DB 적용 후 인증된 운영자 브라우저에서 회원·회비·정모·정산 마감/재개·PDF와 권한 경계 QA
+- [ ] 필요한 Supabase 환경 변수를 제공한 상태에서 프로덕션 빌드를 다시 실행해 통과
 - [x] Implement `docs/superpowers/plans/2026-07-13-club-meeting-attendance.md`
 - [x] Supabase에 `202607130002_add_club_meetings.sql` 적용
 - [x] 적용 후 admin 인증 흐름·낙관적 동시성·월 경계·일정 왕복·모바일 정모 흐름 검증
