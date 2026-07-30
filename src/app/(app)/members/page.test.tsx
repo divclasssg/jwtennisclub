@@ -160,6 +160,25 @@ describe("MembersPage", () => {
     expect(screen.getByRole("list", { name: "모바일 회원 목록" })).toHaveTextContent("활동 시작 2099.08");
   });
 
+  it("shows an operator auto-member as awaiting activity-month confirmation on desktop and mobile", async () => {
+    loadMemberDirectoryPage.mockResolvedValue({
+      members: [{
+        ...member,
+        operatorProfileId: "new-operator-profile",
+        activityStartMonth: null,
+      }],
+      canCreate: true,
+      canUpdate: true,
+    });
+
+    render(await MembersPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getAllByText("활동 시작월 확인 필요")).toHaveLength(2);
+    expect(screen.getByRole("table")).not.toHaveTextContent("활동 예정");
+    expect(screen.getByRole("list", { name: "모바일 회원 목록" }))
+      .toHaveTextContent("활동 시작 -");
+  });
+
   it("hides member management links without create and update permissions", async () => {
     loadMemberDirectoryPage.mockResolvedValue({ members: [member], canCreate: false, canUpdate: false });
 

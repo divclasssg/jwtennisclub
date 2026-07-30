@@ -25,6 +25,9 @@ function getErrorMessage(error?: string) {
   if (error === "invalid-name") return "이름을 입력하세요.";
   if (error === "invalid-phone") return "연락처 형식을 확인하세요.";
   if (error === "invalid-joined-date") return "가입일을 확인하세요.";
+  if (error === "invalid-activity-start-month") {
+    return "활동 시작 월은 필수이며 가입 월 또는 그 이후여야 합니다.";
+  }
   if (error === "invalid-withdrawn-date") return "탈퇴 상태와 탈퇴일을 확인하세요.";
   if (error === "duplicate-member") return "이미 등록된 회원입니다.";
   if (error === "save-failed") return "회원 정보를 저장하지 못했습니다. 권한 또는 입력값을 확인하세요.";

@@ -4,6 +4,7 @@ import {
   formatDate,
   formatPauseStartMonth,
   isMemberActivityPending,
+  isMemberActivityStartUnconfirmed,
   formatMemberKind,
   formatMemberStatus,
   formatMemberStatusTab,
@@ -105,6 +106,15 @@ describe("member list formatting", () => {
   it("marks a member with a future activity start month as pending", () => {
     expect(isMemberActivityPending({ activityStartMonth: "2026-08-01" }, "2026-07-01")).toBe(true);
     expect(isMemberActivityPending({ activityStartMonth: "2026-07-01" }, "2026-07-01")).toBe(false);
+  });
+
+  it("marks only a missing activity start month as awaiting operator confirmation", () => {
+    expect(isMemberActivityStartUnconfirmed({ activityStartMonth: null })).toBe(true);
+    expect(
+      isMemberActivityStartUnconfirmed({
+        activityStartMonth: "2026-08-01",
+      }),
+    ).toBe(false);
   });
 
   it("sorts operators above general members by club position order", () => {

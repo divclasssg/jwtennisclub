@@ -87,7 +87,20 @@ function getSettlementMessage(
 }
 
 function formatClosedDate(value: string) {
-  return value.slice(0, 10).replaceAll("-", ".");
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value)).reduce<Record<string, string>>(
+    (result, part) => {
+      if (part.type !== "literal") result[part.type] = part.value;
+      return result;
+    },
+    {},
+  );
+
+  return `${parts.year}.${parts.month}.${parts.day}`;
 }
 
 export default async function SettlementsPage({

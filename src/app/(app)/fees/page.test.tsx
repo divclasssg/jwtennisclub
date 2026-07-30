@@ -343,6 +343,115 @@ describe("FeesPage", () => {
     expect(within(mobileList).getAllByRole("heading").map((heading) => heading.textContent)).toEqual(["이영희", "김민수"]);
   });
 
+  it("shows and sorts partial, exact, and overpayments by their real status", async () => {
+    queryState.members = [
+      {
+        id: "member-partial",
+        member_code: "M0001",
+        name: "부분 회원",
+        operator_profile_id: null,
+        status: "active",
+        joined_date: "2026-07-01",
+        withdrawn_date: null,
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+        memo: null,
+      },
+      {
+        id: "member-exact",
+        member_code: "M0002",
+        name: "정액 회원",
+        operator_profile_id: null,
+        status: "active",
+        joined_date: "2026-07-01",
+        withdrawn_date: null,
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+        memo: null,
+      },
+      {
+        id: "member-over",
+        member_code: "M0003",
+        name: "초과 회원",
+        operator_profile_id: null,
+        status: "active",
+        joined_date: "2026-07-01",
+        withdrawn_date: null,
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+        memo: null,
+      },
+    ];
+    queryState.payments = [
+      {
+        ...payments[0],
+        id: "payment-partial",
+        member_id: "member-partial",
+        amount: 10000,
+        members: { name: "부분 회원", member_code: "M0001" },
+      },
+      {
+        ...payments[0],
+        id: "payment-exact",
+        member_id: "member-exact",
+        amount: 30000,
+        members: { name: "정액 회원", member_code: "M0002" },
+      },
+      {
+        ...payments[0],
+        id: "payment-over",
+        member_id: "member-over",
+        amount: 40000,
+        members: { name: "초과 회원", member_code: "M0003" },
+      },
+    ];
+    queryState.notes = [];
+
+    render(await FeesPage({
+      searchParams: Promise.resolve({
+        month: "2026-07",
+        sort: "status",
+        direction: "asc",
+      }),
+    }));
+
+    const table = screen.getByRole("table");
+    expect(
+      within(table).getAllByRole("rowheader").map((cell) => cell.textContent),
+    ).toEqual(["정액 회원", "초과 회원", "부분 회원"]);
+
+    const partialRow = screen.getByRole("rowheader", {
+      name: "부분 회원",
+    }).closest("tr")!;
+    expect(within(partialRow).getByText("부분납부")).toBeInTheDocument();
+    expect(within(partialRow).getByText("잔여 20,000원")).toBeInTheDocument();
+    expect(within(partialRow).getByRole("cell", { name: "10,000원" }))
+      .toBeInTheDocument();
+
+    for (const name of ["정액 회원", "초과 회원"]) {
+      const row = screen.getByRole("rowheader", { name }).closest("tr")!;
+      expect(within(row).getByText("납부완료")).toBeInTheDocument();
+    }
+    expect(within(table).getByRole("cell", { name: "40,000원" }))
+      .toBeInTheDocument();
+
+    const mobileList = screen.getByRole("list", {
+      name: "모바일 회비 목록",
+    });
+    const partialItem = within(mobileList)
+      .getByRole("heading", { name: "부분 회원" })
+      .closest("li")!;
+    expect(within(partialItem).getByText("부분납부")).toBeInTheDocument();
+    expect(within(partialItem).getByText("잔여 20,000원"))
+      .toBeInTheDocument();
+    expect(within(partialItem).getByText("기준 금액 10,000원"))
+      .toBeInTheDocument();
+
+    const summary = screen.getByRole("region", { name: "회비 요약" });
+    expect(within(summary).getByText("2명")).toBeInTheDocument();
+    expect(within(summary).getByText("1명")).toBeInTheDocument();
+  });
+
   it("renders a mobile fee list with the same payment details", async () => {
     render(
       await FeesPage({

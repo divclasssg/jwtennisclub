@@ -125,6 +125,28 @@ describe("member actions", () => {
     });
   });
 
+  it.each([
+    ["create", createMember, "/members/new?error=invalid-activity-start-month"],
+    [
+      "edit",
+      updateMember,
+      "/members/member-id/edit?error=invalid-activity-start-month",
+    ],
+  ] as const)(
+    "routes an invalid activity start month to the stable %s error",
+    async (_mode, action, redirectPath) => {
+      const formData = memberFormData();
+      formData.set("activityStartMonth", "2026-06");
+      if (action === updateMember) formData.set("id", "member-id");
+
+      await expect(action(initialState, formData)).rejects.toThrow(
+        `redirect:${redirectPath}`,
+      );
+
+      expect(mocks.rpc).not.toHaveBeenCalled();
+    },
+  );
+
   it("disables general member CSV imports without calling the database", async () => {
     const formData = new FormData();
     formData.set(

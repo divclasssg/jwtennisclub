@@ -21,6 +21,7 @@ import {
   buildFeeListSummary,
   formatCurrency,
   formatPeriodMonth,
+  getFeePaymentStatus,
   mapFeePaymentRow,
   normalizeFeeListFilters,
   type FeeListSearchParams,
@@ -179,8 +180,10 @@ function getTodayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function formatPaymentStatus(row: { payment: unknown }) {
-  return row.payment ? "납부완료" : "미납";
+function formatPaymentStatus(
+  row: ReturnType<typeof buildFeeBoardRows>[number],
+) {
+  return getFeePaymentStatus(row.payment).label;
 }
 
 function feeSortValue(
@@ -318,7 +321,17 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                         <td>{row.memberCode}</td>
                         <th scope="row">{row.memberName}</th>
                         <td>{formatMemberKind(row)}</td>
-                        <td>{formatPaymentStatus(row)}</td>
+                        <td>
+                          {formatPaymentStatus(row)}
+                          {getFeePaymentStatus(row.payment).label === "부분납부" ? (
+                            <>
+                              <br />
+                              <span>잔여 {formatCurrency(
+                                getFeePaymentStatus(row.payment).remainingAmount,
+                              )}원</span>
+                            </>
+                          ) : null}
+                        </td>
                         <td>
                           {formatCurrency(
                             row.payment?.amount ?? DEFAULT_MONTHLY_FEE_AMOUNT,

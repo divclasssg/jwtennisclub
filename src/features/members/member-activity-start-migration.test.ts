@@ -43,6 +43,27 @@ describe("member activity start month migration", () => {
     );
   });
 
+  it("creates operator-linked members with an explicitly unconfirmed activity month", () => {
+    const ensureOperatorMember = migrationFunctionBody(
+      "ensure_operator_member",
+    );
+
+    expect(ensureOperatorMember).toContain("security definer");
+    expect(ensureOperatorMember).toContain("set search_path = ''");
+    expect(ensureOperatorMember).toContain(
+      "perform public.prepare_meeting_rosters_before_member_change(",
+    );
+    expect(ensureOperatorMember).toContain(
+      "perform public.sync_meeting_rosters_after_member_change(kst_today)",
+    );
+    expect(ensureOperatorMember).toMatch(
+      /insert into public\.members \(\s*name,\s*status,\s*joined_date,\s*activity_start_month,\s*memo,\s*operator_profile_id\s*\)[\s\S]*values \(\s*new\.display_name,\s*'active',\s*kst_today,\s*null,/,
+    );
+    expect(migrationSql).toContain(
+      "revoke execute on function public.ensure_operator_member()\nfrom public, anon, authenticated, service_role",
+    );
+  });
+
   it("requires a non-null eligible activity month when preparing or first locking a roster", () => {
     for (const functionName of [
       "sync_preparing_meeting_roster",

@@ -6,6 +6,7 @@ import {
 } from "./fee-model";
 import {
   formatCurrency,
+  getFeePaymentStatus,
   type FeeBoardMemberRow,
 } from "./fee-list";
 import styles from "./FeeMobileList.module.scss";
@@ -23,10 +24,6 @@ type FeeMobileListProps = {
   listState: FeeListState;
 };
 
-function formatPaymentStatus(row: FeeBoardMemberRow) {
-  return row.payment ? "납부완료" : "미납";
-}
-
 export function FeeMobileList({
   canManageNotes,
   cancelPaymentAction,
@@ -40,6 +37,7 @@ export function FeeMobileList({
     <ul aria-label="모바일 회비 목록" className={styles["fee-mobile-list"]}>
       {rows.map((row) => {
         const amount = row.payment?.amount ?? DEFAULT_MONTHLY_FEE_AMOUNT;
+        const paymentStatus = getFeePaymentStatus(row.payment);
 
         return (
           <li className={styles["fee-mobile-item"]} key={row.memberId}>
@@ -50,9 +48,12 @@ export function FeeMobileList({
                   <Badge tone={row.operatorProfileId ? "info" : "muted"}>
                     {formatMemberKind(row)}
                   </Badge>
-                  <Badge tone={row.payment ? "success" : "danger"}>
-                    {formatPaymentStatus(row)}
+                  <Badge tone={paymentStatus.label === "납부완료" ? "success" : "danger"}>
+                    {paymentStatus.label}
                   </Badge>
+                  {paymentStatus.label === "부분납부" ? (
+                    <span>잔여 {formatCurrency(paymentStatus.remainingAmount)}원</span>
+                  ) : null}
                 </div>
               </div>
               {row.payment ? (

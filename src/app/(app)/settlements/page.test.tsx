@@ -185,6 +185,33 @@ describe("SettlementsPage", () => {
     );
   });
 
+  it("formats a UTC closing timestamp on the next Seoul calendar day", async () => {
+    pageState.data = {
+      preview: buildSnapshot(),
+      active_closing: {
+        id: "128a3398-389b-46c9-9314-b795166fa5d0",
+        period_month: "2026-07-01",
+        version: 1,
+        status: "closed",
+        snapshot: buildSnapshot(),
+        closed_at: "2026-07-31T15:30:00+00:00",
+        closed_by: "김마감",
+      },
+      can_close: false,
+      can_reopen: true,
+      close_blocked_reason: "already-closed",
+    };
+
+    render(
+      await SettlementsPage({
+        searchParams: Promise.resolve({ month: "2026-07" }),
+      }),
+    );
+
+    expect(screen.getByText("2026.08.01")).toBeInTheDocument();
+    expect(screen.queryByText("2026.07.31")).not.toBeInTheDocument();
+  });
+
   it("renders the approved empty notice for months without fee targets", async () => {
     pageState.data.preview = buildSnapshot({
       activity_member_count: 0,

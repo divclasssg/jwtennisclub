@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildFeeBoardRows,
   buildFeeListSummary,
+  getFeePaymentStatus,
   mapFeePaymentRow,
   normalizeFeeListFilters,
 } from "./fee-list";
@@ -79,6 +80,38 @@ describe("fee payment list helpers", () => {
       expectedTotal: 90000,
     });
   });
+
+  it("counts only exact and overpayments as fully paid while preserving actual receipts", () => {
+    expect(
+      buildFeeListSummary({
+        expectedCount: 4,
+        payments: [
+          { amount: 10000 },
+          { amount: 30000 },
+          { amount: 40000 },
+        ],
+        monthlyFeeAmount: 30000,
+      }),
+    ).toEqual({
+      expectedCount: 4,
+      paidCount: 2,
+      unpaidCount: 2,
+      paidTotal: 80000,
+      expectedTotal: 120000,
+    });
+  });
+
+  it.each([
+    [null, { label: "미납", remainingAmount: 30000 }],
+    [{ amount: 10000 }, { label: "부분납부", remainingAmount: 20000 }],
+    [{ amount: 30000 }, { label: "납부완료", remainingAmount: 0 }],
+    [{ amount: 40000 }, { label: "납부완료", remainingAmount: 0 }],
+  ])(
+    "classifies payment %j without applying one member's overpayment to another",
+    (payment, expected) => {
+      expect(getFeePaymentStatus(payment, 30000)).toEqual(expected);
+    },
+  );
 
   it("sorts fee board members by member code", () => {
     const rows = buildFeeBoardRows({

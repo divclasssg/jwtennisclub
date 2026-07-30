@@ -115,6 +115,20 @@ describe("monthly settlement closing migration", () => {
     );
   });
 
+  it("rejects a relevant transition member whose activity start month is still unconfirmed", () => {
+    const builder = migrationFunctionBody("build_monthly_settlement_snapshot");
+
+    expect(builder).toMatch(
+      /with relevant_members as materialized \([\s\S]*members\.joined_date <= period_month_end[\s\S]*members\.withdrawn_date >= normalized_period_month/,
+    );
+    expect(builder).toMatch(
+      /select count\(\*\)\s+from relevant_members\s+where relevant_members\.activity_start_month is null/,
+    );
+    expect(builder).toMatch(
+      /if missing_activity_start_count > 0 then\s+raise exception 'member activity start month required'/,
+    );
+  });
+
   it("keeps actual income independent from capped recognized payments", () => {
     const builder = migrationFunctionBody("build_monthly_settlement_snapshot");
 

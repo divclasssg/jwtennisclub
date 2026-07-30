@@ -476,6 +476,84 @@ describe("club meeting migration", () => {
     }
   });
 
+  it("applies activity, pause, and withdrawal month boundaries to every new roster candidate", () => {
+    const functionBody = (functionName: string) => {
+      const start = activityStartMigrationSql.indexOf(
+        `create or replace function public.${functionName}`,
+      );
+      const end = activityStartMigrationSql.indexOf("$$;", start);
+
+      expect(start, functionName).toBeGreaterThan(-1);
+      expect(end, functionName).toBeGreaterThan(start);
+      return activityStartMigrationSql.slice(start, end);
+    };
+    const candidates = [
+      {
+        functionName: "sync_preparing_meeting_roster",
+        periodExpression: "requested_period_month",
+      },
+      {
+        functionName: "ensure_locked_meeting_roster",
+        periodExpression: "requested_period_month",
+      },
+      {
+        functionName: "add_meeting_ad_hoc_member",
+        periodExpression: "locked_meeting.period_month",
+      },
+      {
+        functionName: "get_club_meeting_directory_page",
+        periodExpression: "normalized_period_month",
+      },
+    ];
+
+    for (const { functionName, periodExpression } of candidates) {
+      const functionSql = functionBody(functionName);
+
+      expect(functionSql, functionName).toContain(
+        "members.activity_start_month is not null",
+      );
+      expect(functionSql, functionName).toContain(
+        `members.activity_start_month <= ${periodExpression}`,
+      );
+      expect(functionSql, functionName).toContain(
+        `members.pause_start_month > ${periodExpression}`,
+      );
+      expect(functionSql, functionName).toContain(
+        "members.status = 'withdrawn'",
+      );
+      expect(functionSql, functionName).toContain(
+        "members.withdrawn_date > (",
+      );
+      expect(functionSql, functionName).toContain(
+        `${periodExpression} + interval '1 month - 1 day'`,
+      );
+    }
+  });
+
+  it("keeps the explicit ad-hoc mutation and directory candidate RPC authorization intact", () => {
+    for (const [signature, role] of [
+      ["add_meeting_ad_hoc_member(uuid, uuid)", "authenticated"],
+      ["get_club_meeting_directory_page(date, text)", "authenticated"],
+    ] as const) {
+      expect(activityStartMigrationSql).toMatch(
+        new RegExp(
+          `revoke execute on function public\\.${signature.replaceAll(
+            /[().]/g,
+            "\\$&",
+          )}\\s+from public, anon`,
+        ),
+      );
+      expect(activityStartMigrationSql).toMatch(
+        new RegExp(
+          `grant execute on function public\\.${signature.replaceAll(
+            /[().]/g,
+            "\\$&",
+          )}\\s+to ${role}`,
+        ),
+      );
+    }
+  });
+
   it("evaluates attendance time windows after acquiring the meeting lock", () => {
     for (const [functionName, lockClause] of [
       ["save_meeting_attendance", "for share"],

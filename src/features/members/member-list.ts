@@ -189,3 +189,9 @@ export function isMemberActivityPending(
     member.activityStartMonth && member.activityStartMonth > periodMonth,
   );
 }
+
+export function isMemberActivityStartUnconfirmed(
+  member: Pick<MemberListRow, "activityStartMonth">,
+) {
+  return member.activityStartMonth === null;
+}

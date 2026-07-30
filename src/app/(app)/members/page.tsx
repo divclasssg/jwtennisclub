@@ -5,7 +5,7 @@ import { EmptyState, FilterBar, FormField, TabLink, Tabs } from "@/components/mo
 import { DataPanel, DataTable, parseSortState, SortableTableHeader, stableSortRows } from "@/components/organisms";
 import { ManagementPageTemplate } from "@/components/templates";
 import { loadMemberDirectoryPage } from "@/features/members/member-directory";
-import { formatDate, formatMemberDirectoryKind, formatMemberPosition, formatMemberStatus, formatMemberStatusTab, formatPauseStartMonth, isMemberActivityPending } from "@/features/members/member-list";
+import { formatDate, formatMemberDirectoryKind, formatMemberPosition, formatMemberStatus, formatMemberStatusTab, formatPauseStartMonth, isMemberActivityPending, isMemberActivityStartUnconfirmed } from "@/features/members/member-list";
 import { MemberMobileList } from "@/features/members/MemberMobileList";
 import { MEMBER_STATUSES, type MemberStatus } from "@/features/members/member-model";
 import { getCurrentPeriodMonth } from "@/features/fees/fee-model";
@@ -75,7 +75,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
         <th scope="col">활동 시작</th>
         <th scope="col">관리</th>
       </tr></thead><tbody>{sortedMembers.map((member) => <tr key={member.id}>
-        <td className={styles["member-code-cell"]}>{member.memberCode}</td><th scope="row">{member.name}</th><td>{member.phoneDisplay}</td><td>{formatMemberDirectoryKind(member)}</td><td>{formatMemberPosition(member)}</td><td>{member.groupCode ?? "없음"}</td><td>{formatMemberStatus(member.status)}{isMemberActivityPending(member, currentPeriodMonth) ? <Badge tone="muted">활동 예정</Badge> : null}</td><td>{formatPauseStartMonth(member.status === "paused" ? member.pauseStartMonth : null)}</td><td>{formatDate(member.joinedDate)}</td><td>{formatPauseStartMonth(member.activityStartMonth)}</td><td>{canUpdate ? <Link href={`/members/${member.id}/edit`}>수정</Link> : null}</td>
+        <td className={styles["member-code-cell"]}>{member.memberCode}</td><th scope="row">{member.name}</th><td>{member.phoneDisplay}</td><td>{formatMemberDirectoryKind(member)}</td><td>{formatMemberPosition(member)}</td><td>{member.groupCode ?? "없음"}</td><td>{formatMemberStatus(member.status)}{isMemberActivityPending(member, currentPeriodMonth) ? <Badge tone="muted">활동 예정</Badge> : null}{isMemberActivityStartUnconfirmed(member) ? <Badge tone="danger">활동 시작월 확인 필요</Badge> : null}</td><td>{formatPauseStartMonth(member.status === "paused" ? member.pauseStartMonth : null)}</td><td>{formatDate(member.joinedDate)}</td><td>{formatPauseStartMonth(member.activityStartMonth)}</td><td>{canUpdate ? <Link href={`/members/${member.id}/edit`}>수정</Link> : null}</td>
       </tr>)}</tbody></DataTable></div><div className={styles["members-mobile-list-view"]}><MemberMobileList canUpdate={canUpdate} members={sortedMembers} /></div></> : null}
     </DataPanel>}
     tabs={<Tabs aria-label="회원 상태" columns={3}>{MEMBER_STATUSES.map((item) => <TabLink href={statusHref(item, q)} isCurrent={status === item} key={item}>{formatMemberStatusTab(item)}</TabLink>)}</Tabs>}

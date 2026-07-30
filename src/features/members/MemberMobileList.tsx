@@ -7,6 +7,7 @@ import {
   formatMemberStatus,
   formatPauseStartMonth,
   isMemberActivityPending,
+  isMemberActivityStartUnconfirmed,
 } from "./member-list";
 import { getCurrentPeriodMonth } from "@/features/fees/fee-model";
 import type { MemberListRow } from "./member-directory";
@@ -46,6 +47,9 @@ export function MemberMobileList({ canUpdate = true, members }: MemberMobileList
                 </Badge>
                 {isMemberActivityPending(member, currentPeriodMonth) ? (
                   <Badge tone="muted">활동 예정</Badge>
+                ) : null}
+                {isMemberActivityStartUnconfirmed(member) ? (
+                  <Badge tone="danger">활동 시작월 확인 필요</Badge>
                 ) : null}
               </div>
             </div>
