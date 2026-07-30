@@ -17,7 +17,7 @@ import { formatExpenseCategory } from "@/features/expenses/expense-model";
 
 const notoSansKrFontPath = path.join(
   process.cwd(),
-  "node_modules/@fontsource/noto-sans-kr/files/noto-sans-kr-korean-400-normal.woff",
+  "src/features/reports/fonts/NotoSansKR-Regular.ttf",
 );
 
 Font.register({

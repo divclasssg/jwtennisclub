@@ -47,6 +47,7 @@ describe("renderMonthlyReportPdf", () => {
     const pdf = await renderMonthlyReportPdf(report);
 
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+    expect(await countDarkTitlePixels(pdf)).toBeGreaterThan(100);
 
     const text = await extractPdfText(pdf);
     expect(text).toContain("마감 버전");
@@ -94,6 +95,51 @@ async function extractPdfText(pdf: Buffer) {
     await writeFile(inputPath, pdf);
     await execFileAsync("pdftotext", ["-layout", inputPath, outputPath]);
     return readFile(outputPath, "utf8");
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+}
+
+async function countDarkTitlePixels(pdf: Buffer) {
+  const directory = await mkdtemp(path.join(tmpdir(), "jw-tennis-report-render-"));
+  const inputPath = path.join(directory, "report.pdf");
+  const outputPath = path.join(directory, "report");
+
+  try {
+    await writeFile(inputPath, pdf);
+    await execFileAsync("pdftoppm", [
+      "-f",
+      "1",
+      "-l",
+      "1",
+      "-r",
+      "150",
+      inputPath,
+      outputPath,
+    ]);
+    const ppm = await readFile(`${outputPath}-1.ppm`);
+    const headerEnd = ppm.indexOf(Buffer.from("\n255\n"));
+    const [width] = ppm
+      .subarray(0, headerEnd)
+      .toString("ascii")
+      .split("\n")[1]
+      .split(" ")
+      .map(Number);
+    const pixelStart = headerEnd + 5;
+    const titlePixels = ppm.subarray(pixelStart, pixelStart + width * 190 * 3);
+    let count = 0;
+
+    for (let index = 0; index < titlePixels.length; index += 3) {
+      if (
+        titlePixels[index] < 100 &&
+        titlePixels[index + 1] < 100 &&
+        titlePixels[index + 2] < 100
+      ) {
+        count += 1;
+      }
+    }
+
+    return count;
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
