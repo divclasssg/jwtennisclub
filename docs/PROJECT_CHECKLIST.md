@@ -72,6 +72,13 @@
 - [x] 휴회 시작 월 변경의 루트 전체 테스트·lint·typecheck·프로덕션 빌드 검증
 
 ## Next Work
+- [x] 회원 가입일과 활동 시작 월 분리, 활동 예정 표시, 회비·정모 월 경계 적용
+- [x] 월별 정산 마감·재개·버전 스냅샷 및 스냅샷 전용 PDF 구현과 로컬 교차 기능 검증
+- [ ] 운영 DB에 `202607300001_add_member_activity_start_month.sql`을 먼저, `202607300002_add_monthly_settlement_closings.sql`을 다음으로 적용
+- [ ] 기존 회원별 `activity_start_month`를 운영자가 확인한 값으로 백필하고 월 첫날·가입 월 경계를 검증
+- [ ] 백필이 완전하다고 확인한 뒤에만 별도 `activity_start_month NOT NULL` 마이그레이션 작성·적용
+- [ ] 2026년 7월을 기초 장부 잔액 0원으로 최초 마감한 뒤, 이후 월을 순서대로 마감
+- [ ] DB 적용 후 인증된 운영자 브라우저에서 회원·회비·정모·정산 마감/재개·PDF와 권한 경계 QA
 - [x] Implement `docs/superpowers/plans/2026-07-13-club-meeting-attendance.md`
 - [x] Supabase에 `202607130002_add_club_meetings.sql` 적용
 - [x] 적용 후 admin 인증 흐름·낙관적 동시성·월 경계·일정 왕복·모바일 정모 흐름 검증

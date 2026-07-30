@@ -1,5 +1,26 @@
 # JW Tennis Club SaaS Work Log
 
+## 2026-07-30
+
+### Completed
+- 가입일과 별도로 활동 시작 월을 저장·검증하고, 미래 시작 회원을 회원 명단에서 `활동 예정`으로 표시했다. 활동 시작 월은 회비 대상, 정모 preparing/최초 locked 명단, 월말 활동 회원 수의 공통 시작 경계가 된다.
+- 회원별 회비 인정액·미납액 계산, 실제/인정/조정 수납액 조정식, 2026년 7월 기초 장부 잔액 0원과 월별 기말 잔액 승계, 마감·재개·버전 이력을 가진 정산 스냅샷을 구현했다.
+- 정산 화면과 회원 공유용 PDF가 활성 마감 스냅샷만 사용하도록 변경했다. PDF는 개인별 납부 정보, 회원 식별자, 영수증, 내부 메모를 제외하고 활동 회원 수·회비 현황·장부 잔액·전체 공개 지출 내역을 표시하며, PDF 생성 감사 RPC를 통해 감사 로그를 남긴다.
+
+### Verification Evidence
+- 교차 기능 Vitest: `npm run test -- src/features/members src/features/fees src/features/meetings src/features/settlements src/features/reports 'src/app/(app)/members' 'src/app/(app)/fees' 'src/app/(app)/meetings' 'src/app/(app)/settlements' 'src/app/(app)/reports'` — 51개 파일, 416개 테스트 통과.
+- 전체 `npm run test` — 95개 파일, 611개 테스트 통과.
+- `npm run lint`, `npx tsc --noEmit`, `git diff --check` — 모두 종료 코드 0으로 통과.
+- 표준 `npm run build`(Next.js 16.2.10 Turbopack)은 컴파일과 TypeScript 검사까지 성공했으나, 이 격리 작업트리에 Supabase 환경 변수가 없어 `/(.)expenses/new` 정적 사전 렌더에서 `Missing or invalid Supabase environment variables`로 종료 코드 1을 반환했다. 빌드 통과로 처리하지 않았다.
+- `npx next build --webpack`도 컴파일과 TypeScript 검사까지 성공했으나 같은 환경 변수 부재로 `/(.)expenses/new`와 `/fees/new` 사전 렌더에서 종료 코드 1을 반환했다. 월간 PDF 라우트 NFT에는 `../../../../../../src/features/reports/fonts/IBMPlexSansKR-Regular.ttf` 항목이 정확히 한 번 포함된 것을 확인했다.
+- DB에 적용하지 않고 마이그레이션을 검토했다. `202607300001`은 nullable `activity_start_month`와 월 첫날/가입 월 제약을 먼저 추가하며, `202607300002`는 정산 마감 스키마·RPC·RLS를 추가한다. 최종 `NOT NULL` 마이그레이션은 존재하지 않는다. 마감 계산은 활동 시작 월 null을 거부하고, 스냅샷 JSON은 회원·납부·영수증·메모 식별자를 포함하지 않는다. 활성 운영자 읽기 RLS, 직접 인증 사용자 쓰기 차단, 고정 `search_path`, 명시적 grant/revoke, 권한 재검증, advisory lock과 원본 테이블 공유 잠금, 버전·원장·감사 규칙 및 PDF 감사 RPC의 원자적 closing-row 잠금을 확인했다.
+
+### Deployment Gate
+- 두 마이그레이션은 아직 운영 DB에 적용하지 않았다. 반드시 `202607300001`을 먼저 적용한 뒤 `202607300002`를 적용한다.
+- 기존 회원의 활동 시작 월은 가입일로 추정하지 않는다. 운영자가 확인한 값으로 백필하고 완전성·월 첫날·가입 월 경계를 검증하기 전에는 최종 `NOT NULL` 마이그레이션을 만들거나 적용하지 않는다.
+- 첫 마감은 2026년 7월이며 기초 장부 잔액은 0원이다. 8월 이후는 직전 활성 마감의 기말 잔액을 승계하므로 월 순서를 건너뛰어 마감하지 않는다.
+- 롤백 가능한 DB 환경에서 마이그레이션과 백필을 적용한 뒤, 인증된 운영자 브라우저로 회원·회비·정모·정산 마감/재개·PDF·권한 경계를 QA해야 한다. Supabase 환경 변수를 제공한 프로덕션 빌드도 그 전에 다시 확인해야 한다.
+
 ## 2026-07-29
 
 ### Completed
