@@ -3,11 +3,13 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { Document, Page, Text, renderToBuffer } from "@react-pdf/renderer";
 import { describe, expect, it } from "vitest";
 import { renderMonthlyReportPdf } from "./MonthlyReportPdf";
 
 const PDF_RENDER_TIMEOUT_MS = 15_000;
 const execFileAsync = promisify(execFile);
+const KOREAN_GLYPH_PROBE = ["가", "나", "다", "라", "마", "바", "사", "아"];
 
 const report = {
   title: "2026년 7월 테니스 클럽 월간 정산 보고서",
@@ -89,6 +91,32 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).toContain("미납액");
     expect(text).toContain("운영 지출");
   }, PDF_RENDER_TIMEOUT_MS);
+
+  it("renders distinct Korean glyph shapes instead of repeated tofu boxes", async () => {
+    const pdf = await renderToBuffer(
+      <Document>
+        <Page size="A4" style={{ fontFamily: "IBM Plex Sans KR", fontWeight: 400 }}>
+          {KOREAN_GLYPH_PROBE.map((glyph, index) => (
+            <Text
+              key={glyph}
+              style={{
+                color: "#1d1d1f",
+                fontSize: 40,
+                left: 30 + index * 65,
+                position: "absolute",
+                top: 40,
+              }}
+            >
+              {glyph}
+            </Text>
+          ))}
+        </Page>
+      </Document>,
+    );
+
+    const signatures = await getKoreanGlyphShapeSignatures(pdf);
+    expect(new Set(signatures).size).toBeGreaterThan(3);
+  }, PDF_RENDER_TIMEOUT_MS);
 });
 
 async function extractPdfText(pdf: Buffer) {
@@ -106,6 +134,27 @@ async function extractPdfText(pdf: Buffer) {
 }
 
 async function getRenderedDarkPixelCounts(pdf: Buffer) {
+  const { ppm, pixelStart, width } = await renderFirstPageToPpm(pdf);
+
+  return {
+    titleAndMeta: countDarkPixels(ppm, pixelStart, width, 50, 180),
+    memberCards: countDarkPixels(ppm, pixelStart, width, 180, 320),
+    feeCards: countDarkPixels(ppm, pixelStart, width, 320, 620),
+    tables: countDarkPixels(ppm, pixelStart, width, 620, 1200),
+    notices: countDarkPixels(ppm, pixelStart, width, 1200, 1500),
+  };
+}
+
+async function getKoreanGlyphShapeSignatures(pdf: Buffer) {
+  const { ppm, pixelStart, width } = await renderFirstPageToPpm(pdf);
+
+  return KOREAN_GLYPH_PROBE.map((_, index) => {
+    const left = Math.round((30 + index * 65) * (150 / 72));
+    return getDarkPixelShapeSignature(ppm, pixelStart, width, left, left + 110, 60, 200);
+  });
+}
+
+async function renderFirstPageToPpm(pdf: Buffer) {
   const directory = await mkdtemp(path.join(tmpdir(), "jw-tennis-report-render-"));
   const inputPath = path.join(directory, "report.pdf");
   const outputPath = path.join(directory, "report");
@@ -132,16 +181,33 @@ async function getRenderedDarkPixelCounts(pdf: Buffer) {
       .map(Number);
     const pixelStart = headerEnd + 5;
 
-    return {
-      titleAndMeta: countDarkPixels(ppm, pixelStart, width, 50, 180),
-      memberCards: countDarkPixels(ppm, pixelStart, width, 180, 320),
-      feeCards: countDarkPixels(ppm, pixelStart, width, 320, 620),
-      tables: countDarkPixels(ppm, pixelStart, width, 620, 1200),
-      notices: countDarkPixels(ppm, pixelStart, width, 1200, 1500),
-    };
+    return { ppm, pixelStart, width };
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
+}
+
+function getDarkPixelShapeSignature(
+  ppm: Buffer,
+  pixelStart: number,
+  width: number,
+  left: number,
+  right: number,
+  top: number,
+  bottom: number,
+) {
+  const pixels: string[] = [];
+
+  for (let y = top; y < bottom; y += 1) {
+    for (let x = left; x < right; x += 1) {
+      const index = pixelStart + (y * width + x) * 3;
+      if (ppm[index] < 100 && ppm[index + 1] < 100 && ppm[index + 2] < 100) {
+        pixels.push(`${x - left}:${y - top}`);
+      }
+    }
+  }
+
+  return pixels.join(",");
 }
 
 function countDarkPixels(

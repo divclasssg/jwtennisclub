@@ -1,14 +1,18 @@
-# Noto Sans CJK KR asset provenance
+# IBM Plex Sans KR asset provenance
 
-`NotoSansCJKkr-Regular.otf` is the complete static Korean OpenType font from
-the official [notofonts/noto-cjk](https://github.com/notofonts/noto-cjk)
-repository:
+`IBMPlexSansKR-Regular.ttf` is the unmodified static TrueType regular face
+from the official [IBM Plex](https://github.com/IBM/plex) family. Its internal
+font metadata identifies version `1.001;2020`, copyright IBM Corp. (2018),
+and SIL Open Font License 1.1.
 
-`https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf`
+The complete static source was selected because the official Google Noto Sans
+KR variable font and a generated static derivative both rendered no Korean
+glyph outlines in this `@react-pdf/renderer` path. This static `glyf` TrueType
+font renders the verified Korean glyph outlines correctly.
 
-Downloaded for this repository on 2026-07-30. SHA-256:
+The bundled asset SHA-256 is:
 
-`6bcb2a0703aa137e874fc2dffa85f6c21ba9a67fa329e81b8c801663af7e992a`
+`3fe6897f311fa4355a934716e308e1c206e00114cdbc3a51d1e7fa93e3490243`
 
 It is bundled for server-side `@react-pdf/renderer` output and is licensed
 under the SIL Open Font License 1.1 in [LICENSE](./LICENSE).

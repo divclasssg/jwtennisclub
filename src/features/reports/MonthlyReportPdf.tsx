@@ -15,22 +15,25 @@ import {
 import { formatSettlementBalance } from "@/features/settlements/settlement-summary";
 import { formatExpenseCategory } from "@/features/expenses/expense-model";
 
-const notoSansCjkKrFontPath = path.join(
+const ibmPlexSansKrFontPath = path.join(
   process.cwd(),
-  "src/features/reports/fonts/NotoSansCJKkr-Regular.otf",
+  "src/features/reports/fonts/IBMPlexSansKR-Regular.ttf",
 );
 
 Font.register({
-  family: "Noto Sans KR",
-  src: notoSansCjkKrFontPath,
+  family: "IBM Plex Sans KR",
+  fontStyle: "normal",
+  fontWeight: 400,
+  src: ibmPlexSansKrFontPath,
 });
 
 const styles = StyleSheet.create({
   page: {
     padding: 36,
     color: "#1d1d1f",
-    fontFamily: "Noto Sans KR",
+    fontFamily: "IBM Plex Sans KR",
     fontSize: 10,
+    fontWeight: 400,
     lineHeight: 1.5,
   },
   title: {
