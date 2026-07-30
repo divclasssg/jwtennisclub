@@ -323,7 +323,7 @@ export async function importFeePaymentsCsv(formData: FormData) {
     .select(
       "id, member_code, status, withdrawn_date, pause_start_month, activity_start_month",
     )
-    .in("status", ["active", "paused"]);
+    .in("status", ["active", "paused", "withdrawn"]);
 
   if (membersError) {
     redirect(buildRedirect(feeCreatePath, { importError: "member-load-failed" }));

@@ -67,7 +67,7 @@ describe("fee model", () => {
     };
 
     expect(buildFeeEligibilityFilter("2026-07-01")).toBe(
-      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-07-31)",
     );
     expect(isMemberEligibleForPeriod(pausedInAugust, "2026-07-01")).toBe(true);
     expect(isMemberEligibleForPeriod(pausedInAugust, "2026-08-01")).toBe(false);

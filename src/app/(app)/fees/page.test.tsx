@@ -7,6 +7,19 @@ const permissionMocks = vi.hoisted(() => ({
   currentOperatorHasPermission: vi.fn(async () => true),
 }));
 
+type FeeMemberFixture = {
+  id: string;
+  member_code: string;
+  name: string;
+  operator_profile_id: string | null;
+  status: "active" | "paused" | "withdrawn";
+  joined_date: string;
+  withdrawn_date: string | null;
+  pause_start_month: string | null;
+  activity_start_month: string | null;
+  memo: string | null;
+};
+
 const payments = [
   {
     id: "payment-1",
@@ -26,7 +39,7 @@ const payments = [
   },
 ];
 
-const members = [
+const members: FeeMemberFixture[] = [
   {
     id: "member-1",
     member_code: "M0001",
@@ -254,12 +267,39 @@ describe("FeesPage", () => {
       "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, pause_start_month, activity_start_month, memo",
     );
     expect(membersQuery.or).toHaveBeenCalledWith(
-      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-07-31)",
     );
     expect(membersQuery.neq).toHaveBeenCalledWith("member_code", "#0000");
     expect(membersQuery.lte).toHaveBeenCalledWith(
       "activity_start_month",
       "2026-07-01",
+    );
+  });
+
+  it("includes a member withdrawn after July in the July fee board", async () => {
+    queryState.payments = [];
+    queryState.members = [
+      {
+        id: "member-withdrawn",
+        member_code: "M0003",
+        name: "박지수",
+        operator_profile_id: null,
+        status: "withdrawn",
+        joined_date: "2026-07-01",
+        withdrawn_date: "2026-08-01",
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+        memo: null,
+      },
+    ];
+
+    render(
+      await FeesPage({ searchParams: Promise.resolve({ month: "2026-07" }) }),
+    );
+
+    expect(screen.getByRole("cell", { name: "M0003" })).toBeInTheDocument();
+    expect(membersQuery.or).toHaveBeenCalledWith(
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-07-31)",
     );
   });
 

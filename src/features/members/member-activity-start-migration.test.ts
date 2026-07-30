@@ -65,4 +65,22 @@ describe("member activity start month migration", () => {
     );
     expect(prepare).toContain("perform public.ensure_regular_club_meetings(");
   });
+
+  it("keeps internal roster helpers private while retaining the authenticated preparation RPC", () => {
+    for (const signature of [
+      "sync_preparing_meeting_roster(date)",
+      "ensure_locked_meeting_roster(date, uuid, boolean)",
+    ]) {
+      expect(migrationSql).toContain(
+        `revoke execute on function public.${signature}\nfrom public, anon, authenticated, service_role`,
+      );
+      expect(migrationSql).not.toContain(
+        `grant execute on function public.${signature} to authenticated`,
+      );
+    }
+
+    expect(migrationSql).toContain(
+      "grant execute on function public.prepare_club_meeting_month(date)\nto authenticated",
+    );
+  });
 });

@@ -97,5 +97,5 @@ export function isMemberFeeTargetForPeriod(
 }
 
 export function buildFeeEligibilityFilter(periodMonth: string) {
-  return `status.eq.active,and(status.eq.paused,pause_start_month.gt.${periodMonth})`;
+  return `status.eq.active,and(status.eq.paused,pause_start_month.gt.${periodMonth}),and(status.eq.withdrawn,withdrawn_date.gt.${getPeriodMonthEnd(periodMonth)})`;
 }

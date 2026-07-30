@@ -500,13 +500,9 @@ end;
 $$;
 
 revoke execute on function public.sync_preparing_meeting_roster(date)
-from public, anon;
-grant execute on function public.sync_preparing_meeting_roster(date)
-to authenticated;
+from public, anon, authenticated, service_role;
 revoke execute on function public.ensure_locked_meeting_roster(date, uuid, boolean)
-from public, anon;
-grant execute on function public.ensure_locked_meeting_roster(date, uuid, boolean)
-to authenticated;
+from public, anon, authenticated, service_role;
 revoke execute on function public.prepare_club_meeting_month(date)
 from public, anon;
 grant execute on function public.prepare_club_meeting_month(date)
