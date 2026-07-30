@@ -1,16 +1,18 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildFeeEligibilityFilter,
   formatCurrency,
   formatPeriodMonth,
+  getCurrentPeriodMonth,
   getPeriodMonthEnd,
   isMemberActiveForPeriod,
   isMemberFeeTargetForPeriod,
   normalizePeriodMonth,
 } from "./fee-model";
 import { isMemberEligibleForPeriod } from "@/features/members/member-model";
+import { isMemberActivityPending } from "@/features/members/member-list";
 
 const migrationSql = readFileSync(
   join(process.cwd(), "supabase/migrations/202607030003_add_fee_payments.sql"),
@@ -31,6 +33,31 @@ describe("fee model", () => {
 
   it("calculates the last day for a payment month", () => {
     expect(getPeriodMonthEnd("2026-02-01")).toBe("2026-02-28");
+  });
+
+  it("uses Asia/Seoul when calculating the current payment month", () => {
+    vi.stubEnv("TZ", "UTC");
+    const currentPeriodMonth = getCurrentPeriodMonth(new Date("2026-07-31T15:00:00.000Z"));
+    vi.unstubAllEnvs();
+
+    expect(currentPeriodMonth).toBe("2026-08-01");
+    expect(
+      isMemberActivityPending(
+        { activityStartMonth: "2026-08-01" },
+        currentPeriodMonth,
+      ),
+    ).toBe(false);
+    expect(
+      isMemberActiveForPeriod(
+        {
+          status: "active",
+          withdrawnDate: null,
+          pauseStartMonth: null,
+          activityStartMonth: "2026-08-01",
+        },
+        currentPeriodMonth,
+      ),
+    ).toBe(true);
   });
 
   it("keeps a member paused in August eligible for July fees only", () => {

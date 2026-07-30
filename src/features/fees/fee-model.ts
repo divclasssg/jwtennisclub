@@ -45,10 +45,14 @@ export function isValidDateInput(value: string) {
 }
 
 export function getCurrentPeriodMonth(now = new Date()) {
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
 
-  return `${year}-${month}-01`;
+  return `${values.year}-${values.month}-01`;
 }
 
 export function getPeriodMonthEnd(periodMonth: string) {
