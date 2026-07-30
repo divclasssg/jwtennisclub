@@ -21,6 +21,14 @@ function migrationFunctionBody(functionName: string) {
   return migrationSql.slice(start, end);
 }
 
+function sourceReadStatements(functionName: string) {
+  return migrationFunctionBody(functionName)
+    .split(";")
+    .filter((statement) =>
+      /public\.(members|fee_payments|expenses|monthly_closings)/.test(statement),
+    );
+}
+
 describe("monthly settlement closing migration", () => {
   it("defines versioned immutable closings with only one active row per month", () => {
     expect(migrationSql).toContain(
@@ -124,11 +132,31 @@ describe("monthly settlement closing migration", () => {
     );
   });
 
+  it("reads every snapshot source through one CTE statement and one MVCC command snapshot", () => {
+    const builder = migrationFunctionBody("build_monthly_settlement_snapshot");
+    const sourceStatements = sourceReadStatements(
+      "build_monthly_settlement_snapshot",
+    );
+
+    expect(sourceStatements).toHaveLength(1);
+    expect(sourceStatements[0]).toMatch(/with\s+relevant_members as/);
+    expect(sourceStatements[0]).toContain("activity_members as");
+    expect(sourceStatements[0]).toContain("target_member_payments as");
+    expect(sourceStatements[0]).toContain("actual_income as");
+    expect(sourceStatements[0]).toContain("period_expenses as materialized");
+    expect(sourceStatements[0]).toContain("prior_closing as");
+    expect(builder).not.toMatch(
+      /;\s*(?:select|if exists)[\s\S]*from public\.(members|fee_payments|expenses|monthly_closings)/,
+    );
+  });
+
   it("starts the ledger at zero in July and chains every later month to an active prior closing", () => {
     const builder = migrationFunctionBody("build_monthly_settlement_snapshot");
 
     expect(builder).toContain("date '2026-07-01'");
-    expect(builder).toContain("opening_ledger_balance := 0");
+    expect(builder).toMatch(
+      /when normalized_period_month = date '2026-07-01' then 0::bigint/,
+    );
     expect(builder).toContain(
       "prior_closing.status = 'closed'",
     );
@@ -220,6 +248,22 @@ describe("monthly settlement closing migration", () => {
     expect(page).toContain("'closed_by', closings.closed_by_name");
   });
 
+  it("returns an active stored snapshot without evaluating the live builder", () => {
+    const page = migrationFunctionBody("get_monthly_settlement_page");
+    const activeClosingQuery = page.indexOf(
+      "from public.monthly_closings as closings",
+    );
+    const builderCall = page.indexOf(
+      "public.build_monthly_settlement_snapshot(",
+    );
+
+    expect(activeClosingQuery).toBeGreaterThan(-1);
+    expect(builderCall).toBeGreaterThan(activeClosingQuery);
+    expect(page).toMatch(
+      /if active_closing is null then\s+preview_snapshot := public\.build_monthly_settlement_snapshot\([\s\S]*?\);\s+else\s+preview_snapshot := active_closing->'snapshot';\s+end if/,
+    );
+  });
+
   it("closes only completed Seoul months under the exact permission and serializes the ledger chain", () => {
     const close = migrationFunctionBody("close_monthly_settlement");
 
@@ -243,6 +287,28 @@ describe("monthly settlement closing migration", () => {
     expect(close).toContain("coalesce(max(closings.version), 0) + 1");
   });
 
+  it("rechecks and locks close authorization after every advisory and source-table wait", () => {
+    const close = migrationFunctionBody("close_monthly_settlement");
+    const sourceLock = close.indexOf(
+      "lock table public.members, public.fee_payments, public.expenses in share mode",
+    );
+    const postLockProfileCheck = close.indexOf(
+      "from public.profiles as profiles",
+      sourceLock,
+    );
+    const insert = close.indexOf("insert into public.monthly_closings");
+
+    expect(sourceLock).toBeGreaterThan(-1);
+    expect(postLockProfileCheck).toBeGreaterThan(sourceLock);
+    expect(insert).toBeGreaterThan(postLockProfileCheck);
+    expect(close.slice(postLockProfileCheck, insert)).toContain(
+      "role_permissions.permission = 'settlements.close'",
+    );
+    expect(close.slice(postLockProfileCheck, insert)).toContain(
+      "for share of profiles, role_permissions",
+    );
+  });
+
   it("reopens only the active closing, blocks later active months, and preserves history", () => {
     const reopen = migrationFunctionBody("reopen_monthly_settlement");
 
@@ -261,6 +327,70 @@ describe("monthly settlement closing migration", () => {
       /update public\.monthly_closings[\s\S]*status = 'reopened'/,
     );
     expect(reopen).not.toMatch(/delete from public\.monthly_closings/);
+  });
+
+  it("rechecks and locks reopen authorization after advisory waits", () => {
+    const reopen = migrationFunctionBody("reopen_monthly_settlement");
+    const lastAdvisoryLock = reopen.lastIndexOf("pg_advisory_xact_lock");
+    const postLockProfileCheck = reopen.indexOf(
+      "from public.profiles as profiles",
+      lastAdvisoryLock,
+    );
+    const update = reopen.indexOf("update public.monthly_closings");
+
+    expect(lastAdvisoryLock).toBeGreaterThan(-1);
+    expect(postLockProfileCheck).toBeGreaterThan(lastAdvisoryLock);
+    expect(update).toBeGreaterThan(postLockProfileCheck);
+    expect(reopen.slice(postLockProfileCheck, update)).toContain(
+      "role_permissions.permission = 'settlements.reopen'",
+    );
+    expect(reopen.slice(postLockProfileCheck, update)).toContain(
+      "for share of profiles, role_permissions",
+    );
+  });
+
+  it("captures mutation timestamps after waits and immediately before writes", () => {
+    for (const [functionName, assignment, mutation] of [
+      [
+        "close_monthly_settlement",
+        "closing_occurred_at := pg_catalog.clock_timestamp()",
+        "insert into public.monthly_closings",
+      ],
+      [
+        "reopen_monthly_settlement",
+        "reopen_occurred_at := pg_catalog.clock_timestamp()",
+        "update public.monthly_closings",
+      ],
+    ] as const) {
+      const body = migrationFunctionBody(functionName);
+      const lastAdvisoryLock = body.lastIndexOf("pg_advisory_xact_lock");
+      const timestampAssignment = body.indexOf(assignment);
+      const mutationIndex = body.indexOf(mutation);
+
+      expect(body).not.toMatch(
+        new RegExp(
+          `${assignment.split(" := ")[0]} timestamptz := pg_catalog\\.clock_timestamp`,
+        ),
+      );
+      expect(timestampAssignment).toBeGreaterThan(lastAdvisoryLock);
+      expect(mutationIndex).toBeGreaterThan(timestampAssignment);
+    }
+  });
+
+  it("returns a coherent stored snapshot DTO after reopen without a fallible live rebuild", () => {
+    const reopen = migrationFunctionBody("reopen_monthly_settlement");
+    const update = reopen.indexOf("update public.monthly_closings");
+    const afterUpdate = reopen.slice(update);
+
+    expect(afterUpdate).not.toContain(
+      "public.get_monthly_settlement_page(normalized_period_month)",
+    );
+    expect(afterUpdate).not.toContain(
+      "public.build_monthly_settlement_snapshot(",
+    );
+    expect(afterUpdate).toContain("'preview', active_closing.snapshot");
+    expect(afterUpdate).toContain("'active_closing', null");
+    expect(afterUpdate).toContain("'can_reopen', false");
   });
 
   it("writes close and reopen audit rows atomically with period and version details", () => {
