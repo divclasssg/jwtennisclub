@@ -16,6 +16,20 @@ const pauseMonthMigrationSql = readFileSync(
   ),
   "utf8",
 ).toLowerCase();
+const activityStartMigrationSql = existsSync(
+  join(
+    process.cwd(),
+    "supabase/migrations/202607300001_add_member_activity_start_month.sql",
+  ),
+)
+  ? readFileSync(
+      join(
+        process.cwd(),
+        "supabase/migrations/202607300001_add_member_activity_start_month.sql",
+      ),
+      "utf8",
+    ).toLowerCase()
+  : "";
 
 const meetingTables = [
   "club_meetings",
@@ -438,6 +452,28 @@ describe("club meeting migration", () => {
     expect(functionSql).toContain(
       "where rosters.period_month = locked_meeting.period_month",
     );
+  });
+
+  it("keeps future-start members out of preparing and initially locked rosters", () => {
+    const functionBody = (functionName: string) => {
+      const start = activityStartMigrationSql.indexOf(
+        `create or replace function public.${functionName}`,
+      );
+      const end = activityStartMigrationSql.indexOf("$$;", start);
+      return activityStartMigrationSql.slice(start, end);
+    };
+
+    for (const functionName of [
+      "sync_preparing_meeting_roster",
+      "ensure_locked_meeting_roster",
+    ]) {
+      const functionSql = functionBody(functionName);
+
+      expect(functionSql).toContain("members.activity_start_month is not null");
+      expect(functionSql).toContain(
+        "members.activity_start_month <= requested_period_month",
+      );
+    }
   });
 
   it("evaluates attendance time windows after acquiring the meeting lock", () => {

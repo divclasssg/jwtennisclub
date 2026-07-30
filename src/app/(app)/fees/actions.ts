@@ -19,9 +19,10 @@ import {
   buildFeeEligibilityFilter,
   getCurrentPeriodMonth,
   getPeriodMonthEnd,
+  isMemberFeeTargetForPeriod,
   normalizePeriodMonth,
 } from "@/features/fees/fee-model";
-import { isMemberEligibleForPeriod, type MemberStatus } from "@/features/members/member-model";
+import type { MemberStatus } from "@/features/members/member-model";
 
 const feesPath = "/fees";
 const feeCreatePath = "/fees/new";
@@ -31,7 +32,9 @@ type FeeImportMemberRow = {
   id: string;
   member_code: string;
   status: MemberStatus;
+  withdrawn_date: string | null;
   pause_start_month: string | null;
+  activity_start_month: string | null;
 };
 
 function buildRedirect(path: string, params: Record<string, string | number>) {
@@ -100,14 +103,30 @@ export async function createFeePayment(formData: FormData) {
 
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("id")
+    .select(
+      "id, member_code, status, withdrawn_date, pause_start_month, activity_start_month",
+    )
     .eq("id", payment.memberId)
     .or(buildFeeEligibilityFilter(payment.periodMonth))
     .neq("member_code", FEE_EXEMPT_MEMBER_CODE)
     .lte("joined_date", getPeriodMonthEnd(payment.periodMonth))
+    .lte("activity_start_month", payment.periodMonth)
     .maybeSingle();
 
-  if (memberError || !member) {
+  if (
+    memberError ||
+    !member ||
+    !isMemberFeeTargetForPeriod(
+      {
+        memberCode: member.member_code,
+        status: member.status,
+        withdrawnDate: member.withdrawn_date,
+        pauseStartMonth: member.pause_start_month,
+        activityStartMonth: member.activity_start_month,
+      },
+      payment.periodMonth,
+    )
+  ) {
     redirect(buildRedirect(feeCreatePath, { error: "invalid-member" }));
   }
 
@@ -190,14 +209,30 @@ export async function saveFeeMonthlyNote(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedUserId();
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("id, status, pause_start_month, joined_date, member_code")
+    .select(
+      "id, member_code, status, withdrawn_date, pause_start_month, activity_start_month",
+    )
     .eq("id", memberId)
     .or(buildFeeEligibilityFilter(periodMonth))
     .neq("member_code", FEE_EXEMPT_MEMBER_CODE)
     .lte("joined_date", getPeriodMonthEnd(periodMonth))
+    .lte("activity_start_month", periodMonth)
     .maybeSingle();
 
-  if (memberError || !member) {
+  if (
+    memberError ||
+    !member ||
+    !isMemberFeeTargetForPeriod(
+      {
+        memberCode: member.member_code,
+        status: member.status,
+        withdrawnDate: member.withdrawn_date,
+        pauseStartMonth: member.pause_start_month,
+        activityStartMonth: member.activity_start_month,
+      },
+      periodMonth,
+    )
+  ) {
     redirect(
       buildFeesHref(listState, {
         note: memberId,
@@ -285,7 +320,9 @@ export async function importFeePaymentsCsv(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedUserId();
   const { data: members, error: membersError } = await supabase
     .from("members")
-    .select("id, member_code, status, pause_start_month")
+    .select(
+      "id, member_code, status, withdrawn_date, pause_start_month, activity_start_month",
+    )
     .in("status", ["active", "paused"]);
 
   if (membersError) {
@@ -298,10 +335,13 @@ export async function importFeePaymentsCsv(formData: FormData) {
 
     if (
       !member ||
-      !isMemberEligibleForPeriod(
+      !isMemberFeeTargetForPeriod(
         {
+          memberCode: member.memberCode,
           status: member.status,
+          withdrawnDate: member.withdrawnDate,
           pauseStartMonth: member.pauseStartMonth,
+          activityStartMonth: member.activityStartMonth,
         },
         payment.periodMonth,
       )
@@ -347,8 +387,11 @@ function buildMemberImportMap(members: FeeImportMemberRow[]) {
       member.member_code.trim().toUpperCase(),
       {
         id: member.id,
+        memberCode: member.member_code,
         status: member.status,
+        withdrawnDate: member.withdrawn_date,
         pauseStartMonth: member.pause_start_month,
+        activityStartMonth: member.activity_start_month,
       },
     ]),
   );
