@@ -1,0 +1,296 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const migrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607300002_add_monthly_settlement_closings.sql",
+);
+const migrationSql = existsSync(migrationPath)
+  ? readFileSync(migrationPath, "utf8").toLowerCase()
+  : "";
+
+function migrationFunctionBody(functionName: string) {
+  const start = migrationSql.indexOf(
+    `create or replace function public.${functionName}`,
+  );
+  const end = migrationSql.indexOf("$$;", start);
+
+  expect(start, functionName).toBeGreaterThan(-1);
+  expect(end, functionName).toBeGreaterThan(start);
+  return migrationSql.slice(start, end);
+}
+
+describe("monthly settlement closing migration", () => {
+  it("defines versioned immutable closings with only one active row per month", () => {
+    expect(migrationSql).toContain(
+      "create type public.monthly_closing_status as enum ('closed', 'reopened')",
+    );
+    expect(migrationSql).toContain("create table public.monthly_closings");
+    expect(migrationSql).toContain("unique (period_month, version)");
+    expect(migrationSql).toContain(
+      "create unique index monthly_closings_one_active_month_idx",
+    );
+    expect(migrationSql).toMatch(
+      /on public\.monthly_closings\s*\(period_month\)\s*where status = 'closed'/,
+    );
+    expect(migrationSql).toContain(
+      "period_month = date_trunc('month', period_month)::date",
+    );
+    expect(migrationSql).toContain("closed_by_name text not null");
+    expect(migrationSql).toContain(
+      "monthly_closings_closed_by_name_valid",
+    );
+    expect(migrationSql).toMatch(
+      /status = 'closed'[\s\S]*reopened_by is null[\s\S]*reopened_at is null/,
+    );
+  });
+
+  it("allows active operators to read snapshots but forbids every direct authenticated write", () => {
+    expect(migrationSql).toContain(
+      "alter table public.monthly_closings enable row level security",
+    );
+    expect(migrationSql).toContain(
+      "create policy \"active operators can read monthly closings\"",
+    );
+    expect(migrationSql).toContain(
+      "using (public.is_active_operator())",
+    );
+    expect(migrationSql).toContain(
+      "revoke insert, update, delete on table public.monthly_closings from public, anon, authenticated",
+    );
+    expect(migrationSql).toContain(
+      "grant select on table public.monthly_closings to authenticated",
+    );
+    expect(migrationSql).not.toMatch(
+      /grant\s+(?:insert|update|delete|all)[^;]*monthly_closings[^;]*authenticated/,
+    );
+  });
+
+  it("keeps the one authoritative calculator private with a fixed search path", () => {
+    const builder = migrationFunctionBody("build_monthly_settlement_snapshot");
+
+    expect(builder).toContain("security definer");
+    expect(builder).toContain("set search_path = ''");
+    expect(migrationSql).toContain(
+      "revoke execute on function public.build_monthly_settlement_snapshot(date)\nfrom public, anon, authenticated, service_role",
+    );
+    expect(migrationSql).not.toContain(
+      "grant execute on function public.build_monthly_settlement_snapshot(date)",
+    );
+  });
+
+  it("calculates activity and fee targets member by member at the requested month", () => {
+    const builder = migrationFunctionBody("build_monthly_settlement_snapshot");
+
+    expect(builder).toContain("activity_start_month");
+    expect(builder).toContain("member activity start month required");
+    expect(builder).toContain(
+      "members.activity_start_month <= normalized_period_month",
+    );
+    expect(builder).toContain(
+      "members.withdrawn_date > period_month_end",
+    );
+    expect(builder).toContain(
+      "members.pause_start_month <= normalized_period_month",
+    );
+    expect(builder).toContain("members.member_code <> '#0000'");
+    expect(builder).toContain(
+      "greatest(monthly_fee_amount - coalesce",
+    );
+    expect(builder).toContain("least(coalesce");
+    expect(builder).toMatch(
+      /count\(\*\) filter \(\s*where paid_amount >= monthly_fee_amount\s*\)/,
+    );
+    expect(builder).toMatch(
+      /count\(\*\) filter \(\s*where paid_amount < monthly_fee_amount\s*\)/,
+    );
+  });
+
+  it("keeps actual income independent from capped recognized payments", () => {
+    const builder = migrationFunctionBody("build_monthly_settlement_snapshot");
+
+    expect(builder).toMatch(
+      /from public\.fee_payments as fee_payments[\s\S]*fee_payments\.period_month = normalized_period_month/,
+    );
+    expect(builder).toContain(
+      "actual_fee_income - recognized_paid_total",
+    );
+    expect(builder).toContain(
+      "actual_fee_income - expense_total",
+    );
+    expect(builder).toContain(
+      "opening_ledger_balance + attributed_net",
+    );
+  });
+
+  it("starts the ledger at zero in July and chains every later month to an active prior closing", () => {
+    const builder = migrationFunctionBody("build_monthly_settlement_snapshot");
+
+    expect(builder).toContain("date '2026-07-01'");
+    expect(builder).toContain("opening_ledger_balance := 0");
+    expect(builder).toContain(
+      "prior_closing.status = 'closed'",
+    );
+    expect(builder).toContain(
+      "prior monthly settlement closing required",
+    );
+    expect(builder).toContain(
+      "prior_closing.snapshot->>'closing_ledger_balance'",
+    );
+  });
+
+  it("includes reconciled public expense data and excludes private fields", () => {
+    const builder = migrationFunctionBody("build_monthly_settlement_snapshot");
+
+    for (const key of [
+      "'expense_total'",
+      "'expense_count'",
+      "'expense_category_rows'",
+      "'expense_rows'",
+      "'expense_date'",
+      "'category'",
+      "'description'",
+      "'amount'",
+    ]) {
+      expect(builder).toContain(key);
+    }
+
+    for (const prohibitedKey of [
+      "'member_name'",
+      "'member_code'",
+      "'member_id'",
+      "'memo'",
+      "'receipt_file_key'",
+      "'receipt_file_name'",
+      "'receipt_content_type'",
+      "'receipt_size'",
+    ]) {
+      expect(builder).not.toContain(prohibitedKey);
+    }
+  });
+
+  it("emits the exact versioned snapshot keys consumed by the runtime parser", () => {
+    const builder = migrationFunctionBody("build_monthly_settlement_snapshot");
+
+    for (const key of [
+      "'schema_version'",
+      "'period_month'",
+      "'monthly_fee_amount'",
+      "'activity_member_count'",
+      "'fee_target_count'",
+      "'fully_paid_count'",
+      "'unpaid_count'",
+      "'billed_total'",
+      "'actual_fee_income'",
+      "'recognized_paid_total'",
+      "'adjustment_income'",
+      "'unpaid_total'",
+      "'expense_total'",
+      "'expense_count'",
+      "'attributed_net'",
+      "'opening_ledger_balance'",
+      "'closing_ledger_balance'",
+      "'expense_category_rows'",
+      "'expense_rows'",
+    ]) {
+      expect(builder).toContain(key);
+    }
+  });
+
+  it("requires an active profile for preview and returns the complete page DTO", () => {
+    const page = migrationFunctionBody("get_monthly_settlement_page");
+
+    expect(page).toContain("profiles.id = auth.uid()");
+    expect(page).toContain("profiles.status = 'active'");
+    expect(page).toContain("active operator required");
+    expect(page).toMatch(
+      /public\.build_monthly_settlement_snapshot\(\s*normalized_period_month\s*\)/,
+    );
+    for (const key of [
+      "'preview'",
+      "'active_closing'",
+      "'can_close'",
+      "'can_reopen'",
+      "'close_blocked_reason'",
+      "'closed_by'",
+    ]) {
+      expect(page).toContain(key);
+    }
+    expect(page).toContain("'closed_by', closings.closed_by_name");
+  });
+
+  it("closes only completed Seoul months under the exact permission and serializes the ledger chain", () => {
+    const close = migrationFunctionBody("close_monthly_settlement");
+
+    expect(close).toContain("public.has_permission('settlements.close')");
+    expect(close).toContain("settlements.close permission required");
+    expect(close).toContain("profiles.display_name");
+    expect(close).toContain("closed_by_name");
+    expect(close).toContain("at time zone 'asia/seoul'");
+    expect(close).toContain("current or future month cannot be closed");
+    expect(close).toContain("pg_advisory_xact_lock");
+    expect(close).toContain("'monthly-settlement-chain'");
+    expect(close).toContain(
+      "'monthly-settlement:' || normalized_period_month::text",
+    );
+    expect(close).toContain(
+      "lock table public.members, public.fee_payments, public.expenses in share mode",
+    );
+    expect(close).toMatch(
+      /public\.build_monthly_settlement_snapshot\(\s*normalized_period_month\s*\)/,
+    );
+    expect(close).toContain("coalesce(max(closings.version), 0) + 1");
+  });
+
+  it("reopens only the active closing, blocks later active months, and preserves history", () => {
+    const reopen = migrationFunctionBody("reopen_monthly_settlement");
+
+    expect(reopen).toContain("public.has_permission('settlements.reopen')");
+    expect(reopen).toContain("settlements.reopen permission required");
+    expect(reopen).toContain("pg_advisory_xact_lock");
+    expect(reopen).toContain("'monthly-settlement-chain'");
+    expect(reopen).toContain("closings.status = 'closed'");
+    expect(reopen).toContain(
+      "later monthly settlement closing blocks reopen",
+    );
+    expect(reopen).toMatch(
+      /later_closings\.period_month > normalized_period_month[\s\S]*later_closings\.status = 'closed'/,
+    );
+    expect(reopen).toMatch(
+      /update public\.monthly_closings[\s\S]*status = 'reopened'/,
+    );
+    expect(reopen).not.toMatch(/delete from public\.monthly_closings/);
+  });
+
+  it("writes close and reopen audit rows atomically with period and version details", () => {
+    for (const [functionName, action] of [
+      ["close_monthly_settlement", "monthly_settlement.closed"],
+      ["reopen_monthly_settlement", "monthly_settlement.reopened"],
+    ] as const) {
+      const body = migrationFunctionBody(functionName);
+
+      expect(body).toContain("insert into public.audit_logs");
+      expect(body).toContain(`'${action}'`);
+      expect(body).toContain("'monthly_closings'");
+      expect(body).toContain("'period_month'");
+      expect(body).toContain("'version'");
+      expect(body).toContain("actor_profile_id");
+    }
+  });
+
+  it("exposes only the three authenticated page and mutation RPCs", () => {
+    for (const signature of [
+      "get_monthly_settlement_page(date)",
+      "close_monthly_settlement(date)",
+      "reopen_monthly_settlement(date)",
+    ]) {
+      expect(migrationSql).toContain(
+        `revoke execute on function public.${signature} from public, anon`,
+      );
+      expect(migrationSql).toContain(
+        `grant execute on function public.${signature} to authenticated`,
+      );
+    }
+  });
+});
