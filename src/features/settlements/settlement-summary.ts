@@ -40,8 +40,6 @@ export type SettlementSummary = {
   incomeTotal: number;
   expenseTotal: number;
   attributedNet: number;
-  /** @deprecated Use attributedNet for new settlement UI. */
-  balance: number;
   feePaymentCount: number;
   expenseCount: number;
   expenseCategoryRows: SettlementExpenseCategoryRow[];
@@ -74,7 +72,6 @@ export function buildSettlementSummary(input: {
     incomeTotal,
     expenseTotal,
     attributedNet: incomeTotal - expenseTotal,
-    balance: incomeTotal - expenseTotal,
     feePaymentCount: input.feePayments.length,
     expenseCount: input.expenses.length,
     expenseCategoryRows: buildExpenseCategoryRows(input.expenses),

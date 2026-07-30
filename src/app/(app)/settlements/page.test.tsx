@@ -96,7 +96,7 @@ describe("SettlementsPage", () => {
     expect(screen.getByText("80,000원")).toBeInTheDocument();
     expect(screen.getByText("지출 합계")).toBeInTheDocument();
     expect(screen.getByText("130,000원")).toBeInTheDocument();
-    expect(screen.getByText("정산 잔액")).toBeInTheDocument();
+    expect(screen.getByText("당월 귀속 수지")).toBeInTheDocument();
     expect(screen.getByText("-50,000원")).toBeInTheDocument();
 
     const settlementPanel = screen.getByRole("region", { name: "2026.07 정산" });

@@ -24,7 +24,7 @@ describe("normalizeSettlementFilters", () => {
 });
 
 describe("buildSettlementSummary", () => {
-  it("calculates monthly income, expenses, balance, and expense category totals", () => {
+  it("calculates monthly income, expenses, attributed net, and expense category totals", () => {
     const summary = buildSettlementSummary({
       feePayments: [
         { amount: 30000 },
@@ -42,7 +42,6 @@ describe("buildSettlementSummary", () => {
       incomeTotal: 110000,
       expenseTotal: 150000,
       attributedNet: -40000,
-      balance: -40000,
       feePaymentCount: 3,
       expenseCount: 3,
       expenseCategoryRows: [

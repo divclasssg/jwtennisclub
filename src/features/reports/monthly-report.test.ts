@@ -51,7 +51,7 @@ describe("buildMonthlyReportData", () => {
       generatedBy: "김운영",
       incomeTotal: 80000,
       expenseTotal: 130000,
-      balance: -50000,
+      attributedNet: -50000,
       feePaymentCount: 2,
       expenseCount: 2,
       expenseCategoryRows: [

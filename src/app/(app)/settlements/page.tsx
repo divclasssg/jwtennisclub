@@ -189,8 +189,8 @@ export default async function SettlementsPage({
               value={`${formatCurrency(summary.expenseTotal)}원`}
             />
             <SummaryCard
-              label="정산 잔액"
-              value={formatSettlementBalance(summary.balance)}
+              label="당월 귀속 수지"
+              value={formatSettlementBalance(summary.attributedNet)}
             />
           </SummaryGrid>
         </DataPanel>

@@ -48,7 +48,7 @@ export type MonthlyReportData = {
   generatedBy: string;
   incomeTotal: number;
   expenseTotal: number;
-  balance: number;
+  attributedNet: number;
   feePaymentCount: number;
   expenseCount: number;
   expenseCategoryRows: SettlementExpenseCategoryRow[];
@@ -84,7 +84,7 @@ export function buildMonthlyReportData(input: {
     generatedBy: input.generatedBy,
     incomeTotal: settlement.incomeTotal,
     expenseTotal: settlement.expenseTotal,
-    balance: settlement.balance,
+    attributedNet: settlement.attributedNet,
     feePaymentCount: settlement.feePaymentCount,
     expenseCount: settlement.expenseCount,
     expenseCategoryRows: settlement.expenseCategoryRows,

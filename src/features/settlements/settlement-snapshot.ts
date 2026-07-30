@@ -5,6 +5,7 @@ import {
 } from "@/features/expenses/expense-model";
 
 const SETTLEMENT_SCHEMA_VERSION = 1;
+const FIRST_LEDGER_MONTH = "2026-07-01";
 const PARSE_ERROR_MESSAGE = "월별 정산 데이터 형식이 올바르지 않습니다.";
 
 const calendarDateSchema = z.string().refine(isCalendarDate);
@@ -57,6 +58,17 @@ const databaseSnapshotSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.period_month < FIRST_LEDGER_MONTH) {
+      context.addIssue({ code: "custom", message: "ledger start month" });
+    }
+
+    if (
+      value.period_month === FIRST_LEDGER_MONTH &&
+      value.opening_ledger_balance !== 0
+    ) {
+      context.addIssue({ code: "custom", message: "first ledger opening balance" });
+    }
+
     if (value.fee_target_count > value.activity_member_count) {
       context.addIssue({ code: "custom", message: "fee target count" });
     }
@@ -145,6 +157,15 @@ const databaseSnapshotSchema = z
         context.addIssue({ code: "custom", message: "expense category totals" });
       }
     }
+
+    const periodPrefix = value.period_month.slice(0, 7);
+    if (
+      value.expense_rows.some(
+        (row) => !row.expense_date.startsWith(periodPrefix),
+      )
+    ) {
+      context.addIssue({ code: "custom", message: "expense period month" });
+    }
   });
 
 const databaseClosingSchema = z
@@ -175,6 +196,10 @@ const databasePageSchema = z
         context.addIssue({ code: "custom", message: "reopen without closing" });
       }
       return;
+    }
+
+    if (value.can_close) {
+      context.addIssue({ code: "custom", message: "close with active closing" });
     }
 
     if (

@@ -138,9 +138,9 @@ function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
               </Text>
             </View>
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>월 순변동</Text>
+              <Text style={styles.summaryLabel}>당월 귀속 수지</Text>
               <Text style={styles.summaryValue}>
-                {formatSettlementBalance(report.balance)}
+                {formatSettlementBalance(report.attributedNet)}
               </Text>
             </View>
           </View>

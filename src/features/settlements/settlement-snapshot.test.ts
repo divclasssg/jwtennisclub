@@ -97,7 +97,7 @@ function databasePage(overrides: Record<string, unknown> = {}) {
       closed_at: "2026-08-02T03:04:05+00:00",
       closed_by: "김마감",
     },
-    can_close: true,
+    can_close: false,
     can_reopen: false,
     close_blocked_reason: null,
     ...overrides,
@@ -117,7 +117,7 @@ describe("monthly settlement page parser", () => {
         closedAt: "2026-08-02T03:04:05+00:00",
         closedBy: "김마감",
       },
-      canClose: true,
+      canClose: false,
       canReopen: false,
       closeBlockedReason: null,
     });
@@ -195,6 +195,92 @@ describe("monthly settlement page parser", () => {
             ...databasePage().active_closing,
             period_month: "2026-08-01",
           },
+        }),
+      ),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("rejects a page that allows closing an already closed month", () => {
+    expect(() =>
+      parseMonthlySettlementPage(databasePage({ can_close: true })),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("rejects a page that allows reopening without an active closing", () => {
+    expect(() =>
+      parseMonthlySettlementPage(
+        databasePage({
+          active_closing: null,
+          can_close: true,
+          can_reopen: true,
+        }),
+      ),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("rejects settlement snapshots before the July 2026 ledger start", () => {
+    expect(() =>
+      parseMonthlySettlementPage(
+        databasePage({
+          preview: databaseSnapshot({ period_month: "2026-06-01" }),
+          active_closing: null,
+          can_close: true,
+        }),
+      ),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("requires July 2026 to start from a zero ledger balance", () => {
+    expect(() =>
+      parseMonthlySettlementPage(
+        databasePage({
+          preview: databaseSnapshot({
+            opening_ledger_balance: 1,
+            closing_ledger_balance: 395001,
+          }),
+          active_closing: null,
+          can_close: true,
+        }),
+      ),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("rejects expense rows outside the snapshot month", () => {
+    expect(() =>
+      parseMonthlySettlementPage(
+        databasePage({
+          preview: databaseSnapshot({
+            expense_rows: [
+              {
+                expense_date: "2026-08-01",
+                category: "court",
+                description: "코트 대관",
+                amount: 120000,
+              },
+              {
+                expense_date: "2026-07-20",
+                category: "balls",
+                description: "테니스 공 구매",
+                amount: 10000,
+              },
+            ],
+          }),
+          active_closing: null,
+          can_close: true,
+        }),
+      ),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("rejects numeric values beyond JavaScript's safe integer range", () => {
+    expect(() =>
+      parseMonthlySettlementPage(
+        databasePage({
+          preview: databaseSnapshot({
+            activity_member_count: Number.MAX_SAFE_INTEGER + 1,
+          }),
+          active_closing: null,
+          can_close: true,
         }),
       ),
     ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
