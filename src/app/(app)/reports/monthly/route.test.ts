@@ -1,77 +1,115 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const snapshot = {
+  schema_version: 1,
+  period_month: "2026-07-01",
+  monthly_fee_amount: 30000,
+  activity_member_count: 21,
+  fee_target_count: 20,
+  fully_paid_count: 17,
+  unpaid_count: 3,
+  billed_total: 600000,
+  actual_fee_income: 525000,
+  recognized_paid_total: 510000,
+  adjustment_income: 15000,
+  unpaid_total: 90000,
+  expense_total: 130000,
+  expense_count: 2,
+  attributed_net: 395000,
+  opening_ledger_balance: 0,
+  closing_ledger_balance: 395000,
+  expense_category_rows: [
+    { category: "court", amount: 120000, count: 1 },
+    { category: "balls", amount: 10000, count: 1 },
+  ],
+  expense_rows: [
+    {
+      expense_date: "2026-07-12",
+      category: "court",
+      description: "코트 대관",
+      amount: 120000,
+    },
+    {
+      expense_date: "2026-07-18",
+      category: "balls",
+      description: "시합구",
+      amount: 10000,
+    },
+  ],
+};
+
+const activeClosing = {
+  id: "f0331b6c-99e0-4d6b-ab47-6e0d3ae57c00",
+  period_month: "2026-07-01",
+  version: 2,
+  status: "closed",
+  snapshot,
+  closed_at: "2026-08-02T03:04:05.000Z",
+  closed_by_name: "김마감",
+};
 
 const mocks = vi.hoisted(() => {
-  const feePaymentsQuery = {
-    eq: vi.fn(() => feePaymentsQuery),
-    order: vi.fn(() =>
-      Promise.resolve({
-        data: [{ id: "payment-1", amount: 30000 }],
-        error: null,
-      }),
-    ),
-    select: vi.fn(() => feePaymentsQuery),
+  let closingResult: { data: unknown; error: { message: string } | null } = {
+    data: null,
+    error: null,
   };
-  const expensesQuery = {
-    gte: vi.fn(() => expensesQuery),
-    lt: vi.fn(() => expensesQuery),
-    order: vi.fn(() =>
-      Promise.resolve({
-        data: [
-          {
-            id: "expense-1",
-            amount: 120000,
-            category: "court",
-            description: "코트 대관",
-            expense_date: "2026-06-12",
-            memo: "내부 메모",
-          },
-        ],
-        error: null,
-      }),
-    ),
-    select: vi.fn(() => expensesQuery),
+  let auditResult: { error: { message: string } | null } = { error: null };
+  let authenticated = true;
+
+  const closingsQuery = {
+    eq: vi.fn(() => closingsQuery),
+    maybeSingle: vi.fn(() => Promise.resolve(closingResult)),
+    select: vi.fn(() => closingsQuery),
   };
   const profilesQuery = {
     eq: vi.fn(() => profilesQuery),
     maybeSingle: vi.fn(() =>
-      Promise.resolve({
-        data: { display_name: "김운영" },
-        error: null,
-      }),
+      Promise.resolve({ data: { display_name: "김생성" }, error: null }),
     ),
     select: vi.fn(() => profilesQuery),
+  };
+  const auditQuery = {
+    insert: vi.fn(() => Promise.resolve(auditResult)),
   };
   const supabase = {
     auth: {
       getUser: vi.fn(() =>
-        Promise.resolve({
-          data: { user: { id: "operator-id", email: "operator@example.com" } },
-          error: null,
-        }),
+        Promise.resolve(
+          authenticated
+            ? {
+                data: {
+                  user: { id: "operator-id", email: "operator@example.com" },
+                },
+                error: null,
+              }
+            : { data: { user: null }, error: null },
+        ),
       ),
     },
     from: vi.fn((table: string) => {
-      if (table === "fee_payments") {
-        return feePaymentsQuery;
-      }
+      if (table === "monthly_closings") return closingsQuery;
+      if (table === "profiles") return profilesQuery;
+      if (table === "audit_logs") return auditQuery;
 
-      if (table === "expenses") {
-        return expensesQuery;
-      }
-
-      if (table === "profiles") {
-        return profilesQuery;
-      }
-
-      throw new Error(`Unexpected table: ${table}`);
+      throw new Error(`Unexpected raw source table: ${table}`);
     }),
   };
 
   return {
-    feePaymentsQuery,
+    auditQuery,
+    closingsQuery,
     renderMonthlyReportPdf: vi.fn(() =>
       Promise.resolve(Buffer.from("%PDF monthly report")),
     ),
+    setAuditResult(result: { error: { message: string } | null }) {
+      auditResult = result;
+    },
+    setAuthenticated(value: boolean) {
+      authenticated = value;
+    },
+    setClosingResult(result: { data: unknown; error: { message: string } | null }) {
+      closingResult = result;
+    },
     supabase,
   };
 });
@@ -87,27 +125,101 @@ vi.mock("@/features/reports/MonthlyReportPdf", () => ({
 import { GET } from "./route";
 
 describe("monthly report route", () => {
-  it("returns a PDF attachment for an authenticated operator", async () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-03T12:00:00Z"));
+    vi.clearAllMocks();
+    mocks.setAuthenticated(true);
+    mocks.setAuditResult({ error: null });
+    mocks.setClosingResult({ data: activeClosing, error: null });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("renders an active stored closing, audits it, and returns the stable filename", async () => {
     const response = await GET(
-      new Request("http://localhost/reports/monthly?month=2026-06"),
+      new Request("http://localhost/reports/monthly?month=2026-07"),
     );
 
-    expect(mocks.supabase.from).toHaveBeenCalledWith("fee_payments");
-    expect(mocks.feePaymentsQuery.eq).toHaveBeenCalledWith(
+    expect(mocks.supabase.from).toHaveBeenCalledWith("monthly_closings");
+    expect(mocks.closingsQuery.eq).toHaveBeenNthCalledWith(
+      1,
       "period_month",
-      "2026-06-01",
+      "2026-07-01",
     );
+    expect(mocks.closingsQuery.eq).toHaveBeenNthCalledWith(2, "status", "closed");
     expect(mocks.renderMonthlyReportPdf).toHaveBeenCalledWith(
       expect.objectContaining({
-        generatedBy: "김운영",
-        incomeTotal: 30000,
-        expenseTotal: 120000,
+        closingVersion: 2,
+        closedBy: "김마감",
+        actualFeeIncome: 525000,
+        closingLedgerBalance: 395000,
       }),
     );
+    expect(mocks.auditQuery.insert).toHaveBeenCalledWith({
+      actor_profile_id: "operator-id",
+      action: "monthly_report.generated",
+      table_name: "monthly_closings",
+      record_id: activeClosing.id,
+      details: {
+        period_month: "2026-07-01",
+        version: 2,
+      },
+    });
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(response.headers.get("content-disposition")).toContain(
-      "jw-tennis-club-2026-06-report.pdf",
+      "jw-tennis-club-2026-07-report.pdf",
     );
     expect(await response.text()).toBe("%PDF monthly report");
+  });
+
+  it("requires an authenticated user", async () => {
+    mocks.setAuthenticated(false);
+
+    const response = await GET(
+      new Request("http://localhost/reports/monthly?month=2026-07"),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("http://localhost/login");
+    expect(mocks.supabase.from).not.toHaveBeenCalled();
+  });
+
+  it("rejects report generation before the next month begins in Seoul", async () => {
+    vi.setSystemTime(new Date("2026-07-31T14:59:59.000Z"));
+
+    const response = await GET(
+      new Request("http://localhost/reports/monthly?month=2026-07"),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).toBe("이 월의 PDF 생성 기간이 아직 시작되지 않았습니다.");
+    expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
+    expect(mocks.auditQuery.insert).not.toHaveBeenCalled();
+  });
+
+  it("returns a controlled response when no active closing exists", async () => {
+    mocks.setClosingResult({ data: null, error: null });
+
+    const response = await GET(
+      new Request("http://localhost/reports/monthly?month=2026-07"),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe("마감된 월별 정산을 찾을 수 없습니다.");
+    expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
+  });
+
+  it("does not return a PDF when audit logging fails", async () => {
+    mocks.setAuditResult({ error: { message: "audit insert failed" } });
+
+    const response = await GET(
+      new Request("http://localhost/reports/monthly?month=2026-07"),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("PDF 생성 기록을 저장하지 못했습니다.");
   });
 });

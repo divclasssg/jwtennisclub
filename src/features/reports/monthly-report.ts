@@ -1,17 +1,16 @@
 import {
   formatCurrency,
   formatExpenseCategory,
-  type SettlementExpenseCategoryRow,
-} from "@/features/settlements/settlement-summary";
-import {
-  buildSettlementSummary,
   formatPeriodMonth,
 } from "@/features/settlements/settlement-summary";
+import type {
+  MonthlySettlementClosing,
+  MonthlySettlementExpenseCategoryRow,
+} from "@/features/settlements/settlement-snapshot";
 import {
   getCurrentPeriodMonth,
   normalizePeriodMonth,
 } from "@/features/fees/fee-model";
-import { type ExpenseCategory } from "@/features/expenses/expense-model";
 import { firstSearchParam } from "@/features/members/member-list";
 
 export type ReportSearchParams = {
@@ -20,18 +19,6 @@ export type ReportSearchParams = {
 
 export type ReportFilters = {
   periodMonth: string;
-};
-
-export type MonthlyReportFeePaymentInput = {
-  amount: number;
-};
-
-export type MonthlyReportExpenseInput = {
-  amount: number;
-  category: ExpenseCategory;
-  description: string;
-  expenseDate: string;
-  memo: string | null;
 };
 
 export type MonthlyReportExpenseRow = {
@@ -44,15 +31,27 @@ export type MonthlyReportExpenseRow = {
 export type MonthlyReportData = {
   title: string;
   periodLabel: string;
+  closingVersion: number;
+  closedAtLabel: string;
+  closedBy: string;
   generatedAtLabel: string;
   generatedBy: string;
-  incomeTotal: number;
+  activityMemberCount: number;
+  feeTargetCount: number;
+  fullyPaidCount: number;
+  unpaidCount: number;
+  billedTotal: number;
+  actualFeeIncome: number;
+  recognizedPaidTotal: number;
+  adjustmentIncome: number;
+  unpaidTotal: number;
   expenseTotal: number;
-  attributedNet: number;
-  feePaymentCount: number;
   expenseCount: number;
-  expenseCategoryRows: SettlementExpenseCategoryRow[];
-  majorExpenseRows: MonthlyReportExpenseRow[];
+  attributedNet: number;
+  openingLedgerBalance: number;
+  closingLedgerBalance: number;
+  expenseCategoryRows: MonthlySettlementExpenseCategoryRow[];
+  expenseRows: MonthlyReportExpenseRow[];
 };
 
 export function normalizeReportFilters(
@@ -66,29 +65,37 @@ export function normalizeReportFilters(
 }
 
 export function buildMonthlyReportData(input: {
-  periodMonth: string;
+  closing: MonthlySettlementClosing;
   generatedAt: Date;
   generatedBy: string;
-  feePayments: MonthlyReportFeePaymentInput[];
-  expenses: MonthlyReportExpenseInput[];
 }): MonthlyReportData {
-  const settlement = buildSettlementSummary({
-    feePayments: input.feePayments,
-    expenses: input.expenses,
-  });
+  const { closing } = input;
+  const snapshot = closing.snapshot;
 
   return {
-    title: formatReportTitle(input.periodMonth),
-    periodLabel: formatPeriodMonth(input.periodMonth),
-    generatedAtLabel: formatDateLabel(input.generatedAt),
+    title: formatReportTitle(snapshot.periodMonth),
+    periodLabel: formatPeriodMonth(snapshot.periodMonth),
+    closingVersion: closing.version,
+    closedAtLabel: formatSeoulDateLabel(new Date(closing.closedAt)),
+    closedBy: closing.closedBy,
+    generatedAtLabel: formatSeoulDateLabel(input.generatedAt),
     generatedBy: input.generatedBy,
-    incomeTotal: settlement.incomeTotal,
-    expenseTotal: settlement.expenseTotal,
-    attributedNet: settlement.attributedNet,
-    feePaymentCount: settlement.feePaymentCount,
-    expenseCount: settlement.expenseCount,
-    expenseCategoryRows: settlement.expenseCategoryRows,
-    majorExpenseRows: input.expenses.map((expense) => ({
+    activityMemberCount: snapshot.activityMemberCount,
+    feeTargetCount: snapshot.feeTargetCount,
+    fullyPaidCount: snapshot.fullyPaidCount,
+    unpaidCount: snapshot.unpaidCount,
+    billedTotal: snapshot.billedTotal,
+    actualFeeIncome: snapshot.actualFeeIncome,
+    recognizedPaidTotal: snapshot.recognizedPaidTotal,
+    adjustmentIncome: snapshot.adjustmentIncome,
+    unpaidTotal: snapshot.unpaidTotal,
+    expenseTotal: snapshot.expenseTotal,
+    expenseCount: snapshot.expenseCount,
+    attributedNet: snapshot.attributedNet,
+    openingLedgerBalance: snapshot.openingLedgerBalance,
+    closingLedgerBalance: snapshot.closingLedgerBalance,
+    expenseCategoryRows: snapshot.expenseCategoryRows.map((row) => ({ ...row })),
+    expenseRows: snapshot.expenseRows.map((expense) => ({
       expenseDate: expense.expenseDate.replaceAll("-", "."),
       categoryLabel: formatExpenseCategory(expense.category),
       description: expense.description,
@@ -103,12 +110,18 @@ function formatReportTitle(periodMonth: string) {
   return `${year}년 ${month}월 테니스 클럽 월간 정산 보고서`;
 }
 
-function formatDateLabel(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+function formatSeoulDateLabel(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date).reduce<Record<string, string>>((result, part) => {
+    if (part.type !== "literal") result[part.type] = part.value;
+    return result;
+  }, {});
 
-  return `${year}.${month}.${day}`;
+  return `${parts.year}.${parts.month}.${parts.day}`;
 }
 
 export function formatReportFileName(periodMonth: string) {
