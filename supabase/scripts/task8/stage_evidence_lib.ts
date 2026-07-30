@@ -12,6 +12,8 @@ export type GateStage =
     | "db-dry-run"
     | "db-apply"
     | "inventory"
+    | "inventory-validated"
+    | "recovery-validated"
     | "lock-capability"
     | "direct-rpc"
     | "edge-delete-empty"
@@ -49,6 +51,8 @@ interface LedgerEntry {
     predecessorHash: string | null;
     projectRef: string;
     identityDigest: string;
+    backendHead: string;
+    clientHead: string;
     passed: boolean;
 }
 
@@ -135,16 +139,41 @@ async function verifiedLedger(root: string): Promise<{
         throw new Error("gate ledger is invalid");
     }
     let predecessor: string | null = null;
+    let previousEndedAt = Number.NEGATIVE_INFINITY;
     for (const [index, entry] of ledger.entries.entries()) {
+        const expectedFile = `stage-${
+            String(index).padStart(2, "0")
+        }-${entry.stage}.json`;
+        const stagePath = resolve(root, entry.file);
         if (
             entry.sequence !== index ||
+            entry.file !== expectedFile ||
             entry.predecessorHash !== predecessor ||
             !HASH_PATTERN.test(entry.entryHash) ||
-            entry.entryHash !==
-                await sha256File(resolve(root, entry.file))
+            entry.entryHash !== await sha256File(stagePath)
         ) {
             throw new Error("gate ledger hash chain is invalid");
         }
+        const record = JSON.parse(
+            await Deno.readTextFile(stagePath),
+        ) as StageEvidence;
+        validateRecord(record);
+        if (
+            record.sequence !== entry.sequence ||
+            record.stage !== entry.stage ||
+            record.predecessorHash !== entry.predecessorHash ||
+            record.projectRef !== entry.projectRef ||
+            record.identityDigest !== entry.identityDigest ||
+            record.backendHead !== entry.backendHead ||
+            record.clientHead !== entry.clientHead ||
+            record.result.passed !== entry.passed
+        ) {
+            throw new Error("gate ledger entry binding is invalid");
+        }
+        if (Date.parse(record.startedAt) < previousEndedAt) {
+            throw new Error("gate ledger stage timestamp is stale");
+        }
+        previousEndedAt = Date.parse(record.endedAt);
         predecessor = entry.entryHash;
     }
     return { ledger, ledgerHash: await sha256File(ledgerPath) };
@@ -220,6 +249,8 @@ export async function appendStageEvidence(
         predecessorHash: record.predecessorHash,
         projectRef: record.projectRef,
         identityDigest: record.identityDigest,
+        backendHead: record.backendHead,
+        clientHead: record.clientHead,
         passed: record.result.passed,
     });
     const ledgerFile = await writeEvidence(root, "gate-ledger.json", ledger);
@@ -261,6 +292,9 @@ export async function verifyApplyApproval(
     root: string,
     approval: string,
     projectRef: string,
+    identityDigest: string,
+    backendHead: string,
+    clientHead: string,
     expectedDryRunHash: string,
 ): Promise<void> {
     const { ledger } = await verifiedLedger(root);
@@ -271,14 +305,23 @@ export async function verifyApplyApproval(
     if (!dryRun || dryRun.entryHash !== expectedDryRunHash) {
         throw new Error("dry-run transcript hash mismatch");
     }
+    if (
+        dryRun.projectRef !== projectRef ||
+        dryRun.identityDigest !== identityDigest ||
+        dryRun.backendHead !== backendHead ||
+        dryRun.clientHead !== clientHead
+    ) throw new Error("dry-run evidence binding mismatch");
     const expected =
-        `APPLY:${projectRef}:${expectedDryRunHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;
+        `APPLY:${projectRef}:${expectedDryRunHash}:${backendHead}:${clientHead}`;
     if (approval !== expected) {
         throw new Error("explicit apply approval is required");
     }
 }
 
 const RELEASE_STAGES: GateStage[] = [
+    "inventory-validated",
+    "recovery-validated",
+    "lock-capability",
     "db-dry-run",
     "db-apply",
     "direct-rpc",
@@ -298,16 +341,25 @@ export async function verifyReleaseApproval(
     const manifestHash = await verifiedManifest(root);
     let previousIndex = -1;
     for (const stage of RELEASE_STAGES) {
-        const matches = ledger.entries.filter((entry) =>
-            entry.stage === stage &&
-            entry.passed &&
-            entry.projectRef === projectRef &&
-            entry.identityDigest === identityDigest
+        const candidates = ledger.entries.filter((entry) =>
+            entry.stage === stage
         );
-        if (matches.length !== 1) {
+        if (candidates.length === 0) {
             throw new Error(`missing release gate: ${stage}`);
         }
-        const index = ledger.entries.indexOf(matches[0]);
+        if (
+            candidates.some((entry) =>
+                !entry.passed ||
+                entry.projectRef !== projectRef ||
+                entry.identityDigest !== identityDigest ||
+                entry.backendHead !== BACKEND_PRODUCT_SHA ||
+                entry.clientHead !== CLIENT_PRODUCT_SHA
+            )
+        ) throw new Error(`wrong-identity release gate: ${stage}`);
+        if (candidates.length !== 1) {
+            throw new Error(`duplicate release gate: ${stage}`);
+        }
+        const index = ledger.entries.indexOf(candidates[0]);
         if (index <= previousIndex) {
             throw new Error(`reordered release gate: ${stage}`);
         }

@@ -33,17 +33,30 @@ async function loadPlan(): Promise<LoadPlan> {
 }
 
 function buildPassingEvents(): LoadEvidenceEvent[] {
-    const startMs = Date.parse("2026-07-30T00:00:00.000Z");
-    const at = (iteration: number) =>
-        new Date(startMs + iteration * 2000).toISOString();
+    const baselineStartMs = Date.parse("2026-07-29T23:30:00.000Z");
+    const afterStartMs = Date.parse("2026-07-30T00:00:00.000Z");
+    const at = (phase: "baseline" | "after", iteration: number) =>
+        new Date(
+            (phase === "baseline" ? baselineStartMs : afterStartMs) +
+                iteration * 2000,
+        ).toISOString();
     const events: LoadEvidenceEvent[] = [
         {
             schemaVersion: 1,
             kind: "run_window",
+            phase: "baseline",
+            timestamp: "2026-07-30T00:00:00.000Z",
+            startedAt: "2026-07-29T23:30:00.000Z",
+            endedAt: "2026-07-30T00:00:00.000Z",
+        } as unknown as LoadEvidenceEvent,
+        {
+            schemaVersion: 1,
+            kind: "run_window",
+            phase: "after",
             timestamp: "2026-07-30T00:30:00.000Z",
             startedAt: "2026-07-30T00:00:00.000Z",
             endedAt: "2026-07-30T00:30:00.000Z",
-        },
+        } as unknown as LoadEvidenceEvent,
         {
             schemaVersion: 1,
             kind: "telemetry_capability",
@@ -64,7 +77,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
             events.push({
                 schemaVersion: 1,
                 kind: "request",
-                timestamp: at(iteration),
+                timestamp: at("after", iteration),
                 phase: "after",
                 sessionId,
                 requestType: "operator_poll",
@@ -87,7 +100,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
             events.push({
                 schemaVersion: 1,
                 kind: "request",
-                timestamp: at(iteration),
+                timestamp: at("after", iteration),
                 phase: "after",
                 sessionId,
                 requestType: isRead ? "member_read" : "member_command",
@@ -102,7 +115,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
                 events.push({
                     schemaVersion: 1,
                     kind: "lock_wait",
-                    timestamp: at(iteration),
+                    timestamp: at("after", iteration),
                     operationId: operationId!,
                     lockWaitMs,
                     source: "instrumented_lock_acquisition",
@@ -119,7 +132,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
             events.push({
                 schemaVersion: 1,
                 kind: "request",
-                timestamp: at(iteration),
+                timestamp: at(phase, iteration),
                 phase,
                 sessionId: "web-01",
                 requestType: "web",
@@ -184,6 +197,8 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
         schemaVersion: 1,
         kind: "recovery",
         timestamp: "2026-07-30T02:00:00.000Z",
+        backupCapturedBeforeAt: "2026-07-30T00:00:00.000Z",
+        backupCapturedAfterAt: "2026-07-30T00:30:00.000Z",
         restoreStartedAt: "2026-07-30T01:00:00.000Z",
         restoreHealthyAt: "2026-07-30T02:00:00.000Z",
         recoveryPointAt: "2026-07-30T00:45:00.000Z",
@@ -192,7 +207,7 @@ function buildPassingEvents(): LoadEvidenceEvent[] {
         afterMemberChecksum: "a".repeat(64),
         beforeMatchChecksum: "b".repeat(64),
         afterMatchChecksum: "b".repeat(64),
-    });
+    } as unknown as LoadEvidenceEvent);
     return events;
 }
 
@@ -221,6 +236,18 @@ Deno.test("versioned JSONL parser rejects unknown event fields", () => {
         message = error instanceof Error ? error.message : String(error);
     }
     assert(message.includes("unknown field bearerToken"), message);
+});
+
+Deno.test("versioned parser requires an exact phase key on run windows", () => {
+    const event = {
+        schemaVersion: 1,
+        kind: "run_window",
+        phase: "baseline",
+        timestamp: "2026-07-30T00:00:00.000Z",
+        startedAt: "2026-07-29T23:30:00.000Z",
+        endedAt: "2026-07-30T00:00:00.000Z",
+    };
+    assertEquals(parseEvidenceJsonl(JSON.stringify(event)).length, 1);
 });
 
 Deno.test("versioned JSONL parser rejects missing and invalid typed fields", () => {
@@ -462,6 +489,87 @@ Deno.test("telemetry coverage must contain the complete request interval", async
     assert(
         result.failures.some((failure) =>
             failure.includes("telemetry coverage gap")
+        ),
+    );
+});
+
+Deno.test("baseline web evidence cannot reuse the after request window", async () => {
+    const events = buildPassingEvents();
+    for (const event of events) {
+        if (
+            event.kind === "request" && event.phase === "baseline" &&
+            event.requestType === "web"
+        ) {
+            event.timestamp = new Date(
+                Date.parse("2026-07-30T00:00:00.000Z") +
+                    event.iteration * 2000,
+            ).toISOString();
+        }
+    }
+    const result = evaluateLoadGate(await loadPlan(), events);
+    assert(!result.passed);
+    assert(
+        result.failures.some((failure) =>
+            failure.includes("web baseline violates")
+        ),
+    );
+});
+
+Deno.test("counter, resource, and telemetry timestamps must bracket the after window", async () => {
+    for (
+        const [mutate, expected] of [
+            [
+                (events: LoadEvidenceEvent[]) => {
+                    const counter = events.find((event) =>
+                        event.kind === "counter" && event.phase === "before"
+                    );
+                    assert(counter?.kind === "counter");
+                    counter.timestamp = "2026-07-29T00:00:00.000Z";
+                },
+                "counter timestamps do not bracket",
+            ],
+            [
+                (events: LoadEvidenceEvent[]) => {
+                    const resource = events.find((event) =>
+                        event.kind === "resource" && event.phase === "after"
+                    );
+                    assert(resource?.kind === "resource");
+                    resource.timestamp = "2026-07-30T00:29:59.999Z";
+                },
+                "resource timestamps do not bracket",
+            ],
+            [
+                (events: LoadEvidenceEvent[]) => {
+                    const capability = events.find((event) =>
+                        event.kind === "telemetry_capability"
+                    );
+                    assert(capability?.kind === "telemetry_capability");
+                    capability.timestamp = "2026-07-29T00:00:00.000Z";
+                },
+                "telemetry timestamp is stale",
+            ],
+        ] as const
+    ) {
+        const events = buildPassingEvents();
+        mutate(events);
+        const result = evaluateLoadGate(await loadPlan(), events);
+        assert(
+            result.failures.some((failure) => failure.includes(expected)),
+            `${expected}: ${result.failures.join("\n")}`,
+        );
+    }
+});
+
+Deno.test("recovery timestamps must be monotonic after the measured window", async () => {
+    const events = buildPassingEvents();
+    const recovery = events.find((event) => event.kind === "recovery");
+    assert(recovery?.kind === "recovery");
+    recovery.timestamp = "2026-07-30T01:59:59.999Z";
+    const result = evaluateLoadGate(await loadPlan(), events);
+    assert(!result.passed);
+    assert(
+        result.failures.some((failure) =>
+            failure.includes("recovery timestamps are not monotonic")
         ),
     );
 });

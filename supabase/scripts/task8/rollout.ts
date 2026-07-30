@@ -2,8 +2,10 @@
 /// <reference lib="deno.ns" />
 
 import {
+    BACKEND_PRODUCT_SHA,
     bootstrapCloneProvenance,
     captureValidatedDatabaseIdentity,
+    CLIENT_PRODUCT_SHA,
     DenoCommandRunner,
     executeRolloutStep,
     type ExpectedDatabaseIdentity,
@@ -27,6 +29,13 @@ import {
 } from "./connection_binding_lib.ts";
 import { runDirectRpcGate, runEdgeReplacementGate } from "./remote_gate_lib.ts";
 import { runIosGates } from "./ios_gate_lib.ts";
+import {
+    appendStageEvidence,
+    commandStreamEvidence,
+    expectedIdentityDigest,
+    type GateStage,
+    readStageCursor,
+} from "./stage_evidence_lib.ts";
 
 function env(name: string): string {
     const value = Deno.env.get(name)?.trim();
@@ -60,6 +69,35 @@ async function sha256Text(value: string): Promise<string> {
     return [...new Uint8Array(digest)].map((byte) =>
         byte.toString(16).padStart(2, "0")
     ).join("");
+}
+
+async function appendInternalStage(options: {
+    evidenceRoot: string;
+    identity: ExpectedDatabaseIdentity;
+    stage: GateStage;
+    result: Record<string, unknown> & { passed: true };
+}): Promise<void> {
+    const cursor = await readStageCursor(options.evidenceRoot);
+    const timestamp = new Date().toISOString();
+    await appendStageEvidence(options.evidenceRoot, {
+        schemaVersion: 1,
+        stage: options.stage,
+        sequence: cursor.sequence,
+        startedAt: timestamp,
+        endedAt: timestamp,
+        projectRef: options.identity.validationRef,
+        identityDigest: await expectedIdentityDigest(options.identity),
+        backendHead: BACKEND_PRODUCT_SHA,
+        clientHead: CLIENT_PRODUCT_SHA,
+        predecessorHash: cursor.predecessorHash,
+        command: {
+            program: "task8-inventory-validator",
+            args: [options.stage],
+        },
+        stdout: commandStreamEvidence("validated\n"),
+        stderr: commandStreamEvidence(""),
+        result: options.result,
+    });
 }
 
 async function captureProduction(): Promise<void> {
@@ -222,7 +260,30 @@ async function validateInventory(): Promise<void> {
         },
     );
     await writeEvidence(evidenceRoot, "inventory-v1.json", inventory);
-    await writeEvidenceManifest(evidenceRoot);
+    await appendInternalStage({
+        evidenceRoot,
+        identity: storedIdentity,
+        stage: "inventory-validated",
+        result: {
+            passed: true,
+            schemaVersion: inventory.schemaVersion,
+            derivedIsolation: inventory.derivedIsolation,
+        },
+    });
+    await appendInternalStage({
+        evidenceRoot,
+        identity: storedIdentity,
+        stage: "recovery-validated",
+        result: {
+            passed: true,
+            physicalBackupsEnabled: inventory.backup.physicalBackupsEnabled,
+            pitrEnabled: inventory.backup.pitrEnabled,
+            checksumMatch: inventory.recovery.beforeMemberChecksum ===
+                    inventory.recovery.afterMemberChecksum &&
+                inventory.recovery.beforeMatchChecksum ===
+                    inventory.recovery.afterMatchChecksum,
+        },
+    });
 }
 
 async function remoteGate(
@@ -270,6 +331,7 @@ async function iosGates(): Promise<void> {
     await runIosGates({
         evidenceRoot,
         clientRoot,
+        configPath: env("TASK8_IOS_CONFIG_FILE"),
         expectedIdentity: await readPrivateJson<ExpectedDatabaseIdentity>(
             env("TASK8_IDENTITY_FILE"),
         ),

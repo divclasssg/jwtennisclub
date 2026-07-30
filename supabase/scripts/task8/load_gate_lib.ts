@@ -124,6 +124,8 @@ export interface RecoveryEvent {
     schemaVersion: 1;
     kind: "recovery";
     timestamp: string;
+    backupCapturedBeforeAt: string;
+    backupCapturedAfterAt: string;
     restoreStartedAt: string;
     restoreHealthyAt: string;
     recoveryPointAt: string;
@@ -138,6 +140,7 @@ export interface RunWindowEvent {
     schemaVersion: 1;
     kind: "run_window";
     timestamp: string;
+    phase: "baseline" | "after";
     startedAt: string;
     endedAt: string;
 }
@@ -226,6 +229,8 @@ const allowedFields: Record<LoadEvidenceEvent["kind"], Set<string>> = {
         "schemaVersion",
         "kind",
         "timestamp",
+        "backupCapturedBeforeAt",
+        "backupCapturedAfterAt",
         "restoreStartedAt",
         "restoreHealthyAt",
         "recoveryPointAt",
@@ -239,6 +244,7 @@ const allowedFields: Record<LoadEvidenceEvent["kind"], Set<string>> = {
         "schemaVersion",
         "kind",
         "timestamp",
+        "phase",
         "startedAt",
         "endedAt",
     ]),
@@ -428,6 +434,9 @@ function validateParsedEvent(
     }
 
     if (kind === "run_window") {
+        if (!["baseline", "after"].includes(String(value.phase))) {
+            throw new Error(`line ${line}: invalid run window phase`);
+        }
         for (const field of ["startedAt", "endedAt"]) {
             const item = requireString(value[field], field, line);
             if (!Number.isFinite(Date.parse(item))) {
@@ -441,6 +450,8 @@ function validateParsedEvent(
 
     for (
         const field of [
+            "backupCapturedBeforeAt",
+            "backupCapturedAfterAt",
             "restoreStartedAt",
             "restoreHealthyAt",
             "recoveryPointAt",

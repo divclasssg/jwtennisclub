@@ -35,12 +35,18 @@ async function assertRejects(
 
 const ref = "abcdefghijklmnopqrst";
 const identityDigest = "1".repeat(64);
+const otherRef = "bcdefghijklmnopqrstu";
+const otherIdentityDigest = "2".repeat(64);
 
 async function append(
     root: string,
     stage: GateStage,
     sequence: number,
     predecessorHash: string | null,
+    binding: {
+        projectRef: string;
+        identityDigest: string;
+    } = { projectRef: ref, identityDigest },
 ) {
     return await appendStageEvidence(root, {
         schemaVersion: 1,
@@ -48,8 +54,8 @@ async function append(
         sequence,
         startedAt: `2026-07-30T00:${String(sequence).padStart(2, "0")}:00.000Z`,
         endedAt: `2026-07-30T00:${String(sequence).padStart(2, "0")}:01.000Z`,
-        projectRef: ref,
-        identityDigest,
+        projectRef: binding.projectRef,
+        identityDigest: binding.identityDigest,
         backendHead: BACKEND_PRODUCT_SHA,
         clientHead: CLIENT_PRODUCT_SHA,
         predecessorHash,
@@ -84,9 +90,26 @@ Deno.test("DB apply approval binds the exact dry-run transcript hash", async () 
         const dryRun = await append(root, "db-dry-run", 0, null);
         const approval =
             `APPLY:${ref}:${dryRun.entryHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;
-        await verifyApplyApproval(root, approval, ref, dryRun.entryHash);
+        await verifyApplyApproval(
+            root,
+            approval,
+            ref,
+            identityDigest,
+            BACKEND_PRODUCT_SHA,
+            CLIENT_PRODUCT_SHA,
+            dryRun.entryHash,
+        );
         await assertRejects(
-            () => verifyApplyApproval(root, approval, ref, "2".repeat(64)),
+            () =>
+                verifyApplyApproval(
+                    root,
+                    approval,
+                    ref,
+                    identityDigest,
+                    BACKEND_PRODUCT_SHA,
+                    CLIENT_PRODUCT_SHA,
+                    "2".repeat(64),
+                ),
             "dry-run transcript hash mismatch",
         );
         await assertRejects(
@@ -97,6 +120,9 @@ Deno.test("DB apply approval binds the exact dry-run transcript hash", async () 
                         "3".repeat(64)
                     }:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`,
                     ref,
+                    identityDigest,
+                    BACKEND_PRODUCT_SHA,
+                    CLIENT_PRODUCT_SHA,
                     dryRun.entryHash,
                 ),
             "explicit apply approval",
@@ -106,8 +132,128 @@ Deno.test("DB apply approval binds the exact dry-run transcript hash", async () 
     }
 });
 
+Deno.test("DB apply rejects an exact dry-run hash from another clone identity", async () => {
+    const root = await Deno.makeTempDir();
+    try {
+        const dryRun = await append(root, "db-dry-run", 0, null);
+        const crossCloneApproval =
+            `APPLY:${otherRef}:${dryRun.entryHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;
+        await assertRejects(
+            () =>
+                verifyApplyApproval(
+                    root,
+                    crossCloneApproval,
+                    otherRef,
+                    otherIdentityDigest,
+                    BACKEND_PRODUCT_SHA,
+                    CLIENT_PRODUCT_SHA,
+                    dryRun.entryHash,
+                ),
+            "dry-run evidence binding mismatch",
+        );
+    } finally {
+        await Deno.remove(root, { recursive: true });
+    }
+});
+
+Deno.test("release rejects a ledger without inventory, recovery, and lock prerequisites", async () => {
+    const root = await Deno.makeTempDir();
+    try {
+        let predecessor: string | null = null;
+        let ledgerHash = "";
+        let manifestHash = "";
+        for (
+            const [sequence, stage] of [
+                "db-dry-run",
+                "db-apply",
+                "direct-rpc",
+                "edge-delete-empty",
+                "edge-deploy-active",
+                "ios-test",
+                "ios-build",
+            ].entries()
+        ) {
+            const written = await append(
+                root,
+                stage as GateStage,
+                sequence,
+                predecessor,
+            );
+            predecessor = written.entryHash;
+            ledgerHash = written.ledgerHash;
+            manifestHash = written.manifestHash;
+        }
+        const approval =
+            `RELEASE:${ref}:${ledgerHash}:${manifestHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;
+        await assertRejects(
+            () =>
+                verifyReleaseApproval(
+                    root,
+                    approval,
+                    ref,
+                    identityDigest,
+                ),
+            "missing release gate: inventory-validated",
+        );
+    } finally {
+        await Deno.remove(root, { recursive: true });
+    }
+});
+
+Deno.test("release rejects an extra required stage bound to another clone identity", async () => {
+    const root = await Deno.makeTempDir();
+    try {
+        const required: GateStage[] = [
+            "inventory-validated",
+            "recovery-validated",
+            "lock-capability",
+            "db-dry-run",
+            "db-apply",
+            "direct-rpc",
+            "edge-delete-empty",
+            "edge-deploy-active",
+            "ios-test",
+            "ios-build",
+        ];
+        let predecessor: string | null = null;
+        let sequence = 0;
+        for (const stage of required) {
+            const written = await append(root, stage, sequence, predecessor);
+            predecessor = written.entryHash;
+            sequence += 1;
+        }
+        const polluted = await append(
+            root,
+            "recovery-validated",
+            sequence,
+            predecessor,
+            {
+                projectRef: otherRef,
+                identityDigest: otherIdentityDigest,
+            },
+        );
+        const approval =
+            `RELEASE:${ref}:${polluted.ledgerHash}:${polluted.manifestHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;
+        await assertRejects(
+            () =>
+                verifyReleaseApproval(
+                    root,
+                    approval,
+                    ref,
+                    identityDigest,
+                ),
+            "wrong-identity release gate: recovery-validated",
+        );
+    } finally {
+        await Deno.remove(root, { recursive: true });
+    }
+});
+
 Deno.test("release approval rejects missing, stale, and reordered gate evidence", async () => {
     const required: GateStage[] = [
+        "inventory-validated",
+        "recovery-validated",
+        "lock-capability",
         "db-dry-run",
         "db-apply",
         "direct-rpc",
@@ -176,14 +322,37 @@ Deno.test("release approval rejects missing, stale, and reordered gate evidence"
 
         const reorderedRoot = await Deno.makeTempDir();
         try {
-            const one = await append(reorderedRoot, "db-dry-run", 0, null);
+            const inventory = await append(
+                reorderedRoot,
+                "inventory-validated",
+                0,
+                null,
+            );
+            const recovery = await append(
+                reorderedRoot,
+                "recovery-validated",
+                1,
+                inventory.entryHash,
+            );
+            const lock = await append(
+                reorderedRoot,
+                "lock-capability",
+                2,
+                recovery.entryHash,
+            );
+            const one = await append(
+                reorderedRoot,
+                "db-dry-run",
+                3,
+                lock.entryHash,
+            );
             const two = await append(
                 reorderedRoot,
                 "direct-rpc",
-                1,
+                4,
                 one.entryHash,
             );
-            await append(reorderedRoot, "db-apply", 2, two.entryHash);
+            await append(reorderedRoot, "db-apply", 5, two.entryHash);
             await assertRejects(
                 () =>
                     verifyReleaseApproval(

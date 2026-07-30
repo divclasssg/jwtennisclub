@@ -89,16 +89,41 @@ export function evaluateLoadGate(
     const windows = events.filter(
         (event): event is RunWindowEvent => event.kind === "run_window",
     );
+    let baselineStartMs = Number.NaN;
+    let baselineEndMs = Number.NaN;
     let runStartMs = Number.NaN;
     let runEndMs = Number.NaN;
-    if (windows.length !== 1) {
-        failures.push("exactly one 30-minute run_window record is required");
-    } else {
-        runStartMs = Date.parse(windows[0].startedAt);
-        runEndMs = Date.parse(windows[0].endedAt);
-        if (runEndMs - runStartMs !== plan.durationSeconds * 1000) {
-            failures.push("run_window must be exactly 30-minute duration");
+    for (const phase of ["baseline", "after"] as const) {
+        const matches = windows.filter((window) => window.phase === phase);
+        if (matches.length !== 1) {
+            failures.push(
+                `exactly one ${phase} 30-minute run_window record is required`,
+            );
+            continue;
         }
+        const startMs = Date.parse(matches[0].startedAt);
+        const endMs = Date.parse(matches[0].endedAt);
+        if (
+            endMs - startMs !== plan.durationSeconds * 1000 ||
+            Date.parse(matches[0].timestamp) !== endMs
+        ) {
+            failures.push(
+                `${phase} run_window must be timestamped at its exact 30-minute end`,
+            );
+        }
+        if (phase === "baseline") {
+            baselineStartMs = startMs;
+            baselineEndMs = endMs;
+        } else {
+            runStartMs = startMs;
+            runEndMs = endMs;
+        }
+    }
+    if (
+        Number.isFinite(baselineEndMs) && Number.isFinite(runStartMs) &&
+        baselineEndMs !== runStartMs
+    ) {
+        failures.push("baseline and after run_windows must be contiguous");
     }
 
     const requests = events.filter(
@@ -270,6 +295,14 @@ export function evaluateLoadGate(
         }
     }
     validateCadence(
+        webBaseline,
+        baselineStartMs,
+        plan.web.cadenceMs,
+        plan.cadenceToleranceMs,
+        "web baseline",
+        failures,
+    );
+    validateCadence(
         webAfter,
         runStartMs,
         plan.web.cadenceMs,
@@ -317,6 +350,11 @@ export function evaluateLoadGate(
             coverageEndMs - coverageStartMs <
                 plan.lockTelemetry.minimumCoverageSeconds * 1000
         ) failures.push("lock telemetry capability is insufficient");
+        if (
+            Date.parse(capability.timestamp) !== runStartMs ||
+            coverageStartMs !== runStartMs ||
+            coverageEndMs !== runEndMs
+        ) failures.push("telemetry timestamp is stale or does not bracket run");
         if (
             requestTimes.length === 0 ||
             coverageStartMs > Math.min(...requestTimes) ||
@@ -379,6 +417,15 @@ export function evaluateLoadGate(
             before.length !== 1 || after.length !== 1 ||
             after[0]?.value - before[0]?.value !== 0
         ) failures.push(`${counterName} delta must be zero`);
+        if (
+            before.length === 1 && after.length === 1 &&
+            (Date.parse(before[0].timestamp) !== runStartMs ||
+                Date.parse(after[0].timestamp) !== runEndMs)
+        ) {
+            failures.push(
+                `${counterName} counter timestamps do not bracket after run_window`,
+            );
+        }
     }
 
     for (const resourceName of ["cpu", "connections"] as const) {
@@ -398,6 +445,15 @@ export function evaluateLoadGate(
             after[0].warningUsageRatio >=
                 plan.thresholds.resourceWarningUsageRatioExclusive
         ) failures.push(`${resourceName} warning usage must be below 70%`);
+        if (
+            before.length === 1 && after.length === 1 &&
+            (Date.parse(before[0].timestamp) !== runStartMs ||
+                Date.parse(after[0].timestamp) !== runEndMs)
+        ) {
+            failures.push(
+                `${resourceName} resource timestamps do not bracket after run_window`,
+            );
+        }
     }
 
     const recoveryEvents = events.filter(
@@ -429,6 +485,26 @@ export function evaluateLoadGate(
             recovery.beforeMemberChecksum !== recovery.afterMemberChecksum ||
             recovery.beforeMatchChecksum !== recovery.afterMatchChecksum
         ) failures.push("restore before/after checksums do not match");
+        const backupBeforeMs = Date.parse(recovery.backupCapturedBeforeAt);
+        const backupAfterMs = Date.parse(recovery.backupCapturedAfterAt);
+        const latestRestoredMs = Date.parse(
+            recovery.latestRestoredOperationAt,
+        );
+        const recoveryPointMs = Date.parse(recovery.recoveryPointAt);
+        const restoreStartMs = Date.parse(recovery.restoreStartedAt);
+        const restoreHealthyMs = Date.parse(recovery.restoreHealthyAt);
+        const recoveryEvidenceMs = Date.parse(recovery.timestamp);
+        if (
+            backupBeforeMs !== runStartMs ||
+            backupAfterMs !== runEndMs
+        ) failures.push("backup timestamps do not bracket after run_window");
+        if (
+            latestRestoredMs < runEndMs ||
+            latestRestoredMs > recoveryPointMs ||
+            recoveryPointMs > restoreStartMs ||
+            restoreStartMs > restoreHealthyMs ||
+            restoreHealthyMs > recoveryEvidenceMs
+        ) failures.push("recovery timestamps are not monotonic");
     }
 
     return {

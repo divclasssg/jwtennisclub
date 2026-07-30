@@ -500,6 +500,9 @@ export async function executeRolloutStep(
             options.evidenceRoot,
             options.approval,
             normalizeProjectRef(options.expectedIdentity.validationRef),
+            await expectedIdentityDigest(options.expectedIdentity),
+            BACKEND_PRODUCT_SHA,
+            CLIENT_PRODUCT_SHA,
             options.dryRunHash,
         );
         let baselinePrepared = false;

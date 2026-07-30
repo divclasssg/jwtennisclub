@@ -170,6 +170,8 @@
                 "schemaVersion",
                 "kind",
                 "timestamp",
+                "backupCapturedBeforeAt",
+                "backupCapturedAfterAt",
                 "restoreStartedAt",
                 "restoreHealthyAt",
                 "recoveryPointAt",
@@ -183,6 +185,12 @@
                 "schemaVersion": { "const": 1 },
                 "kind": { "const": "recovery" },
                 "timestamp": { "$ref": "#/$defs/timestamp" },
+                "backupCapturedBeforeAt": {
+                    "$ref": "#/$defs/timestamp"
+                },
+                "backupCapturedAfterAt": {
+                    "$ref": "#/$defs/timestamp"
+                },
                 "restoreStartedAt": { "type": "string", "format": "date-time" },
                 "restoreHealthyAt": { "type": "string", "format": "date-time" },
                 "recoveryPointAt": { "type": "string", "format": "date-time" },
@@ -203,6 +211,7 @@
                 "schemaVersion",
                 "kind",
                 "timestamp",
+                "phase",
                 "startedAt",
                 "endedAt"
             ],
@@ -210,6 +219,7 @@
                 "schemaVersion": { "const": 1 },
                 "kind": { "const": "run_window" },
                 "timestamp": { "$ref": "#/$defs/timestamp" },
+                "phase": { "enum": ["baseline", "after"] },
                 "startedAt": { "$ref": "#/$defs/timestamp" },
                 "endedAt": { "$ref": "#/$defs/timestamp" }
             }
