@@ -288,7 +288,7 @@ await writeFile(
 Run:
 
 ```bash
-npx vite-node scripts/render-monthly-report-preview.tsx
+npm run preview:monthly-report
 ```
 
 Expected: `output/pdf/monthly-report-ledger-style-preview.pdf` exists and begins with `%PDF`.

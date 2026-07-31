@@ -38,9 +38,18 @@ const report = {
   ],
 };
 
-const outputDirectory = path.join(process.cwd(), "output/pdf");
-await mkdir(outputDirectory, { recursive: true });
-await writeFile(
-  path.join(outputDirectory, "monthly-report-ledger-style-preview.pdf"),
-  await renderMonthlyReportPdf(report),
-);
+async function renderPreview() {
+  const outputDirectory = path.join(process.cwd(), "output/pdf");
+  await mkdir(outputDirectory, { recursive: true });
+  await writeFile(
+    path.join(outputDirectory, "monthly-report-ledger-style-preview.pdf"),
+    await renderMonthlyReportPdf(report),
+  );
+}
+
+void renderPreview().catch((error: unknown) => {
+  process.stderr.write(
+    `${error instanceof Error ? error.stack ?? error.message : String(error)}\n`,
+  );
+  process.exitCode = 1;
+});
