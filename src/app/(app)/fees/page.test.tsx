@@ -5,6 +5,7 @@ import FeesPage from "./page";
 
 const permissionMocks = vi.hoisted(() => ({
   currentOperatorHasPermission: vi.fn(async () => true),
+  getMonthlySourceLockStatus: vi.fn(async () => false),
 }));
 
 type FeeMemberFixture = {
@@ -152,6 +153,10 @@ vi.mock("@/features/auth/operator-context", () => ({
   currentOperatorHasPermission: permissionMocks.currentOperatorHasPermission,
 }));
 
+vi.mock("@/features/settlements/monthly-source-lock", () => ({
+  getMonthlySourceLockStatus: permissionMocks.getMonthlySourceLockStatus,
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ back: vi.fn(), replace: vi.fn() }),
 }));
@@ -220,6 +225,31 @@ describe("FeesPage", () => {
     );
     permissionMocks.currentOperatorHasPermission.mockReset();
     permissionMocks.currentOperatorHasPermission.mockResolvedValue(true);
+    permissionMocks.getMonthlySourceLockStatus.mockReset();
+    permissionMocks.getMonthlySourceLockStatus.mockResolvedValue(false);
+  });
+
+  it("hides fee source actions but preserves note editing for a finalized month", async () => {
+    permissionMocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+
+    render(
+      await FeesPage({
+        searchParams: Promise.resolve({ month: "2026-07" }),
+      }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+    expect(screen.queryByRole("link", { name: "CSV 등록" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "납부 처리" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "납부 취소" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /메모 (입력|수정)/ }).length)
+      .toBeGreaterThan(0);
+    expect(permissionMocks.getMonthlySourceLockStatus).toHaveBeenCalledTimes(1);
+    expect(permissionMocks.getMonthlySourceLockStatus).toHaveBeenCalledWith(
+      "2026-07-01",
+    );
   });
 
   it("renders monthly fee board rows with filters and summary", async () => {

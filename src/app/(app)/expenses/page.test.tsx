@@ -2,6 +2,10 @@ import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ExpensesPage from "./page";
 
+const lockMocks = vi.hoisted(() => ({
+  getMonthlySourceLockStatus: vi.fn(async () => false),
+}));
+
 vi.mock("./actions", () => ({
   deleteExpense: vi.fn(),
 }));
@@ -58,6 +62,10 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
+vi.mock("@/features/settlements/monthly-source-lock", () => ({
+  getMonthlySourceLockStatus: lockMocks.getMonthlySourceLockStatus,
+}));
+
 describe("ExpensesPage", () => {
   beforeEach(() => {
     expensesQuery.select.mockClear();
@@ -65,6 +73,27 @@ describe("ExpensesPage", () => {
     expensesQuery.lt.mockClear();
     expensesQuery.eq.mockClear();
     expensesQuery.order.mockClear();
+    lockMocks.getMonthlySourceLockStatus.mockReset();
+    lockMocks.getMonthlySourceLockStatus.mockResolvedValue(false);
+  });
+
+  it("hides expense mutations but preserves receipts for a finalized month", async () => {
+    lockMocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+
+    render(
+      await ExpensesPage({
+        searchParams: Promise.resolve({ month: "2026-07" }),
+      }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+    expect(screen.queryByRole("link", { name: "지출 등록" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "수정" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "삭제" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "영수증 보기" })).toBeInTheDocument();
+    expect(lockMocks.getMonthlySourceLockStatus).toHaveBeenCalledTimes(1);
   });
 
   it("renders monthly expenses with filters and summary", async () => {
@@ -77,7 +106,7 @@ describe("ExpensesPage", () => {
     expect(screen.getByRole("heading", { name: "지출 관리" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "지출 등록" })).toHaveAttribute(
       "href",
-      "/expenses/new",
+      "/expenses/new?month=2026-07",
     );
     expect(screen.getByLabelText("사용 월")).toHaveValue("2026-07");
     expect(screen.getByLabelText("카테고리")).toHaveValue("court");

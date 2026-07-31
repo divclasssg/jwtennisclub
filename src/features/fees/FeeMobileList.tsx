@@ -18,6 +18,7 @@ type FeeMobileListProps = {
   canManageNotes: boolean;
   cancelPaymentAction: FormAction;
   createPaymentAction: FormAction;
+  isLocked: boolean;
   periodMonth: string;
   rows: FeeBoardMemberRow[];
   today: string;
@@ -28,6 +29,7 @@ export function FeeMobileList({
   canManageNotes,
   cancelPaymentAction,
   createPaymentAction,
+  isLocked,
   periodMonth,
   rows,
   today,
@@ -56,7 +58,7 @@ export function FeeMobileList({
                   ) : null}
                 </div>
               </div>
-              {row.payment ? (
+              {isLocked ? null : row.payment ? (
                 <form action={cancelPaymentAction} className={styles["fee-mobile-action"]}>
                   <input name="paymentId" type="hidden" value={row.payment.id} />
                   <input name="periodMonth" type="hidden" value={periodMonth} />

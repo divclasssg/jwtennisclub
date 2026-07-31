@@ -22,6 +22,7 @@ import {
   normalizeExpenseListFilters,
   type ExpenseListSearchParams,
 } from "@/features/expenses/expense-list";
+import { getMonthlySourceLockStatus } from "@/features/settlements/monthly-source-lock";
 
 type ExpensesPageProps = {
   searchParams: Promise<ExpenseListSearchParams>;
@@ -78,7 +79,10 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   const params = await searchParams;
   const filters = normalizeExpenseListFilters(params);
   const sortState = parseSortState(params, EXPENSE_SORT_KEYS, { key: "expenseDate", direction: "desc" });
-  const expenses = await getExpenses(filters);
+  const [expenses, isLocked] = await Promise.all([
+    getExpenses(filters),
+    getMonthlySourceLockStatus(filters.periodMonth),
+  ]);
   const sortedExpenses = stableSortRows(expenses, (expense) => expenseSortValue(expense, sortState.key), sortState.direction);
   const sortSearchParams = {
     month: filters.periodMonth.slice(0, 7),
@@ -115,7 +119,14 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
       }
       kicker="월별 지출 현황"
       list={
-        <DataPanel
+        <>
+          {isLocked ? (
+            <p role="status">
+              최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을
+              재개하세요.
+            </p>
+          ) : null}
+          <DataPanel
           aria-label="월별 지출 목록"
           empty={
             <EmptyState
@@ -126,14 +137,19 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
           headerSide={
             <>
               {hasFilters ? <a href="/expenses">필터 초기화</a> : null}
-              <ActionLink href="/expenses/new" size="compact">
-                지출 등록
-              </ActionLink>
+              {isLocked ? null : (
+                <ActionLink
+                  href={`/expenses/new?month=${filters.periodMonth.slice(0, 7)}`}
+                  size="compact"
+                >
+                  지출 등록
+                </ActionLink>
+              )}
             </>
           }
           headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${sortedExpenses.length}건`}
-        >
-          {sortedExpenses.length > 0 ? (
+          >
+            {sortedExpenses.length > 0 ? (
             <DataTable>
               <thead>
                 <tr>
@@ -170,28 +186,33 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                     </td>
                     <td>{expense.memo ?? "-"}</td>
                     <td>
-                      <RowActions>
-                        <ActionLink
-                          href={`/expenses/${expense.id}/edit`}
-                          size="compact"
-                          variant="secondary"
-                        >
-                          수정
-                        </ActionLink>
-                        <form action={deleteExpense}>
-                          <input name="expenseId" type="hidden" value={expense.id} />
-                          <Button size="compact" type="submit" variant="danger">
-                            삭제
-                          </Button>
-                        </form>
-                      </RowActions>
+                      {isLocked ? (
+                        "-"
+                      ) : (
+                        <RowActions>
+                          <ActionLink
+                            href={`/expenses/${expense.id}/edit`}
+                            size="compact"
+                            variant="secondary"
+                          >
+                            수정
+                          </ActionLink>
+                          <form action={deleteExpense}>
+                            <input name="expenseId" type="hidden" value={expense.id} />
+                            <Button size="compact" type="submit" variant="danger">
+                              삭제
+                            </Button>
+                          </form>
+                        </RowActions>
+                      )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </DataTable>
-          ) : null}
-        </DataPanel>
+            ) : null}
+          </DataPanel>
+        </>
       }
       summary={
         <SummaryGrid aria-label="지출 요약" columns={2}>

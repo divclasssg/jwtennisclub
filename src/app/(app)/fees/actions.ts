@@ -23,6 +23,10 @@ import {
   normalizePeriodMonth,
 } from "@/features/fees/fee-model";
 import type { MemberStatus } from "@/features/members/member-model";
+import {
+  getMonthlySourceLockStatus,
+  isMonthlySourceLockError,
+} from "@/features/settlements/monthly-source-lock";
 
 const feesPath = "/fees";
 const feeCreatePath = "/fees/new";
@@ -101,6 +105,15 @@ export async function createFeePayment(formData: FormData) {
     redirect(buildRedirect(feeCreatePath, { error: "forbidden" }));
   }
 
+  if (await getMonthlySourceLockStatus(payment.periodMonth)) {
+    redirect(
+      buildRedirect(feesPath, {
+        error: "closing-locked",
+        month: payment.periodMonth.slice(0, 7),
+      }),
+    );
+  }
+
   const { data: member, error: memberError } = await supabase
     .from("members")
     .select(
@@ -137,6 +150,15 @@ export async function createFeePayment(formData: FormData) {
   });
 
   if (error) {
+    if (isMonthlySourceLockError(error)) {
+      redirect(
+        buildRedirect(feesPath, {
+          error: "closing-locked",
+          month: payment.periodMonth.slice(0, 7),
+        }),
+      );
+    }
+
     redirect(buildRedirect(feeCreatePath, { error: "save-failed" }));
   }
 
@@ -161,12 +183,21 @@ export async function cancelFeePayment(formData: FormData) {
   }
 
   const { supabase } = await getAuthenticatedUserId();
+
+  if (await getMonthlySourceLockStatus(periodMonth)) {
+    redirect(buildRedirect(feesPath, { error: "closing-locked", month }));
+  }
+
   const { error } = await supabase
     .from("fee_payments")
     .delete()
     .eq("id", paymentId);
 
   if (error) {
+    if (isMonthlySourceLockError(error)) {
+      redirect(buildRedirect(feesPath, { error: "closing-locked", month }));
+    }
+
     redirect(buildRedirect(feesPath, { error: "cancel-failed", month }));
   }
 
@@ -318,6 +349,27 @@ export async function importFeePaymentsCsv(formData: FormData) {
   }
 
   const { supabase, userId } = await getAuthenticatedUserId();
+  const periodMonths = [
+    ...new Set(parsed.payments.map((payment) => payment.periodMonth)),
+  ];
+  const lockStatuses = await Promise.all(
+    periodMonths.map((periodMonth) =>
+      getMonthlySourceLockStatus(periodMonth),
+    ),
+  );
+  const lockedPeriodMonth = periodMonths.find(
+    (_, index) => lockStatuses[index],
+  );
+
+  if (lockedPeriodMonth) {
+    redirect(
+      buildRedirect(feeCreatePath, {
+        importError: "closing-locked",
+        month: lockedPeriodMonth.slice(0, 7),
+      }),
+    );
+  }
+
   const { data: members, error: membersError } = await supabase
     .from("members")
     .select(
@@ -368,6 +420,12 @@ export async function importFeePaymentsCsv(formData: FormData) {
   const { error } = await supabase.from("fee_payments").insert(payments);
 
   if (error) {
+    if (isMonthlySourceLockError(error)) {
+      redirect(
+        buildRedirect(feeCreatePath, { importError: "closing-locked" }),
+      );
+    }
+
     redirect(buildRedirect(feeCreatePath, { importError: "save-failed" }));
   }
 

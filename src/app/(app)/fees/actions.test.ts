@@ -6,7 +6,9 @@ const mocks = vi.hoisted(() => {
   };
   const feePaymentsTable = {
     delete: vi.fn(() => deleteQuery),
-    insert: vi.fn(async () => ({ error: null })),
+    insert: vi.fn(
+      async (): Promise<{ error: unknown }> => ({ error: null }),
+    ),
   };
   const importMembersQuery = {
     eq: vi.fn(async () => ({
@@ -122,6 +124,23 @@ const mocks = vi.hoisted(() => {
     noteDeleteQuery,
     noteTable,
     currentOperatorHasPermission: vi.fn(async () => true),
+    getMonthlySourceLockStatus: vi.fn(
+      async (periodMonth: string) => {
+        void periodMonth;
+        return false;
+      },
+    ),
+    isMonthlySourceLockError: vi.fn(
+      (error: unknown) =>
+        Boolean(
+          error &&
+            typeof error === "object" &&
+            "code" in error &&
+            error.code === "55000" &&
+            "message" in error &&
+            String(error.message).includes("monthly closing source is locked"),
+        ),
+    ),
     revalidatePath: vi.fn(),
     redirect: vi.fn((path: string) => {
       throw new Error(`redirect:${path}`);
@@ -144,6 +163,11 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/features/auth/operator-context", () => ({
   currentOperatorHasPermission: mocks.currentOperatorHasPermission,
+}));
+
+vi.mock("@/features/settlements/monthly-source-lock", () => ({
+  getMonthlySourceLockStatus: mocks.getMonthlySourceLockStatus,
+  isMonthlySourceLockError: mocks.isMonthlySourceLockError,
 }));
 
 import {
@@ -199,9 +223,67 @@ describe("fee payment actions", () => {
     mocks.noteTable.insert.mockResolvedValue({ error: null });
     mocks.currentOperatorHasPermission.mockReset();
     mocks.currentOperatorHasPermission.mockResolvedValue(true);
+    mocks.getMonthlySourceLockStatus.mockReset();
+    mocks.getMonthlySourceLockStatus.mockResolvedValue(false);
+    mocks.isMonthlySourceLockError.mockClear();
     mocks.deleteQuery.eq.mockClear();
     mocks.deleteQuery.eq.mockResolvedValue({ error: null });
     mocks.feePaymentsTable.insert.mockResolvedValue({ error: null });
+  });
+
+  it("redirects a finalized inline payment month before reading or writing sources", async () => {
+    mocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({
+          memberId: "member-1",
+          periodMonth: "2026-07",
+        }),
+      ),
+    ).rejects.toThrow(
+      "redirect:/fees?error=closing-locked&month=2026-07",
+    );
+
+    expect(mocks.getMonthlySourceLockStatus).toHaveBeenCalledWith("2026-07-01");
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("members");
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("redirects a finalized cancellation month before deleting", async () => {
+    mocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+    const formData = new FormData();
+    formData.set("paymentId", "payment-1");
+    formData.set("periodMonth", "2026-07");
+
+    await expect(cancelFeePayment(formData)).rejects.toThrow(
+      "redirect:/fees?error=closing-locked&month=2026-07",
+    );
+
+    expect(mocks.feePaymentsTable.delete).not.toHaveBeenCalled();
+  });
+
+  it("maps a racing final-close trigger error during payment creation", async () => {
+    mocks.feePaymentsTable.insert.mockResolvedValueOnce({
+      error: {
+        code: "55000",
+        message: "monthly closing source is locked",
+      },
+    });
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({
+          memberId: "member-1",
+          periodMonth: "2026-07",
+        }),
+      ),
+    ).rejects.toThrow(
+      "redirect:/fees?error=closing-locked&month=2026-07",
+    );
+
+    expect(mocks.getMonthlySourceLockStatus).toHaveBeenCalledWith("2026-07-01");
+    expect(mocks.isMonthlySourceLockError).toHaveBeenCalled();
   });
 
   it("cancels a fee payment and returns to the selected month", async () => {
@@ -447,6 +529,39 @@ describe("fee payment actions", () => {
       },
     ]);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
+  });
+
+  it("preflights every distinct CSV month before the batch insert", async () => {
+    mocks.getMonthlySourceLockStatus.mockImplementation(
+      async (periodMonth: string) => periodMonth === "2026-08-01",
+    );
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(
+        [
+          [
+            "memberCode,periodMonth,amount,paidDate,memo",
+            "m0001,2026-07,30000,2026-07-03,7월 회비",
+            "m0001,2026-08,30000,2026-08-03,8월 회비",
+            "m0001,2026-07,30000,2026-07-04,추가 행",
+          ].join("\n"),
+        ],
+        "fees.csv",
+        { type: "text/csv" },
+      ),
+    );
+
+    await expect(importFeePaymentsCsv(formData)).rejects.toThrow(
+      "redirect:/fees/new?importError=closing-locked&month=2026-08",
+    );
+
+    expect(mocks.getMonthlySourceLockStatus.mock.calls).toEqual([
+      ["2026-07-01"],
+      ["2026-08-01"],
+    ]);
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("members");
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
   });
 
   it("accepts an August-paused member's July CSV row but rejects its August row", async () => {

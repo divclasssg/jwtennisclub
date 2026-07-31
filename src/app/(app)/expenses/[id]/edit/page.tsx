@@ -7,6 +7,7 @@ import { ExpenseForm } from "@/features/expenses/ExpenseForm";
 import { mapExpenseRow } from "@/features/expenses/expense-list";
 import { firstSearchParam } from "@/features/members/member-list";
 import { createClient } from "@/lib/supabase/server";
+import { getMonthlySourceLockStatus } from "@/features/settlements/monthly-source-lock";
 
 type EditExpensePageProps = {
   params: Promise<{ id: string }>;
@@ -82,26 +83,37 @@ export default async function EditExpensePage({
     notFound();
   }
 
+  const isLocked = await getMonthlySourceLockStatus(
+    `${expense.expenseDate.slice(0, 7)}-01`,
+  );
+
   return (
     <FormPageTemplate
       description="지출 정보와 영수증 파일을 수정합니다."
       kicker={expense.description}
       title="지출 수정"
     >
-      <FormPanel
-        description="새 영수증 파일을 선택하면 기존 파일이 교체됩니다."
-        title="지출 정보"
-      >
-        <ExpenseForm
-          action={updateExpense}
-          defaultExpenseDate={expense.expenseDate}
-          expense={expense}
-          mode="edit"
-        />
-        {errorMessage ? (
-          <FormMessage>{errorMessage}</FormMessage>
-        ) : null}
-      </FormPanel>
+      {isLocked ? (
+        <p role="status">
+          최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을
+          재개하세요.
+        </p>
+      ) : (
+        <FormPanel
+          description="새 영수증 파일을 선택하면 기존 파일이 교체됩니다."
+          title="지출 정보"
+        >
+          <ExpenseForm
+            action={updateExpense}
+            defaultExpenseDate={expense.expenseDate}
+            expense={expense}
+            mode="edit"
+          />
+          {errorMessage ? (
+            <FormMessage>{errorMessage}</FormMessage>
+          ) : null}
+        </FormPanel>
+      )}
     </FormPageTemplate>
   );
 }

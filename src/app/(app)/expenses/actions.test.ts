@@ -4,10 +4,13 @@ const mocks = vi.hoisted(() => {
   const expensesTable = {
     delete: vi.fn(() => expensesTable),
     eq: vi.fn(() => expensesTable),
-    insert: vi.fn(async () => ({ error: null })),
+    insert: vi.fn(
+      async (): Promise<{ error: unknown }> => ({ error: null }),
+    ),
     maybeSingle: vi.fn(async () => ({
       data: {
         id: "expense-1",
+        expense_date: "2026-07-03",
         receipt_file_key: "expenses/operator-id/2026/07/receipt.jpg",
       },
       error: null,
@@ -33,8 +36,31 @@ const mocks = vi.hoisted(() => {
 
   return {
     expensesTable,
-    deleteReceiptFile: vi.fn(async () => undefined),
-    uploadReceiptFile: vi.fn(async () => undefined),
+    deleteReceiptFile: vi.fn(async (key: string) => {
+      void key;
+    }),
+    getMonthlySourceLockStatus: vi.fn(
+      async (periodMonth: string) => {
+        void periodMonth;
+        return false;
+      },
+    ),
+    isMonthlySourceLockError: vi.fn(
+      (error: unknown) =>
+        Boolean(
+          error &&
+            typeof error === "object" &&
+            "code" in error &&
+            error.code === "55000" &&
+            "message" in error &&
+            String(error.message).includes("monthly closing source is locked"),
+        ),
+    ),
+    uploadReceiptFile: vi.fn(
+      async (input: { contentType: string; file: File; key: string }) => {
+        void input;
+      },
+    ),
     revalidatePath: vi.fn(),
     redirect: vi.fn((path: string) => {
       throw new Error(`redirect:${path}`);
@@ -60,6 +86,11 @@ vi.mock("@/lib/r2", () => ({
   uploadReceiptFile: mocks.uploadReceiptFile,
 }));
 
+vi.mock("@/features/settlements/monthly-source-lock", () => ({
+  getMonthlySourceLockStatus: mocks.getMonthlySourceLockStatus,
+  isMonthlySourceLockError: mocks.isMonthlySourceLockError,
+}));
+
 import { createExpense, deleteExpense, updateExpense } from "./actions";
 
 describe("expense actions", () => {
@@ -76,6 +107,7 @@ describe("expense actions", () => {
     mocks.expensesTable.maybeSingle.mockResolvedValue({
       data: {
         id: "expense-1",
+        expense_date: "2026-07-03",
         receipt_file_key: "expenses/operator-id/2026/07/receipt.jpg",
       },
       error: null,
@@ -84,6 +116,86 @@ describe("expense actions", () => {
     mocks.expensesTable.update.mockClear();
     mocks.deleteReceiptFile.mockClear();
     mocks.uploadReceiptFile.mockClear();
+    mocks.getMonthlySourceLockStatus.mockReset();
+    mocks.getMonthlySourceLockStatus.mockResolvedValue(false);
+    mocks.isMonthlySourceLockError.mockClear();
+  });
+
+  it("redirects a finalized expense month before uploading or inserting", async () => {
+    mocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+    const formData = buildExpenseFormData({ expenseDate: "2026-07-03" });
+    formData.set(
+      "receiptFile",
+      new File(["receipt"], "receipt.jpg", { type: "image/jpeg" }),
+    );
+
+    await expect(createExpense(formData)).rejects.toThrow(
+      "redirect:/expenses/new?error=closing-locked",
+    );
+
+    expect(mocks.getMonthlySourceLockStatus).toHaveBeenCalledWith("2026-07-01");
+    expect(mocks.uploadReceiptFile).not.toHaveBeenCalled();
+    expect(mocks.expensesTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("cleans up a newly uploaded receipt when final closing wins the insert race", async () => {
+    mocks.expensesTable.insert.mockResolvedValueOnce({
+      error: {
+        code: "55000",
+        message: "monthly closing source is locked",
+      },
+    });
+    const formData = buildExpenseFormData({ expenseDate: "2026-07-03" });
+    formData.set(
+      "receiptFile",
+      new File(["receipt"], "receipt.jpg", { type: "image/jpeg" }),
+    );
+
+    await expect(createExpense(formData)).rejects.toThrow(
+      "redirect:/expenses/new?error=closing-locked",
+    );
+
+    const uploadedKey = mocks.uploadReceiptFile.mock.calls[0][0].key;
+    expect(mocks.deleteReceiptFile).toHaveBeenCalledWith(uploadedKey);
+    expect(mocks.isMonthlySourceLockError).toHaveBeenCalled();
+  });
+
+  it("preflights both source and destination months before moving an expense", async () => {
+    mocks.getMonthlySourceLockStatus.mockImplementation(
+      async (periodMonth: string) => periodMonth === "2026-08-01",
+    );
+    const formData = buildExpenseFormData({
+      id: "expense-1",
+      expenseDate: "2026-08-04",
+    });
+    formData.set(
+      "receiptFile",
+      new File(["receipt"], "receipt.jpg", { type: "image/jpeg" }),
+    );
+
+    await expect(updateExpense(formData)).rejects.toThrow(
+      "redirect:/expenses/expense-1/edit?error=closing-locked",
+    );
+
+    expect(mocks.getMonthlySourceLockStatus.mock.calls).toEqual([
+      ["2026-07-01"],
+      ["2026-08-01"],
+    ]);
+    expect(mocks.uploadReceiptFile).not.toHaveBeenCalled();
+    expect(mocks.expensesTable.update).not.toHaveBeenCalled();
+  });
+
+  it("redirects a finalized month before deleting its expense", async () => {
+    mocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+    const formData = new FormData();
+    formData.set("expenseId", "expense-1");
+
+    await expect(deleteExpense(formData)).rejects.toThrow(
+      "redirect:/expenses?error=closing-locked&month=2026-07",
+    );
+
+    expect(mocks.expensesTable.delete).not.toHaveBeenCalled();
+    expect(mocks.deleteReceiptFile).not.toHaveBeenCalled();
   });
 
   it("creates an expense and returns to the selected month", async () => {
@@ -160,7 +272,7 @@ describe("expense actions", () => {
     );
 
     expect(mocks.expensesTable.select).toHaveBeenCalledWith(
-      "id, receipt_file_key",
+      "id, expense_date, receipt_file_key",
     );
     expect(mocks.expensesTable.eq).toHaveBeenCalledWith("id", "expense-1");
     expect(mocks.expensesTable.delete).toHaveBeenCalled();
@@ -259,3 +371,18 @@ describe("expense actions", () => {
     );
   });
 });
+
+function buildExpenseFormData(input: {
+  expenseDate: string;
+  id?: string;
+}) {
+  const formData = new FormData();
+  if (input.id) {
+    formData.set("id", input.id);
+  }
+  formData.set("expenseDate", input.expenseDate);
+  formData.set("category", "court");
+  formData.set("description", "코트 대관");
+  formData.set("amount", "120000");
+  return formData;
+}

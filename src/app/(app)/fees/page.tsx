@@ -48,6 +48,7 @@ import {
   formatMemberKind,
   mapMemberRow,
 } from "@/features/members/member-list";
+import { getMonthlySourceLockStatus } from "@/features/settlements/monthly-source-lock";
 
 type FeesPageProps = {
   searchParams: Promise<FeeListSearchParams>;
@@ -205,12 +206,20 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
   const params = await searchParams;
   const filters = normalizeFeeListFilters(params);
   const sortState = parseSortState(params, FEE_SORT_KEYS, { key: "memberCode", direction: "asc" });
-  const [payments, targetMembers, notes, canCreateNotes, canUpdateNotes] = await Promise.all([
+  const [
+    payments,
+    targetMembers,
+    notes,
+    canCreateNotes,
+    canUpdateNotes,
+    isLocked,
+  ] = await Promise.all([
     getFeePayments(filters.periodMonth),
     getFeeTargetMembers(filters.periodMonth, filters.query),
     getFeeMonthlyNotes(filters.periodMonth),
     currentOperatorHasPermission("fees.payments.create"),
     currentOperatorHasPermission("fees.payments.update"),
+    getMonthlySourceLockStatus(filters.periodMonth),
   ]);
   const canManageNotes = canCreateNotes || canUpdateNotes;
   const boardRows = buildFeeBoardRows({
@@ -277,7 +286,14 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
       }
       kicker="월별 회비 현황"
       list={
-        <DataPanel
+        <>
+          {isLocked ? (
+            <p role="status">
+              최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을
+              재개하세요.
+            </p>
+          ) : null}
+          <DataPanel
           aria-label="월별 회비 체크판"
           empty={
             <EmptyState
@@ -292,14 +308,16 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
           headerSide={
             <>
               {hasFilters ? <a href="/fees">필터 초기화</a> : null}
-              <ActionLink href="/fees/new" size="compact">
-                CSV 등록
-              </ActionLink>
+              {isLocked ? null : (
+                <ActionLink href="/fees/new" size="compact">
+                  CSV 등록
+                </ActionLink>
+              )}
             </>
           }
           headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${sortedBoardRows.length}명`}
-        >
-          {sortedBoardRows.length > 0 ? (
+          >
+            {sortedBoardRows.length > 0 ? (
             <>
               <div className={styles["fees-table-view"]}>
                 <DataTable>
@@ -366,7 +384,9 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                           </div>
                         </td>
                         <td>
-                          {row.payment ? (
+                          {isLocked ? (
+                            "-"
+                          ) : row.payment ? (
                             <form
                               action={cancelFeePayment}
                               className={styles["fees-inline-form"]}
@@ -422,6 +442,7 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                   canManageNotes={canManageNotes}
                   cancelPaymentAction={cancelFeePayment}
                   createPaymentAction={createFeePayment}
+                  isLocked={isLocked}
                   periodMonth={filters.periodMonth.slice(0, 7)}
                   rows={sortedBoardRows}
                   today={today}
@@ -429,8 +450,9 @@ export default async function FeesPage({ searchParams }: FeesPageProps) {
                 />
               </div>
             </>
-          ) : null}
-        </DataPanel>
+            ) : null}
+          </DataPanel>
+        </>
       }
       summary={
         <SummaryGrid aria-label="회비 요약" columns={4}>
