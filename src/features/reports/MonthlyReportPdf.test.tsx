@@ -74,7 +74,7 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).toContain("지출 합계");
     expect(text).toContain("지출 합계 (2건)");
     expect(text).toContain("잔액");
-    expect(text).toContain("기말 장부 잔액");
+    expect(text).toContain("월말 잔액");
     expect(text).toContain("지출 상세");
     expect(text).not.toContain("최종 마감 v2 · 재개됨");
     expect(text).toContain("결산일");
@@ -94,9 +94,9 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).toContain("조정 수납액");
     expect(text).toContain("미납액");
     expect(text).toContain("지출 합계");
-    expect(text).toContain("당월 귀속 수지");
-    expect(text).toContain("기초 장부 잔액");
-    expect(text).toContain("기말 장부 잔액");
+    expect(text).toContain("당월 수지");
+    expect(text).toContain("전월 이월 잔액");
+    expect(text).toContain("월말 잔액");
     expect(text).toContain("지출 상세");
     expect(text).toContain("회비는 귀속월 기준이며 지출은 사용일 기준입니다.");
     expect(text).toContain("개별 납부 내역");

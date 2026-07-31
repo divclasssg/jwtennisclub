@@ -256,17 +256,17 @@ export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
         <View style={styles.section}>
           <SectionTitle>잔액</SectionTitle>
           <LedgerRow
-            label="기초 장부 잔액"
+            label="전월 이월 잔액"
             value={formatSettlementBalance(report.openingLedgerBalance)}
           />
-          <LedgerRow label="당월 귀속 수지" value={formatSettlementBalance(report.attributedNet)} />
+          <LedgerRow label="당월 수지" value={formatSettlementBalance(report.attributedNet)} />
           <LedgerRow
-            label="기말 장부 잔액"
+            label="월말 잔액"
             value={formatSettlementBalance(report.closingLedgerBalance)}
             total
           />
           <Text style={styles.notice}>
-            기초 장부 잔액 + 당월 귀속 수지 = 기말 장부 잔액
+            전월 이월 잔액 + 당월 수지 = 월말 잔액
           </Text>
         </View>
 
