@@ -10,6 +10,12 @@ import { renderMonthlyReportPdf } from "./MonthlyReportPdf";
 const PDF_RENDER_TIMEOUT_MS = 15_000;
 const execFileAsync = promisify(execFile);
 const KOREAN_GLYPH_PROBE = ["가", "나", "다", "라", "마", "바", "사", "아"];
+const A4_WIDTH_POINTS = 595.28;
+const PAGE_HORIZONTAL_PADDING_POINTS = 72;
+const DESCRIPTION_COLUMN_END_POINTS =
+  PAGE_HORIZONTAL_PADDING_POINTS +
+  (A4_WIDTH_POINTS - PAGE_HORIZONTAL_PADDING_POINTS * 2) *
+    (0.21 + 0.19 + 0.38);
 
 const report = {
   title: "2026년 7월 테니스 클럽 월간 결산 보고서",
@@ -134,6 +140,67 @@ describe("renderMonthlyReportPdf", () => {
     expect(longRowStartPage).toBe(longRowEndPage);
   }, PDF_RENDER_TIMEOUT_MS);
 
+  it("wraps a UI-valid 120-character no-space Korean description inside its column", async () => {
+    const finalMarker = "끝고유표식";
+    const description = `${"가".repeat(115)}${finalMarker}`;
+    const pdf = await renderMonthlyReportPdf({
+      ...report,
+      expenseRows: [
+        {
+          expenseDate: "2026.07.12",
+          categoryLabel: "코트",
+          description,
+          amount: 9_876_543,
+        },
+      ],
+    });
+    const text = normalizeWrappedPdfText(await extractPdfText(pdf));
+    const descriptionWords = (await getPdfWordBoundingBoxes(pdf)).filter(
+      (word) => word.text.includes("가"),
+    );
+
+    expect(description).toHaveLength(120);
+    expect(text).toContain(finalMarker);
+    expect([...text].filter((character) => character === "가")).toHaveLength(115);
+    expect(descriptionWords.length).toBeGreaterThan(1);
+    expect(Math.max(...descriptionWords.map((word) => word.xMax))).toBeLessThanOrEqual(
+      DESCRIPTION_COLUMN_END_POINTS,
+    );
+  }, PDF_RENDER_TIMEOUT_MS);
+
+  it("wraps the snapshot contract's 500-character no-space description boundary", async () => {
+    const finalMarker = "경계고유표식";
+    const description = `${"나".repeat(494)}${finalMarker}`;
+    const pdf = await renderMonthlyReportPdf({
+      ...report,
+      expenseRows: [
+        {
+          expenseDate: "2026.07.12",
+          categoryLabel: "코트",
+          description,
+          amount: 9_876_543,
+        },
+      ],
+    });
+    const text = normalizeWrappedPdfText(await extractPdfText(pdf));
+    const descriptionWords = (await getPdfWordBoundingBoxes(pdf)).filter(
+      (word) => word.text.includes("나"),
+    );
+    const [rowStartPage, rowEndPage] = await getPdfTextPageNumbers(pdf, [
+      "2026.07.12",
+      finalMarker,
+    ]);
+
+    expect(description).toHaveLength(500);
+    expect(text).toContain(finalMarker);
+    expect([...text].filter((character) => character === "나")).toHaveLength(494);
+    expect(descriptionWords.length).toBeGreaterThan(1);
+    expect(Math.max(...descriptionWords.map((word) => word.xMax))).toBeLessThanOrEqual(
+      DESCRIPTION_COLUMN_END_POINTS,
+    );
+    expect(rowStartPage).toBe(rowEndPage);
+  }, PDF_RENDER_TIMEOUT_MS);
+
   it("renders distinct Korean glyph shapes instead of repeated tofu boxes", async () => {
     const pdf = await renderToBuffer(
       <Document>
@@ -220,6 +287,34 @@ async function getPdfTextPageNumbers(pdf: Buffer, textMarkers: string[]) {
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
+}
+
+async function getPdfWordBoundingBoxes(pdf: Buffer) {
+  const directory = await mkdtemp(path.join(tmpdir(), "jw-tennis-report-words-"));
+  const inputPath = path.join(directory, "report.pdf");
+  const outputPath = path.join(directory, "report.html");
+
+  try {
+    await writeFile(inputPath, pdf);
+    await execFileAsync("pdftotext", ["-bbox", inputPath, outputPath]);
+    const boundingBoxHtml = await readFile(outputPath, "utf8");
+
+    return [...boundingBoxHtml.matchAll(
+      /<word xMin="([^"]+)" yMin="([^"]+)" xMax="([^"]+)" yMax="([^"]+)">([^<]*)<\/word>/g,
+    )].map((match) => ({
+      text: match[5],
+      xMin: Number(match[1]),
+      yMin: Number(match[2]),
+      xMax: Number(match[3]),
+      yMax: Number(match[4]),
+    }));
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+}
+
+function normalizeWrappedPdfText(text: string) {
+  return text.replace(/[\s-]+/g, "");
 }
 
 async function getRenderedDarkPixelCounts(pdf: Buffer) {

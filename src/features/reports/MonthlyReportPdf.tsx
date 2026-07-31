@@ -27,6 +27,17 @@ Font.register({
   src: ibmPlexSansKrFontPath,
 });
 
+const koreanGraphemeSegmenter = new Intl.Segmenter("ko", {
+  granularity: "grapheme",
+});
+
+function breakAtGraphemeBoundaries(word: string) {
+  return Array.from(
+    koreanGraphemeSegmenter.segment(word),
+    ({ segment }) => segment,
+  );
+}
+
 const styles = StyleSheet.create({
   page: {
     paddingHorizontal: 72,
@@ -240,7 +251,12 @@ export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
             >
               <Text style={[styles.rowLabel, styles.dateColumn]}>{row.expenseDate}</Text>
               <Text style={[styles.rowLabel, styles.expenseCategoryColumn]}>{row.categoryLabel}</Text>
-              <Text style={[styles.rowLabel, styles.descriptionColumn]}>{row.description}</Text>
+              <Text
+                hyphenationCallback={breakAtGraphemeBoundaries}
+                style={[styles.rowLabel, styles.descriptionColumn]}
+              >
+                {row.description}
+              </Text>
               <Text style={[styles.rowLabel, styles.expenseAmountColumn]}>
                 {formatCurrency(row.amount)}원
               </Text>

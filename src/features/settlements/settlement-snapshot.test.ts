@@ -156,6 +156,43 @@ describe("monthly settlement page parser", () => {
     });
   });
 
+  it("accepts a 500-character public expense description and rejects 501 characters", () => {
+    const expenseRowsWithDescription = (description: string) => [
+      {
+        expense_date: "2026-07-12",
+        category: "court",
+        description,
+        amount: 120000,
+      },
+      {
+        expense_date: "2026-07-20",
+        category: "balls",
+        description: "테니스 공 구매",
+        amount: 10000,
+      },
+    ];
+    const acceptedDescription = "가".repeat(500);
+
+    const page = parseMonthlySettlementPage(
+      databasePage({
+        preview: databaseSnapshot({
+          expense_rows: expenseRowsWithDescription(acceptedDescription),
+        }),
+      }),
+    );
+
+    expect(page.preview.expenseRows[0].description).toBe(acceptedDescription);
+    expect(() =>
+      parseMonthlySettlementPage(
+        databasePage({
+          preview: databaseSnapshot({
+            expense_rows: expenseRowsWithDescription("가".repeat(501)),
+          }),
+        }),
+      ),
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
+  });
+
   it.each([
     ["an unsupported schema version", { schema_version: 2 }],
     ["a negative member count", { activity_member_count: -1 }],
