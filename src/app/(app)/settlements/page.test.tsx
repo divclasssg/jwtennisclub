@@ -213,6 +213,12 @@ describe("SettlementsPage", () => {
     expect(screen.getByText("최종 마감일")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "결산 재개" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "최종 마감" })).not.toBeInTheDocument();
+    const settlementList = screen.getByRole("region", {
+      name: "결산 상세 목록",
+    });
+    expect(
+      within(settlementList).getByRole("region", { name: "중간 결산 이력" }),
+    ).toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: "중간 결산 이력" })).getByText(
         "중간 결산 v2",

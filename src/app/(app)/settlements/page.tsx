@@ -250,7 +250,11 @@ export default async function SettlementsPage({
       }
       kicker="월별 결산 요약"
       list={
-        <>
+        <div
+          aria-label="결산 상세 목록"
+          className={styles["settlements-list"]}
+          role="region"
+        >
           <DataPanel
             aria-label="카테고리별 지출"
             empty={
@@ -294,7 +298,7 @@ export default async function SettlementsPage({
             kind="interim"
           />
           <ClosingHistoryPanel closings={finalClosingHistory} kind="final" />
-        </>
+        </div>
       }
       summary={
         <DataPanel
