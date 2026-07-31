@@ -108,6 +108,22 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).toContain("지출 합계");
   }, PDF_RENDER_TIMEOUT_MS);
 
+  it("continues long expense details onto a second page without omitting rows", async () => {
+    const expenseRows = Array.from({ length: 45 }, (_, index) => ({
+      expenseDate: `2026.07.${String((index % 28) + 1).padStart(2, "0")}`,
+      categoryLabel: "코트",
+      description: `장기 지출 내역 ${index + 1}`,
+      amount: 10_000 + index,
+    }));
+    const pdf = await renderMonthlyReportPdf({ ...report, expenseRows });
+    const text = await extractPdfText(pdf);
+    const pageCount = await getPdfPageCount(pdf);
+
+    expect(pageCount).toBeGreaterThan(1);
+    expect(text).toContain("장기 지출 내역 1");
+    expect(text).toContain("장기 지출 내역 45");
+  }, PDF_RENDER_TIMEOUT_MS);
+
   it("renders distinct Korean glyph shapes instead of repeated tofu boxes", async () => {
     const pdf = await renderToBuffer(
       <Document>
@@ -144,6 +160,26 @@ async function extractPdfText(pdf: Buffer) {
     await writeFile(inputPath, pdf);
     await execFileAsync("pdftotext", ["-layout", inputPath, outputPath]);
     return readFile(outputPath, "utf8");
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+}
+
+async function getPdfPageCount(pdf: Buffer) {
+  const directory = await mkdtemp(path.join(tmpdir(), "jw-tennis-report-pages-"));
+  const inputPath = path.join(directory, "report.pdf");
+
+  try {
+    await writeFile(inputPath, pdf);
+    const { stdout } = await execFileAsync("pdfinfo", [inputPath]);
+    const pagesLine = stdout.split("\n").find((line) => line.startsWith("Pages:"));
+    const pageCount = Number(pagesLine?.replace("Pages:", "").trim());
+
+    if (!Number.isInteger(pageCount) || pageCount < 1) {
+      throw new Error(`pdfinfo did not return a valid page count: ${pagesLine ?? "missing Pages line"}`);
+    }
+
+    return pageCount;
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
