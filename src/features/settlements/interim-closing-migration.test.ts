@@ -30,7 +30,13 @@ describe("interim monthly settlement closing migration", () => {
       "add column closing_kind public.monthly_closing_kind not null default 'final'",
     );
     expect(sql).toContain(
+      "drop constraint monthly_closings_period_month_version_key",
+    );
+    expect(sql).toContain(
       "unique (period_month, closing_kind, version)",
+    );
+    expect(sql).toContain(
+      "drop index public.monthly_closings_one_active_month_idx",
     );
     expect(sql).toContain(
       "where closing_kind = 'final' and status = 'closed'",
@@ -61,6 +67,9 @@ describe("interim monthly settlement closing migration", () => {
     expect(interim).toContain(
       "monthly_settlement.interim_created",
     );
+    expect(interim).toMatch(
+      /select coalesce\(max\(closings\.version\), 0\) \+ 1\s+into next_version\s+from public\.monthly_closings as closings\s+where closings\.period_month = normalized_period_month\s+and closings\.closing_kind = 'interim'/,
+    );
     expect(interim).toContain("profiles.status = 'active'");
     expect(interim).toContain("pg_advisory_xact_lock");
     expect(interim).toContain("'monthly-settlement-chain'");
@@ -87,7 +96,9 @@ describe("interim monthly settlement closing migration", () => {
     expect(finalClose).not.toContain(
       "normalized_period_month >= current_period_month",
     );
-    expect(finalClose).toContain("closing_kind = 'final'");
+    expect(finalClose).toMatch(
+      /select coalesce\(max\(closings\.version\), 0\) \+ 1\s+into next_version\s+from public\.monthly_closings as closings\s+where closings\.period_month = normalized_period_month\s+and closings\.closing_kind = 'final'/,
+    );
   });
 
   it("chains ledger balances only from the prior active final closing", () => {

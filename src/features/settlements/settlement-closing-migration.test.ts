@@ -34,17 +34,22 @@ function sourceReadStatements(functionName: string) {
 }
 
 describe("monthly settlement closing migration", () => {
-  it("defines versioned immutable closings with only one active row per month", () => {
+  it("evolves immutable closings to kind-scoped versions and one active final per month", () => {
     expect(migrationSql).toContain(
       "create type public.monthly_closing_status as enum ('closed', 'reopened')",
     );
     expect(migrationSql).toContain("create table public.monthly_closings");
-    expect(migrationSql).toContain("unique (period_month, version)");
-    expect(migrationSql).toContain(
-      "create unique index monthly_closings_one_active_month_idx",
+    expect(additiveMigrationSql).toContain(
+      "drop constraint monthly_closings_period_month_version_key",
     );
-    expect(migrationSql).toMatch(
-      /on public\.monthly_closings\s*\(period_month\)\s*where status = 'closed'/,
+    expect(additiveMigrationSql).toContain(
+      "unique (period_month, closing_kind, version)",
+    );
+    expect(additiveMigrationSql).toContain(
+      "drop index public.monthly_closings_one_active_month_idx",
+    );
+    expect(additiveMigrationSql).toMatch(
+      /create unique index monthly_closings_one_active_final_month_idx\s+on public\.monthly_closings\s*\(period_month\)\s*where closing_kind = 'final' and status = 'closed'/,
     );
     expect(migrationSql).toContain(
       "period_month = date_trunc('month', period_month)::date",
@@ -305,8 +310,9 @@ describe("monthly settlement closing migration", () => {
     expect(close).toMatch(
       /public\.build_monthly_settlement_snapshot\(\s*normalized_period_month\s*\)/,
     );
-    expect(close).toContain("coalesce(max(closings.version), 0) + 1");
-    expect(close).toContain("closings.closing_kind = 'final'");
+    expect(close).toMatch(
+      /select coalesce\(max\(closings\.version\), 0\) \+ 1\s+into next_version\s+from public\.monthly_closings as closings\s+where closings\.period_month = normalized_period_month\s+and closings\.closing_kind = 'final'/,
+    );
   });
 
   it("rechecks and locks close authorization after every advisory and source-table wait", () => {
