@@ -213,8 +213,7 @@ export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
 
         <View style={styles.section}>
           <SectionTitle>{formatMemberStatusTitle(report.periodLabel)}</SectionTitle>
-          <LedgerRow label="활동 회원" value={`${report.activityMemberCount}명`} />
-          <LedgerRow label="회비 부과 대상" value={`${report.feeTargetCount}명`} />
+          <LedgerRow label="회원 수" value={`${report.feeTargetCount}명`} />
           <LedgerRow label="완납 회원" value={`${report.fullyPaidCount}명`} />
           <LedgerRow label="미납 회원" value={`${report.unpaidCount}명`} />
         </View>

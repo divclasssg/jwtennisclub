@@ -83,8 +83,9 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).toContain("PDF 생성일");
     expect(text).toContain("2026.08.03 21:00:00");
     expect(text).toContain("생성자");
-    expect(text).toContain("활동 회원");
-    expect(text).toContain("회비 부과 대상");
+    expect(text).toContain("회원 수");
+    expect(text).not.toContain("활동 회원");
+    expect(text).not.toContain("회비 부과 대상");
     expect(text).toContain("완납 회원");
     expect(text).toContain("미납 회원");
     expect(text).toContain("총 청구액");
