@@ -155,13 +155,20 @@ describe("renderMonthlyReportPdf", () => {
       ],
     });
     const text = normalizeWrappedPdfText(await extractPdfText(pdf));
-    const descriptionWords = (await getPdfWordBoundingBoxes(pdf)).filter(
-      (word) => word.text.includes("가"),
+    const descriptionWords = getDescriptionWords(
+      await getPdfWordBoundingBoxes(pdf),
+      description,
     );
+    const extractedDescription = descriptionWords
+      .map((word) => word.text)
+      .join("")
+      .replace(/\s+/g, "");
 
     expect(description).toHaveLength(120);
     expect(text).toContain(finalMarker);
     expect([...text].filter((character) => character === "가")).toHaveLength(115);
+    expect(extractedDescription).toBe(description);
+    expect(extractedDescription).not.toContain("-");
     expect(descriptionWords.length).toBeGreaterThan(1);
     expect(Math.max(...descriptionWords.map((word) => word.xMax))).toBeLessThanOrEqual(
       DESCRIPTION_COLUMN_END_POINTS,
@@ -183,9 +190,14 @@ describe("renderMonthlyReportPdf", () => {
       ],
     });
     const text = normalizeWrappedPdfText(await extractPdfText(pdf));
-    const descriptionWords = (await getPdfWordBoundingBoxes(pdf)).filter(
-      (word) => word.text.includes("나"),
+    const descriptionWords = getDescriptionWords(
+      await getPdfWordBoundingBoxes(pdf),
+      description,
     );
+    const extractedDescription = descriptionWords
+      .map((word) => word.text)
+      .join("")
+      .replace(/\s+/g, "");
     const [rowStartPage, rowEndPage] = await getPdfTextPageNumbers(pdf, [
       "2026.07.12",
       finalMarker,
@@ -194,6 +206,8 @@ describe("renderMonthlyReportPdf", () => {
     expect(description).toHaveLength(500);
     expect(text).toContain(finalMarker);
     expect([...text].filter((character) => character === "나")).toHaveLength(494);
+    expect(extractedDescription).toBe(description);
+    expect(extractedDescription).not.toContain("-");
     expect(descriptionWords.length).toBeGreaterThan(1);
     expect(Math.max(...descriptionWords.map((word) => word.xMax))).toBeLessThanOrEqual(
       DESCRIPTION_COLUMN_END_POINTS,
@@ -272,7 +286,10 @@ async function getPdfTextPageNumbers(pdf: Buffer, textMarkers: string[]) {
     await execFileAsync("pdftotext", ["-bbox", inputPath, outputPath]);
     const boundingBoxHtml = await readFile(outputPath, "utf8");
     const pages = [...boundingBoxHtml.matchAll(/<page [^>]*>([\s\S]*?)<\/page>/g)].map(
-      (match) => match[1],
+      (match) =>
+        [...match[1].matchAll(/<word [^>]*>([^<]*)<\/word>/g)]
+          .map((wordMatch) => normalizeWrappedPdfText(wordMatch[1]))
+          .join(""),
     );
 
     return textMarkers.map((marker) => {
@@ -314,7 +331,23 @@ async function getPdfWordBoundingBoxes(pdf: Buffer) {
 }
 
 function normalizeWrappedPdfText(text: string) {
-  return text.replace(/[\s-]+/g, "");
+  return text.replace(/\s+/g, "");
+}
+
+function getDescriptionWords(
+  words: Awaited<ReturnType<typeof getPdfWordBoundingBoxes>>,
+  description: string,
+) {
+  const descriptionCharacters = new Set([...description, "-"]);
+
+  return words.filter((word) => {
+    const normalizedWord = normalizeWrappedPdfText(word.text);
+
+    return (
+      normalizedWord.length > 0 &&
+      [...normalizedWord].every((character) => descriptionCharacters.has(character))
+    );
+  });
 }
 
 async function getRenderedDarkPixelCounts(pdf: Buffer) {
