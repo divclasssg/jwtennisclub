@@ -6,8 +6,14 @@ import { normalizePeriodMonth } from "@/features/fees/fee-model";
 import { createClient } from "@/lib/supabase/server";
 
 type SettlementMutationRpc =
+  | "create_interim_monthly_settlement"
   | "close_monthly_settlement"
   | "reopen_monthly_settlement";
+
+type SettlementMutationSuccess =
+  | "interim-created"
+  | "final-closed"
+  | "final-reopened";
 
 function normalizeSettlementPeriodMonth(value: string) {
   const periodMonth = normalizePeriodMonth(value);
@@ -31,7 +37,9 @@ function readFormValue(formData: FormData, name: string) {
 function buildSettlementHref(
   periodMonth: string,
   formData: FormData,
-  statusOrError: { status: "updated" } | { error: "mutation-failed" },
+  statusOrError:
+    | { status: SettlementMutationSuccess }
+    | { error: "mutation-failed" },
 ) {
   const params = new URLSearchParams({ month: periodMonth.slice(0, 7) });
   const sort = readFormValue(formData, "sort");
@@ -51,9 +59,12 @@ function buildSettlementHref(
 
 async function runSettlementMutation(
   rpcName: SettlementMutationRpc,
+  successStatus: SettlementMutationSuccess,
   formData: FormData,
 ) {
-  const periodMonth = normalizeSettlementPeriodMonth(readFormValue(formData, "month"));
+  const periodMonth = normalizeSettlementPeriodMonth(
+    readFormValue(formData, "month"),
+  );
   if (!periodMonth) {
     redirect("/settlements?error=invalid-month");
   }
@@ -70,13 +81,31 @@ async function runSettlementMutation(
   }
 
   revalidatePath("/settlements");
-  redirect(buildSettlementHref(periodMonth, formData, { status: "updated" }));
+  redirect(
+    buildSettlementHref(periodMonth, formData, { status: successStatus }),
+  );
+}
+
+export async function createInterimMonthlySettlement(formData: FormData) {
+  await runSettlementMutation(
+    "create_interim_monthly_settlement",
+    "interim-created",
+    formData,
+  );
 }
 
 export async function closeMonthlySettlement(formData: FormData) {
-  await runSettlementMutation("close_monthly_settlement", formData);
+  await runSettlementMutation(
+    "close_monthly_settlement",
+    "final-closed",
+    formData,
+  );
 }
 
 export async function reopenMonthlySettlement(formData: FormData) {
-  await runSettlementMutation("reopen_monthly_settlement", formData);
+  await runSettlementMutation(
+    "reopen_monthly_settlement",
+    "final-reopened",
+    formData,
+  );
 }
