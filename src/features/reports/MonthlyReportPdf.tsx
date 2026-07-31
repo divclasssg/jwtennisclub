@@ -226,7 +226,7 @@ export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
 
         <View style={styles.section}>
           <SectionTitle>지출 상세</SectionTitle>
-          <View style={styles.expenseHeader}>
+          <View style={styles.expenseHeader} fixed={false}>
             <Text style={[styles.rowLabel, styles.dateColumn]}>사용일</Text>
             <Text style={[styles.rowLabel, styles.expenseCategoryColumn]}>카테고리</Text>
             <Text style={[styles.rowLabel, styles.descriptionColumn]}>내용</Text>

@@ -109,19 +109,29 @@ describe("renderMonthlyReportPdf", () => {
   }, PDF_RENDER_TIMEOUT_MS);
 
   it("continues long expense details onto a second page without omitting rows", async () => {
+    const longDescription = [
+      "행시작표식",
+      ...Array.from({ length: 50 }, () => "페이지경계행분리방지검증"),
+      "행종료표식",
+    ].join(" ");
     const expenseRows = Array.from({ length: 45 }, (_, index) => ({
       expenseDate: `2026.07.${String((index % 28) + 1).padStart(2, "0")}`,
       categoryLabel: "코트",
-      description: `장기 지출 내역 ${index + 1}`,
+      description: index === 33 ? longDescription : `장기 지출 내역 ${index + 1}`,
       amount: 10_000 + index,
     }));
     const pdf = await renderMonthlyReportPdf({ ...report, expenseRows });
     const text = await extractPdfText(pdf);
     const pageCount = await getPdfPageCount(pdf);
+    const [longRowStartPage, longRowEndPage] = await getPdfTextPageNumbers(pdf, [
+      "행시작표식",
+      "행종료표식",
+    ]);
 
     expect(pageCount).toBeGreaterThan(1);
     expect(text).toContain("장기 지출 내역 1");
     expect(text).toContain("장기 지출 내역 45");
+    expect(longRowStartPage).toBe(longRowEndPage);
   }, PDF_RENDER_TIMEOUT_MS);
 
   it("renders distinct Korean glyph shapes instead of repeated tofu boxes", async () => {
@@ -180,6 +190,33 @@ async function getPdfPageCount(pdf: Buffer) {
     }
 
     return pageCount;
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+}
+
+async function getPdfTextPageNumbers(pdf: Buffer, textMarkers: string[]) {
+  const directory = await mkdtemp(path.join(tmpdir(), "jw-tennis-report-bbox-"));
+  const inputPath = path.join(directory, "report.pdf");
+  const outputPath = path.join(directory, "report.html");
+
+  try {
+    await writeFile(inputPath, pdf);
+    await execFileAsync("pdftotext", ["-bbox", inputPath, outputPath]);
+    const boundingBoxHtml = await readFile(outputPath, "utf8");
+    const pages = [...boundingBoxHtml.matchAll(/<page [^>]*>([\s\S]*?)<\/page>/g)].map(
+      (match) => match[1],
+    );
+
+    return textMarkers.map((marker) => {
+      const pageIndex = pages.findIndex((page) => page.includes(marker));
+
+      if (pageIndex === -1) {
+        throw new Error(`Could not find PDF text marker: ${marker}`);
+      }
+
+      return pageIndex + 1;
+    });
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
