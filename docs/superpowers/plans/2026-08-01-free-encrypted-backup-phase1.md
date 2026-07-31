@@ -346,11 +346,11 @@ Test exact KST cases:
 
 ```ts
 {
-  utc: "2026-08-07T14:00:00.000Z",
+  utc: "2026-08-14T14:00:00.000Z",
   expected: { force: true, backupClass: "match", trigger: { kind: "pre-match" } },
 }
 {
-  utc: "2026-08-08T15:00:00.000Z",
+  utc: "2026-08-15T15:00:00.000Z",
   expected: { force: true, backupClass: "match", trigger: { kind: "post-match" } },
 }
 {
@@ -359,7 +359,7 @@ Test exact KST cases:
 }
 ```
 
-Also test second/fourth Saturdays do not force match backups, a daily event requests fingerprint comparison, blank manual reason fails, and pre-deploy always forces.
+Also test Friday/Sunday candidates adjacent to second/fourth Saturdays do not force match backups, a daily event requests fingerprint comparison, blank manual reason fails, and pre-deploy always forces.
 
 - [ ] **Step 2: Run tests and verify RED**
 
