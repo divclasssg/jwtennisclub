@@ -19,12 +19,23 @@ const ibmPlexSansKrFontPath = path.join(
   process.cwd(),
   "src/features/reports/fonts/IBMPlexSansKR-Regular.ttf",
 );
+const notoSansKrBoldFontPath = path.join(
+  process.cwd(),
+  "node_modules/@fontsource/noto-sans-kr/files/noto-sans-kr-korean-700-normal.woff",
+);
 
 Font.register({
   family: "IBM Plex Sans KR",
   fontStyle: "normal",
   fontWeight: 400,
   src: ibmPlexSansKrFontPath,
+});
+
+Font.register({
+  family: "Noto Sans KR Report Bold",
+  fontStyle: "normal",
+  fontWeight: 700,
+  src: notoSansKrBoldFontPath,
 });
 
 const koreanGraphemeSegmenter = new Intl.Segmenter("ko", {
@@ -65,11 +76,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   clubName: {
+    fontFamily: "Noto Sans KR Report Bold",
     fontSize: 14,
+    fontWeight: 700,
+    marginBottom: 10,
   },
   reportTitle: {
     fontSize: 13,
-    marginTop: 2,
   },
   period: {
     fontSize: 10,
@@ -85,6 +98,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sectionTitle: {
+    fontFamily: "Noto Sans KR Report Bold",
+    fontWeight: 700,
     marginBottom: 4,
     fontSize: 12,
   },
@@ -166,6 +181,14 @@ function SectionTitle({ children }: { children: string }) {
   return <Text style={styles.sectionTitle}>{children}</Text>;
 }
 
+function formatMemberStatusTitle(periodLabel: string) {
+  const month = Number(periodLabel.split(".").at(-1));
+
+  return Number.isInteger(month) && month >= 1 && month <= 12
+    ? `회원 현황 (${month}월 기준)`
+    : "회원 현황";
+}
+
 export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
   return (
     <Document title={report.title}>
@@ -177,7 +200,6 @@ export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
             <Text style={styles.period}>{report.periodLabel}</Text>
           </View>
           <View style={styles.metaColumn}>
-            <Text>{report.closingLabel}</Text>
             <Text>결산일 {report.closedAtLabel}</Text>
             <Text>결산 처리자 {report.closedBy}</Text>
             <Text>PDF 생성일 {report.generatedAtLabel}</Text>
@@ -186,7 +208,7 @@ export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
         </View>
 
         <View style={styles.section}>
-          <SectionTitle>회원 현황</SectionTitle>
+          <SectionTitle>{formatMemberStatusTitle(report.periodLabel)}</SectionTitle>
           <LedgerRow label="활동 회원" value={`${report.activityMemberCount}명`} />
           <LedgerRow label="회비 부과 대상" value={`${report.feeTargetCount}명`} />
           <LedgerRow label="완납 회원" value={`${report.fullyPaidCount}명`} />

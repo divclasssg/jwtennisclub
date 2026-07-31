@@ -67,7 +67,7 @@ describe("renderMonthlyReportPdf", () => {
     const text = await extractPdfText(pdf);
     expect(text).toContain("JW TENNIS CLUB");
     expect(text).toContain("월간 결산 보고서");
-    expect(text).toContain("회원 현황");
+    expect(text).toContain("회원 현황 (7월 기준)");
     expect(text).toContain("수입");
     expect(text).toContain("수입 합계");
     expect(text).toContain("지출");
@@ -76,7 +76,7 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).toContain("잔액");
     expect(text).toContain("기말 장부 잔액");
     expect(text).toContain("지출 상세");
-    expect(text).toContain("최종 마감 v2 · 재개됨");
+    expect(text).not.toContain("최종 마감 v2 · 재개됨");
     expect(text).toContain("결산일");
     expect(text).toContain("2026.08.02 12:04:05");
     expect(text).toContain("결산 처리자");
