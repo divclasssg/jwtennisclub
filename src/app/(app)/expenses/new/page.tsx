@@ -10,9 +10,7 @@ import {
 import { getMonthlySourceLockStatus } from "@/features/settlements/monthly-source-lock";
 
 type NewExpensePageProps = {
-  searchParams: Promise<
-    NewExpenseSearchParams & { month?: string | string[] }
-  >;
+  searchParams: Promise<NewExpenseSearchParams>;
 };
 
 export default async function NewExpensePage({ searchParams }: NewExpensePageProps) {

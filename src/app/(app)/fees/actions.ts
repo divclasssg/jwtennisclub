@@ -173,16 +173,38 @@ export async function createFeePayment(formData: FormData) {
 
 export async function cancelFeePayment(formData: FormData) {
   const paymentId = String(formData.get("paymentId") ?? "");
-  const periodMonth =
+  const fallbackPeriodMonth =
     normalizePeriodMonth(String(formData.get("periodMonth") ?? "")) ||
     getCurrentPeriodMonth();
-  const month = periodMonth.slice(0, 7);
+  const fallbackMonth = fallbackPeriodMonth.slice(0, 7);
 
   if (!paymentId) {
-    redirect(buildRedirect(feesPath, { error: "missing-payment", month }));
+    redirect(
+      buildRedirect(feesPath, {
+        error: "missing-payment",
+        month: fallbackMonth,
+      }),
+    );
   }
 
   const { supabase } = await getAuthenticatedUserId();
+  const { data: payment, error: readError } = await supabase
+    .from("fee_payments")
+    .select("id, period_month")
+    .eq("id", paymentId)
+    .maybeSingle();
+
+  if (readError || !payment) {
+    redirect(
+      buildRedirect(feesPath, {
+        error: "cancel-failed",
+        month: fallbackMonth,
+      }),
+    );
+  }
+
+  const periodMonth = payment.period_month;
+  const month = periodMonth.slice(0, 7);
 
   if (await getMonthlySourceLockStatus(periodMonth)) {
     redirect(buildRedirect(feesPath, { error: "closing-locked", month }));
@@ -421,8 +443,20 @@ export async function importFeePaymentsCsv(formData: FormData) {
 
   if (error) {
     if (isMonthlySourceLockError(error)) {
+      const racingLockStatuses = await Promise.all(
+        periodMonths.map((periodMonth) =>
+          getMonthlySourceLockStatus(periodMonth),
+        ),
+      );
+      const racingLockedPeriodMonth =
+        periodMonths.find((_, index) => racingLockStatuses[index]) ??
+        periodMonths[0];
+
       redirect(
-        buildRedirect(feeCreatePath, { importError: "closing-locked" }),
+        buildRedirect(feeCreatePath, {
+          importError: "closing-locked",
+          month: racingLockedPeriodMonth.slice(0, 7),
+        }),
       );
     }
 

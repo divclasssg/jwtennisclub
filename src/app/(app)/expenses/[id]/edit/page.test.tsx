@@ -93,4 +93,19 @@ describe("EditExpensePage", () => {
     );
     expect(screen.getByRole("button", { name: "변경 저장" })).toBeInTheDocument();
   });
+
+  it("renders a racing closing-locked redirect after the month is reopened", async () => {
+    render(
+      await EditExpensePage({
+        params: Promise.resolve({ id: "expense-1" }),
+        searchParams: Promise.resolve({ error: "closing-locked" }),
+      }),
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+    expect(screen.getByRole("button", { name: "변경 저장" }))
+      .toBeInTheDocument();
+  });
 });

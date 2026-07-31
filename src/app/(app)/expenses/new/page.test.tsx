@@ -31,6 +31,24 @@ describe("NewExpensePage", () => {
       .not.toBeInTheDocument();
   });
 
+  it("renders a racing closing-locked redirect with its attempted month", async () => {
+    render(
+      await NewExpensePage({
+        searchParams: Promise.resolve({
+          error: "closing-locked",
+          month: "2026-07",
+        }),
+      }),
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+    expect(lockMocks.getMonthlySourceLockStatus).toHaveBeenCalledWith(
+      "2026-07-01",
+    );
+  });
+
   it("renders the expense creation form", async () => {
     render(
       await NewExpensePage({

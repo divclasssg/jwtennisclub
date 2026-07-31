@@ -1,8 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
+  const expenseDeleteQuery = {
+    eq: vi.fn(() => expenseDeleteQuery),
+    maybeSingle: vi.fn(async () => ({
+      data: { id: "expense-1" } as { id: string } | null,
+      error: null,
+    })),
+    select: vi.fn(() => expenseDeleteQuery),
+  };
   const expensesTable = {
-    delete: vi.fn(() => expensesTable),
+    delete: vi.fn(() => expenseDeleteQuery),
     eq: vi.fn(() => expensesTable),
     insert: vi.fn(
       async (): Promise<{ error: unknown }> => ({ error: null }),
@@ -35,6 +43,7 @@ const mocks = vi.hoisted(() => {
   };
 
   return {
+    expenseDeleteQuery,
     expensesTable,
     deleteReceiptFile: vi.fn(async (key: string) => {
       void key;
@@ -114,7 +123,15 @@ describe("expense actions", () => {
     });
     mocks.expensesTable.select.mockClear();
     mocks.expensesTable.update.mockClear();
-    mocks.deleteReceiptFile.mockClear();
+    mocks.expenseDeleteQuery.eq.mockClear();
+    mocks.expenseDeleteQuery.select.mockClear();
+    mocks.expenseDeleteQuery.maybeSingle.mockReset();
+    mocks.expenseDeleteQuery.maybeSingle.mockResolvedValue({
+      data: { id: "expense-1" },
+      error: null,
+    });
+    mocks.deleteReceiptFile.mockReset();
+    mocks.deleteReceiptFile.mockResolvedValue(undefined);
     mocks.uploadReceiptFile.mockClear();
     mocks.getMonthlySourceLockStatus.mockReset();
     mocks.getMonthlySourceLockStatus.mockResolvedValue(false);
@@ -130,7 +147,7 @@ describe("expense actions", () => {
     );
 
     await expect(createExpense(formData)).rejects.toThrow(
-      "redirect:/expenses/new?error=closing-locked",
+      "redirect:/expenses/new?error=closing-locked&month=2026-07",
     );
 
     expect(mocks.getMonthlySourceLockStatus).toHaveBeenCalledWith("2026-07-01");
@@ -150,14 +167,44 @@ describe("expense actions", () => {
       "receiptFile",
       new File(["receipt"], "receipt.jpg", { type: "image/jpeg" }),
     );
+    mocks.deleteReceiptFile
+      .mockRejectedValueOnce(new Error("transient R2 failure"))
+      .mockResolvedValueOnce(undefined);
 
     await expect(createExpense(formData)).rejects.toThrow(
-      "redirect:/expenses/new?error=closing-locked",
+      "redirect:/expenses/new?error=closing-locked&month=2026-07",
     );
 
     const uploadedKey = mocks.uploadReceiptFile.mock.calls[0][0].key;
     expect(mocks.deleteReceiptFile).toHaveBeenCalledWith(uploadedKey);
+    expect(mocks.deleteReceiptFile).toHaveBeenCalledTimes(2);
     expect(mocks.isMonthlySourceLockError).toHaveBeenCalled();
+  });
+
+  it("fails observably after bounded receipt cleanup attempts are exhausted", async () => {
+    mocks.expensesTable.insert.mockResolvedValueOnce({
+      error: {
+        code: "55000",
+        message: "monthly closing source is locked",
+      },
+    });
+    mocks.deleteReceiptFile.mockRejectedValue(
+      new Error("persistent R2 failure"),
+    );
+    const formData = buildExpenseFormData({ expenseDate: "2026-07-03" });
+    formData.set(
+      "receiptFile",
+      new File(["receipt"], "receipt.jpg", { type: "image/jpeg" }),
+    );
+
+    await expect(createExpense(formData)).rejects.toThrow(
+      "업로드된 영수증 파일을 정리하지 못했습니다.",
+    );
+
+    expect(mocks.deleteReceiptFile).toHaveBeenCalledTimes(3);
+    expect(mocks.redirect).not.toHaveBeenCalledWith(
+      "/expenses/new?error=closing-locked&month=2026-07",
+    );
   });
 
   it("preflights both source and destination months before moving an expense", async () => {
@@ -174,7 +221,7 @@ describe("expense actions", () => {
     );
 
     await expect(updateExpense(formData)).rejects.toThrow(
-      "redirect:/expenses/expense-1/edit?error=closing-locked",
+      "redirect:/expenses/expense-1/edit?error=closing-locked&month=2026-08",
     );
 
     expect(mocks.getMonthlySourceLockStatus.mock.calls).toEqual([
@@ -183,6 +230,20 @@ describe("expense actions", () => {
     ]);
     expect(mocks.uploadReceiptFile).not.toHaveBeenCalled();
     expect(mocks.expensesTable.update).not.toHaveBeenCalled();
+  });
+
+  it("preserves the authoritative month when receipt removal is locked", async () => {
+    mocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+    const formData = new FormData();
+    formData.set("id", "expense-1");
+    formData.set("intent", "removeReceipt");
+
+    await expect(updateExpense(formData)).rejects.toThrow(
+      "redirect:/expenses/expense-1/edit?error=closing-locked&month=2026-07",
+    );
+
+    expect(mocks.expensesTable.update).not.toHaveBeenCalled();
+    expect(mocks.deleteReceiptFile).not.toHaveBeenCalled();
   });
 
   it("redirects a finalized month before deleting its expense", async () => {
@@ -276,10 +337,31 @@ describe("expense actions", () => {
     );
     expect(mocks.expensesTable.eq).toHaveBeenCalledWith("id", "expense-1");
     expect(mocks.expensesTable.delete).toHaveBeenCalled();
+    expect(mocks.expenseDeleteQuery.eq).toHaveBeenCalledWith(
+      "id",
+      "expense-1",
+    );
+    expect(mocks.expenseDeleteQuery.select).toHaveBeenCalledWith("id");
     expect(mocks.deleteReceiptFile).toHaveBeenCalledWith(
       "expenses/operator-id/2026/07/receipt.jpg",
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/expenses");
+  });
+
+  it("does not delete a receipt when the database reports no deleted row", async () => {
+    mocks.expenseDeleteQuery.maybeSingle.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+    const formData = new FormData();
+    formData.set("expenseId", "expense-1");
+
+    await expect(deleteExpense(formData)).rejects.toThrow(
+      "redirect:/expenses?error=delete-failed",
+    );
+
+    expect(mocks.deleteReceiptFile).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it("updates an expense", async () => {

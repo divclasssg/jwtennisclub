@@ -21,6 +21,7 @@ import {
 
 const expensesPath = "/expenses";
 const expenseCreatePath = "/expenses/new";
+const receiptCleanupMaximumAttempts = 3;
 
 function buildRedirect(path: string, params: Record<string, string | number>) {
   const searchParams = new URLSearchParams();
@@ -61,11 +62,20 @@ async function deleteNewReceiptAfterFailedWrite(receiptFileKey: string | null) {
     return;
   }
 
-  try {
-    await deleteReceiptFile(receiptFileKey);
-  } catch {
-    // The database does not reference this object. Leave cleanup for ops.
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < receiptCleanupMaximumAttempts; attempt += 1) {
+    try {
+      await deleteReceiptFile(receiptFileKey);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
   }
+
+  throw new Error("업로드된 영수증 파일을 정리하지 못했습니다.", {
+    cause: lastError,
+  });
 }
 
 async function getAuthenticatedUserId() {
@@ -102,13 +112,15 @@ export async function createExpense(formData: FormData) {
   }
 
   const { supabase, userId } = await getAuthenticatedUserId();
+  const periodMonth = getExpensePeriodMonth(expense.expenseDate);
 
-  if (
-    await getMonthlySourceLockStatus(
-      getExpensePeriodMonth(expense.expenseDate),
-    )
-  ) {
-    redirect(buildRedirect(expenseCreatePath, { error: "closing-locked" }));
+  if (await getMonthlySourceLockStatus(periodMonth)) {
+    redirect(
+      buildRedirect(expenseCreatePath, {
+        error: "closing-locked",
+        month: periodMonth.slice(0, 7),
+      }),
+    );
   }
 
   const receiptFileKey = receiptFile
@@ -146,7 +158,12 @@ export async function createExpense(formData: FormData) {
     await deleteNewReceiptAfterFailedWrite(receiptFileKey);
 
     if (isMonthlySourceLockError(error)) {
-      redirect(buildRedirect(expenseCreatePath, { error: "closing-locked" }));
+      redirect(
+        buildRedirect(expenseCreatePath, {
+          error: "closing-locked",
+          month: periodMonth.slice(0, 7),
+        }),
+      );
     }
 
     redirect(buildRedirect(expenseCreatePath, { error: "save-failed" }));
@@ -191,7 +208,12 @@ export async function updateExpense(formData: FormData) {
         getExpensePeriodMonth(currentExpense.expense_date),
       )
     ) {
-      redirect(buildRedirect(editPath, { error: "closing-locked" }));
+      redirect(
+        buildRedirect(editPath, {
+          error: "closing-locked",
+          month: currentExpense.expense_date.slice(0, 7),
+        }),
+      );
     }
 
     const { error } = await supabase
@@ -208,7 +230,12 @@ export async function updateExpense(formData: FormData) {
 
     if (error) {
       if (isMonthlySourceLockError(error)) {
-        redirect(buildRedirect(editPath, { error: "closing-locked" }));
+        redirect(
+          buildRedirect(editPath, {
+            error: "closing-locked",
+            month: currentExpense.expense_date.slice(0, 7),
+          }),
+        );
       }
 
       redirect(buildRedirect(editPath, { error: "save-failed" }));
@@ -261,8 +288,17 @@ export async function updateExpense(formData: FormData) {
     ),
   );
 
-  if (lockStatuses.some(Boolean)) {
-    redirect(buildRedirect(editPath, { error: "closing-locked" }));
+  const lockedPeriodMonth = periodMonths.find(
+    (_, index) => lockStatuses[index],
+  );
+
+  if (lockedPeriodMonth) {
+    redirect(
+      buildRedirect(editPath, {
+        error: "closing-locked",
+        month: lockedPeriodMonth.slice(0, 7),
+      }),
+    );
   }
 
   const receiptFileKey = receiptFile
@@ -312,7 +348,21 @@ export async function updateExpense(formData: FormData) {
     await deleteNewReceiptAfterFailedWrite(receiptFileKey);
 
     if (isMonthlySourceLockError(error)) {
-      redirect(buildRedirect(editPath, { error: "closing-locked" }));
+      const racingLockStatuses = await Promise.all(
+        periodMonths.map((periodMonth) =>
+          getMonthlySourceLockStatus(periodMonth),
+        ),
+      );
+      const racingLockedPeriodMonth =
+        periodMonths.find((_, index) => racingLockStatuses[index]) ??
+        destinationPeriodMonth;
+
+      redirect(
+        buildRedirect(editPath, {
+          error: "closing-locked",
+          month: racingLockedPeriodMonth.slice(0, 7),
+        }),
+      );
     }
 
     redirect(buildRedirect(editPath, { error: "save-failed" }));
@@ -365,10 +415,12 @@ export async function deleteExpense(formData: FormData) {
     );
   }
 
-  const { error: deleteError } = await supabase
+  const { data: deletedExpense, error: deleteError } = await supabase
     .from("expenses")
     .delete()
-    .eq("id", expenseId);
+    .eq("id", expenseId)
+    .select("id")
+    .maybeSingle();
 
   if (deleteError) {
     if (isMonthlySourceLockError(deleteError)) {
@@ -380,6 +432,10 @@ export async function deleteExpense(formData: FormData) {
       );
     }
 
+    redirect(buildRedirect(expensesPath, { error: "delete-failed" }));
+  }
+
+  if (!deletedExpense) {
     redirect(buildRedirect(expensesPath, { error: "delete-failed" }));
   }
 

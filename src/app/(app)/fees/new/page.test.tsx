@@ -54,4 +54,19 @@ describe("NewFeePaymentPage", () => {
       }),
     ).toBeInTheDocument();
   });
+
+  it("renders the finalized month returned by a racing CSV insert", async () => {
+    render(
+      await NewFeePaymentPage({
+        searchParams: Promise.resolve({
+          importError: "closing-locked",
+          month: "2026-07",
+        }),
+      }),
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+  });
 });

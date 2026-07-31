@@ -29,25 +29,25 @@ security definer
 set search_path = ''
 as $$
 begin
-  if tg_op = 'delete' then
-    perform public.assert_monthly_source_unlocked(old.period_month);
-    return old;
-  end if;
-
-  if tg_op = 'insert' then
-    perform public.assert_monthly_source_unlocked(new.period_month);
-    return new;
-  end if;
-
-  if tg_op = 'update' then
-    perform public.assert_monthly_source_unlocked(old.period_month);
-
-    if old.period_month is distinct from new.period_month then
+  case TG_OP
+    when 'DELETE' then
+      perform public.assert_monthly_source_unlocked(old.period_month);
+      return OLD;
+    when 'INSERT' then
       perform public.assert_monthly_source_unlocked(new.period_month);
-    end if;
-  end if;
+      return NEW;
+    when 'UPDATE' then
+      perform public.assert_monthly_source_unlocked(old.period_month);
 
-  return new;
+      if old.period_month is distinct from new.period_month then
+        perform public.assert_monthly_source_unlocked(new.period_month);
+      end if;
+
+      return NEW;
+    else
+      raise exception 'unexpected fee payment source trigger operation: %', TG_OP
+        using errcode = '55000';
+  end case;
 end;
 $$;
 
@@ -58,35 +58,35 @@ security definer
 set search_path = ''
 as $$
 begin
-  if tg_op = 'delete' then
-    perform public.assert_monthly_source_unlocked(
-      pg_catalog.date_trunc('month', old.expense_date)::date
-    );
-    return old;
-  end if;
-
-  if tg_op = 'insert' then
-    perform public.assert_monthly_source_unlocked(
-      pg_catalog.date_trunc('month', new.expense_date)::date
-    );
-    return new;
-  end if;
-
-  if tg_op = 'update' then
-    perform public.assert_monthly_source_unlocked(
-      pg_catalog.date_trunc('month', old.expense_date)::date
-    );
-
-    if pg_catalog.date_trunc('month', old.expense_date)::date
-      is distinct from pg_catalog.date_trunc('month', new.expense_date)::date
-    then
+  case TG_OP
+    when 'DELETE' then
+      perform public.assert_monthly_source_unlocked(
+        pg_catalog.date_trunc('month', old.expense_date)::date
+      );
+      return OLD;
+    when 'INSERT' then
       perform public.assert_monthly_source_unlocked(
         pg_catalog.date_trunc('month', new.expense_date)::date
       );
-    end if;
-  end if;
+      return NEW;
+    when 'UPDATE' then
+      perform public.assert_monthly_source_unlocked(
+        pg_catalog.date_trunc('month', old.expense_date)::date
+      );
 
-  return new;
+      if pg_catalog.date_trunc('month', old.expense_date)::date
+        is distinct from pg_catalog.date_trunc('month', new.expense_date)::date
+      then
+        perform public.assert_monthly_source_unlocked(
+          pg_catalog.date_trunc('month', new.expense_date)::date
+        );
+      end if;
+
+      return NEW;
+    else
+      raise exception 'unexpected expense source trigger operation: %', TG_OP
+        using errcode = '55000';
+  end case;
 end;
 $$;
 

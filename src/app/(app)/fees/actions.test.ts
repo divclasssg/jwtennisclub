@@ -4,11 +4,22 @@ const mocks = vi.hoisted(() => {
   const deleteQuery = {
     eq: vi.fn(async () => ({ error: null })),
   };
+  const feePaymentReadQuery = {
+    eq: vi.fn(() => feePaymentReadQuery),
+    maybeSingle: vi.fn(async () => ({
+      data: {
+        id: "payment-1",
+        period_month: "2026-07-01",
+      } as { id: string; period_month: string } | null,
+      error: null,
+    })),
+  };
   const feePaymentsTable = {
     delete: vi.fn(() => deleteQuery),
     insert: vi.fn(
       async (): Promise<{ error: unknown }> => ({ error: null }),
     ),
+    select: vi.fn(() => feePaymentReadQuery),
   };
   const importMembersQuery = {
     eq: vi.fn(async () => ({
@@ -115,6 +126,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     deleteQuery,
+    feePaymentReadQuery,
     feePaymentsTable,
     importMembersQuery,
     targetMemberQuery,
@@ -189,6 +201,16 @@ describe("fee payment actions", () => {
     mocks.supabase.from.mockClear();
     mocks.feePaymentsTable.delete.mockClear();
     mocks.feePaymentsTable.insert.mockClear();
+    mocks.feePaymentsTable.select.mockClear();
+    mocks.feePaymentReadQuery.eq.mockClear();
+    mocks.feePaymentReadQuery.maybeSingle.mockReset();
+    mocks.feePaymentReadQuery.maybeSingle.mockResolvedValue({
+      data: {
+        id: "payment-1",
+        period_month: "2026-07-01",
+      },
+      error: null,
+    });
     mocks.membersTable.select.mockClear();
     mocks.importMembersQuery.eq.mockClear();
     mocks.targetMemberQuery.in.mockClear();
@@ -250,16 +272,26 @@ describe("fee payment actions", () => {
     expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
   });
 
-  it("redirects a finalized cancellation month before deleting", async () => {
+  it("uses the stored month when a cancellation posts a mismatched month", async () => {
     mocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
     const formData = new FormData();
     formData.set("paymentId", "payment-1");
-    formData.set("periodMonth", "2026-07");
+    formData.set("periodMonth", "2026-08");
 
     await expect(cancelFeePayment(formData)).rejects.toThrow(
       "redirect:/fees?error=closing-locked&month=2026-07",
     );
 
+    expect(mocks.feePaymentsTable.select).toHaveBeenCalledWith(
+      "id, period_month",
+    );
+    expect(mocks.feePaymentReadQuery.eq).toHaveBeenCalledWith(
+      "id",
+      "payment-1",
+    );
+    expect(mocks.getMonthlySourceLockStatus).toHaveBeenCalledWith(
+      "2026-07-01",
+    );
     expect(mocks.feePaymentsTable.delete).not.toHaveBeenCalled();
   });
 

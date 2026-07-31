@@ -13,6 +13,7 @@ type EditExpensePageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{
     error?: string | string[];
+    month?: string | string[];
   }>;
 };
 
@@ -47,6 +48,10 @@ function getErrorMessage(error: string | undefined) {
 
   if (error === "save-failed") {
     return "지출 기록을 저장하지 못했습니다. 권한과 입력값을 확인하세요.";
+  }
+
+  if (error === "closing-locked") {
+    return "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.";
   }
 
   return null;

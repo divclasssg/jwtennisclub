@@ -8,6 +8,7 @@ import { firstSearchParam } from "@/features/members/member-list";
 export type NewFeePaymentSearchParams = {
   importError?: string | string[];
   line?: string | string[];
+  month?: string | string[];
 };
 
 function getImportErrorMessage(error: string | undefined, line: string | undefined) {
@@ -35,6 +36,10 @@ function getImportErrorMessage(error: string | undefined, line: string | undefin
 
   if (error === "save-failed") {
     return "CSV 납부 기록을 저장하지 못했습니다. 중복 기록, 권한, 입력값을 확인하세요.";
+  }
+
+  if (error === "closing-locked") {
+    return "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.";
   }
 
   return null;

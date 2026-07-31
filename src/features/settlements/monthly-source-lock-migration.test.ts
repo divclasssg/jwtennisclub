@@ -6,9 +6,10 @@ const migrationPath = join(
   process.cwd(),
   "supabase/migrations/202607310002_lock_finalized_month_sources.sql",
 );
-const sql = existsSync(migrationPath)
-  ? readFileSync(migrationPath, "utf8").toLowerCase()
+const rawSql = existsSync(migrationPath)
+  ? readFileSync(migrationPath, "utf8")
   : "";
+const sql = rawSql.toLowerCase();
 
 function functionBody(functionName: string) {
   const start = sql.indexOf(
@@ -19,6 +20,17 @@ function functionBody(functionName: string) {
   expect(start, functionName).toBeGreaterThan(-1);
   expect(end, functionName).toBeGreaterThan(start);
   return sql.slice(start, end);
+}
+
+function rawFunctionBody(functionName: string) {
+  const start = rawSql.indexOf(
+    `create or replace function public.${functionName}`,
+  );
+  const end = rawSql.indexOf("$$;", start);
+
+  expect(start, functionName).toBeGreaterThan(-1);
+  expect(end, functionName).toBeGreaterThan(start);
+  return rawSql.slice(start, end);
 }
 
 describe("monthly source lock migration", () => {
@@ -49,21 +61,42 @@ describe("monthly source lock migration", () => {
       "public.assert_monthly_source_unlocked(new.period_month)",
     );
     expect(feeGuard).toMatch(
-      /tg_op = 'update'[\s\S]*old\.period_month is distinct from new\.period_month/,
+      /when 'update' then[\s\S]*old\.period_month is distinct from new\.period_month/,
     );
   });
 
   it("checks both old and new months when expense rows move between periods", () => {
     const expenseGuard = functionBody("guard_expense_monthly_source");
 
-    expect(expenseGuard).toContain(
-      "public.assert_monthly_source_unlocked(\n      pg_catalog.date_trunc('month', old.expense_date)::date\n    )",
-    );
-    expect(expenseGuard).toContain(
-      "public.assert_monthly_source_unlocked(\n      pg_catalog.date_trunc('month', new.expense_date)::date\n    )",
+    expect(expenseGuard).toMatch(
+      /public\.assert_monthly_source_unlocked\(\s*pg_catalog\.date_trunc\('month', old\.expense_date\)::date\s*\)/,
     );
     expect(expenseGuard).toMatch(
-      /tg_op = 'update'[\s\S]*date_trunc\('month', old\.expense_date\)::date[\s\S]*is distinct from[\s\S]*date_trunc\('month', new\.expense_date\)::date/,
+      /public\.assert_monthly_source_unlocked\(\s*pg_catalog\.date_trunc\('month', new\.expense_date\)::date\s*\)/,
+    );
+    expect(expenseGuard).toMatch(
+      /when 'update' then[\s\S]*date_trunc\('month', old\.expense_date\)::date[\s\S]*is distinct from[\s\S]*date_trunc\('month', new\.expense_date\)::date/,
+    );
+  });
+
+  it("matches PostgreSQL uppercase trigger operations and returns the affected row", () => {
+    const feeGuard = rawFunctionBody("guard_fee_payment_monthly_source");
+    const expenseGuard = rawFunctionBody("guard_expense_monthly_source");
+
+    for (const guard of [feeGuard, expenseGuard]) {
+      expect(guard).toMatch(
+        /when 'DELETE' then[\s\S]*return OLD;[\s\S]*when 'INSERT' then[\s\S]*return NEW;[\s\S]*when 'UPDATE' then[\s\S]*return NEW;/,
+      );
+      expect(guard).toContain("else");
+      expect(guard).toContain("TG_OP");
+      expect(guard).not.toMatch(/(?:TG_OP =|when) '(?:delete|insert|update)'/);
+    }
+
+    expect(feeGuard).toContain(
+      "raise exception 'unexpected fee payment source trigger operation: %', TG_OP",
+    );
+    expect(expenseGuard).toContain(
+      "raise exception 'unexpected expense source trigger operation: %', TG_OP",
     );
   });
 
