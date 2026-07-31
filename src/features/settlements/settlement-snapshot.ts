@@ -16,6 +16,8 @@ const nonNegativeIntegerSchema = z.number().finite().int().nonnegative();
 const positiveIntegerSchema = z.number().finite().int().positive();
 const signedIntegerSchema = z.number().finite().int();
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
+const closingKindSchema = z.enum(["interim", "final"]);
+const closingStatusSchema = z.enum(["closed", "reopened"]);
 
 const databaseExpenseCategoryRowSchema = z
   .object({
@@ -172,18 +174,30 @@ const databaseClosingSchema = z
   .object({
     id: z.string().uuid(),
     period_month: periodMonthSchema,
+    closing_kind: closingKindSchema,
     version: positiveIntegerSchema,
-    status: z.literal("closed"),
+    status: closingStatusSchema,
     snapshot: databaseSnapshotSchema,
     closed_at: z.string().datetime({ offset: true }),
     closed_by: z.string().trim().min(1).max(100),
+    reopened_at: z.string().datetime({ offset: true }).nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.closing_kind === "interim" &&
+      (value.status !== "closed" || value.reopened_at !== null)
+    ) {
+      context.addIssue({ code: "custom", message: "interim closing reopened" });
+    }
+  });
 
 const databasePageSchema = z
   .object({
     preview: databaseSnapshotSchema,
     active_closing: databaseClosingSchema.nullable(),
+    closing_history: z.array(databaseClosingSchema),
+    can_create_interim: z.boolean(),
     can_close: z.boolean(),
     can_reopen: z.boolean(),
     close_blocked_reason: z.string().trim().min(1).max(200).nullable(),
@@ -191,6 +205,31 @@ const databasePageSchema = z
   .strict()
   .superRefine((value, context) => {
     const closing = value.active_closing;
+
+    const closingVersions = new Set<string>();
+    for (const historyClosing of value.closing_history) {
+      const versionKey = `${historyClosing.closing_kind}:${historyClosing.version}`;
+      if (closingVersions.has(versionKey)) {
+        context.addIssue({ code: "custom", message: "duplicate closing version" });
+      }
+      closingVersions.add(versionKey);
+
+      if (
+        historyClosing.period_month !== value.preview.period_month ||
+        historyClosing.snapshot.period_month !== value.preview.period_month
+      ) {
+        context.addIssue({ code: "custom", message: "closing period month" });
+      }
+    }
+
+    for (let index = 1; index < value.closing_history.length; index += 1) {
+      const previous = value.closing_history[index - 1];
+      const current = value.closing_history[index];
+      if (Date.parse(previous.closed_at) < Date.parse(current.closed_at)) {
+        context.addIssue({ code: "custom", message: "closing history order" });
+      }
+    }
+
     if (!closing) {
       if (value.can_reopen) {
         context.addIssue({ code: "custom", message: "reopen without closing" });
@@ -198,7 +237,11 @@ const databasePageSchema = z
       return;
     }
 
-    if (value.can_close) {
+    if (
+      closing.closing_kind !== "final" ||
+      closing.status !== "closed" ||
+      value.can_close
+    ) {
       context.addIssue({ code: "custom", message: "close with active closing" });
     }
 
@@ -245,19 +288,27 @@ export type MonthlySettlementSnapshot = {
   expenseRows: MonthlySettlementExpenseRow[];
 };
 
+export type MonthlySettlementClosingKind = "interim" | "final";
+
+export type MonthlySettlementClosingStatus = "closed" | "reopened";
+
 export type MonthlySettlementClosing = {
   id: string;
   periodMonth: string;
+  closingKind: MonthlySettlementClosingKind;
   version: number;
-  status: "closed";
+  status: MonthlySettlementClosingStatus;
   snapshot: MonthlySettlementSnapshot;
   closedAt: string;
   closedBy: string;
+  reopenedAt: string | null;
 };
 
 export type MonthlySettlementPage = {
   preview: MonthlySettlementSnapshot;
   activeClosing: MonthlySettlementClosing | null;
+  closingHistory: MonthlySettlementClosing[];
+  canCreateInterim: boolean;
   canClose: boolean;
   canReopen: boolean;
   closeBlockedReason: string | null;
@@ -274,38 +325,12 @@ export function parseMonthlySettlementPage(value: unknown): MonthlySettlementPag
     activeClosing: parsed.data.active_closing
       ? mapClosing(parsed.data.active_closing)
       : null,
+    closingHistory: parsed.data.closing_history.map(mapClosing),
+    canCreateInterim: parsed.data.can_create_interim,
     canClose: parsed.data.can_close,
     canReopen: parsed.data.can_reopen,
     closeBlockedReason: parsed.data.close_blocked_reason,
   };
-}
-
-export function canDownloadMonthlyReport(periodMonth: string, now: Date): boolean {
-  if (!periodMonthSchema.safeParse(periodMonth).success || Number.isNaN(now.getTime())) {
-    return false;
-  }
-
-  const [year, month] = periodMonth.slice(0, 7).split("-").map(Number);
-  const nextMonth = new Date(Date.UTC(year, month, 1));
-  const eligibleFrom = `${nextMonth.getUTCFullYear()}-${String(
-    nextMonth.getUTCMonth() + 1,
-  ).padStart(2, "0")}-01`;
-  const seoulDate = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  })
-    .formatToParts(now)
-    .reduce<Record<string, string>>((parts, part) => {
-      if (part.type !== "literal") {
-        parts[part.type] = part.value;
-      }
-      return parts;
-    }, {});
-  const currentSeoulDate = `${seoulDate.year}-${seoulDate.month}-${seoulDate.day}`;
-
-  return currentSeoulDate >= eligibleFrom;
 }
 
 function mapSnapshot(
@@ -349,11 +374,13 @@ function mapClosing(
   return {
     id: value.id,
     periodMonth: value.period_month,
+    closingKind: value.closing_kind,
     version: value.version,
     status: value.status,
     snapshot: mapSnapshot(value.snapshot),
     closedAt: value.closed_at,
     closedBy: value.closed_by,
+    reopenedAt: value.reopened_at,
   };
 }
 

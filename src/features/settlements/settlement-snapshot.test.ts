@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  canDownloadMonthlyReport,
   parseMonthlySettlementPage,
   type MonthlySettlementSnapshot,
 } from "./settlement-snapshot";
 
-const closingId = "a2d6d2a4-6d59-4ad4-b21a-cd259d83c715";
+const activeClosingId = "11111111-1111-4111-8111-111111111111";
+const interimClosingId = "22222222-2222-4222-8222-222222222222";
 
 function validSnapshot(): MonthlySettlementSnapshot {
   return {
@@ -89,16 +89,32 @@ function databasePage(overrides: Record<string, unknown> = {}) {
   return {
     preview: databaseSnapshot(),
     active_closing: {
-      id: closingId,
+      id: activeClosingId,
       period_month: "2026-07-01",
-      version: 2,
+      closing_kind: "final",
+      version: 1,
       status: "closed",
       snapshot: databaseSnapshot(),
-      closed_at: "2026-08-02T03:04:05+00:00",
-      closed_by: "김마감",
+      closed_at: "2026-07-31T00:00:00.000Z",
+      closed_by: "박세익",
+      reopened_at: null,
     },
+    closing_history: [
+      {
+        id: interimClosingId,
+        period_month: "2026-07-01",
+        closing_kind: "interim",
+        version: 2,
+        status: "closed",
+        snapshot: databaseSnapshot(),
+        closed_at: "2026-07-30T00:00:00.000Z",
+        closed_by: "박세익",
+        reopened_at: null,
+      },
+    ],
+    can_create_interim: false,
     can_close: false,
-    can_reopen: false,
+    can_reopen: true,
     close_blocked_reason: null,
     ...overrides,
   };
@@ -109,16 +125,32 @@ describe("monthly settlement page parser", () => {
     expect(parseMonthlySettlementPage(databasePage())).toEqual({
       preview: validSnapshot(),
       activeClosing: {
-        id: closingId,
+        id: activeClosingId,
         periodMonth: "2026-07-01",
-        version: 2,
+        closingKind: "final",
+        version: 1,
         status: "closed",
         snapshot: validSnapshot(),
-        closedAt: "2026-08-02T03:04:05+00:00",
-        closedBy: "김마감",
+        closedAt: "2026-07-31T00:00:00.000Z",
+        closedBy: "박세익",
+        reopenedAt: null,
       },
+      closingHistory: [
+        {
+          id: interimClosingId,
+          periodMonth: "2026-07-01",
+          closingKind: "interim",
+          version: 2,
+          status: "closed",
+          snapshot: validSnapshot(),
+          closedAt: "2026-07-30T00:00:00.000Z",
+          closedBy: "박세익",
+          reopenedAt: null,
+        },
+      ],
+      canCreateInterim: false,
       canClose: false,
-      canReopen: false,
+      canReopen: true,
       closeBlockedReason: null,
     });
   });
@@ -187,14 +219,99 @@ describe("monthly settlement page parser", () => {
     ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
   });
 
-  it("rejects a closing whose month or snapshot does not match the preview month", () => {
+  it("rejects a closing whose snapshot month does not match the preview month", () => {
+    expect(() =>
+      parseMonthlySettlementPage(
+        databasePage({
+          closing_history: [
+            {
+              ...databasePage().closing_history[0],
+              snapshot: databaseSnapshot({
+                period_month: "2026-08-01",
+                expense_rows: [
+                  {
+                    expense_date: "2026-08-12",
+                    category: "court",
+                    description: "코트 대관",
+                    amount: 120000,
+                  },
+                  {
+                    expense_date: "2026-08-20",
+                    category: "balls",
+                    description: "테니스 공 구매",
+                    amount: 10000,
+                  },
+                ],
+              }),
+            },
+          ],
+        }),
+      ),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("rejects an interim closing that was reopened", () => {
+    expect(() =>
+      parseMonthlySettlementPage(
+        databasePage({
+          closing_history: [
+            {
+              ...databasePage().closing_history[0],
+              status: "reopened",
+              reopened_at: "2026-07-30T01:00:00.000Z",
+            },
+          ],
+        }),
+      ),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("rejects an active closing that is not final and closed", () => {
     expect(() =>
       parseMonthlySettlementPage(
         databasePage({
           active_closing: {
             ...databasePage().active_closing,
-            period_month: "2026-08-01",
+            closing_kind: "interim",
           },
+        }),
+      ),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("rejects closing history with duplicate kind and version pairs", () => {
+    expect(() =>
+      parseMonthlySettlementPage(
+        databasePage({
+          closing_history: [
+            databasePage().closing_history[0],
+            {
+              ...databasePage().closing_history[0],
+              id: "33333333-3333-4333-8333-333333333333",
+              closed_at: "2026-07-29T00:00:00.000Z",
+            },
+          ],
+        }),
+      ),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
+  it("rejects closing history that is not ordered newest first", () => {
+    expect(() =>
+      parseMonthlySettlementPage(
+        databasePage({
+          closing_history: [
+            {
+              ...databasePage().closing_history[0],
+              closed_at: "2026-07-29T00:00:00.000Z",
+            },
+            {
+              ...databasePage().closing_history[0],
+              id: "33333333-3333-4333-8333-333333333333",
+              version: 3,
+              closed_at: "2026-07-30T00:00:00.000Z",
+            },
+          ],
         }),
       ),
     ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
@@ -288,27 +405,9 @@ describe("monthly settlement page parser", () => {
 });
 
 describe("monthly report download eligibility", () => {
-  it("allows download from exactly midnight on the first day of the following Seoul month", () => {
-    expect(
-      canDownloadMonthlyReport(
-        "2026-07-01",
-        new Date("2026-08-01T00:00:00+09:00"),
-      ),
-    ).toBe(true);
-  });
-
-  it("blocks download one second before the following Seoul month", () => {
-    expect(
-      canDownloadMonthlyReport(
-        "2026-07-01",
-        new Date("2026-07-31T23:59:59+09:00"),
-      ),
-    ).toBe(false);
-  });
-
-  it("rejects malformed period months instead of guessing an eligibility date", () => {
-    expect(
-      canDownloadMonthlyReport("2026-07-12", new Date("2026-08-02T00:00:00+09:00")),
-    ).toBe(false);
+  it("represents same-day download eligibility with a valid active closing identity", () => {
+    expect(parseMonthlySettlementPage(databasePage()).activeClosing?.id).toBe(
+      activeClosingId,
+    );
   });
 });
