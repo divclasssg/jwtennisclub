@@ -70,10 +70,12 @@ const styles = StyleSheet.create({
     lineHeight: 1.4,
   },
   header: {
+    marginBottom: 16,
+  },
+  headerDetails: {
     display: "flex",
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 16,
   },
   clubName: {
     fontFamily: "Noto Sans KR Report Bold",
@@ -194,16 +196,18 @@ export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
     <Document title={report.title}>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <View>
-            <Text style={styles.clubName}>JW TENNIS CLUB</Text>
-            <Text style={styles.reportTitle}>월간 결산 보고서</Text>
-            <Text style={styles.period}>{report.periodLabel}</Text>
-          </View>
-          <View style={styles.metaColumn}>
-            <Text>결산일 {report.closedAtLabel}</Text>
-            <Text>결산 처리자 {report.closedBy}</Text>
-            <Text>PDF 생성일 {report.generatedAtLabel}</Text>
-            <Text>생성자 {report.generatedBy}</Text>
+          <Text style={styles.clubName}>JW TENNIS CLUB</Text>
+          <View style={styles.headerDetails}>
+            <View>
+              <Text style={styles.reportTitle}>월간 결산 보고서</Text>
+              <Text style={styles.period}>{report.periodLabel}</Text>
+            </View>
+            <View style={styles.metaColumn}>
+              <Text>결산일 {report.closedAtLabel}</Text>
+              <Text>결산 처리자 {report.closedBy}</Text>
+              <Text>PDF 생성일 {report.generatedAtLabel}</Text>
+              <Text>생성자 {report.generatedBy}</Text>
+            </View>
           </View>
         </View>
 
