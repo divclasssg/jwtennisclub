@@ -4,8 +4,10 @@ const mocks = vi.hoisted(() => {
   const supabase = {
     rpc: vi.fn(async () => ({ error: null as { message: string } | null })),
   };
+  const createClient = vi.fn(async () => supabase);
 
   return {
+    createClient,
     revalidatePath: vi.fn(),
     redirect: vi.fn((path: string) => {
       throw new Error(`redirect:${path}`);
@@ -23,7 +25,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn(async () => mocks.supabase),
+  createClient: mocks.createClient,
 }));
 
 import {
@@ -34,6 +36,8 @@ import {
 
 describe("monthly settlement actions", () => {
   beforeEach(() => {
+    mocks.createClient.mockReset();
+    mocks.createClient.mockResolvedValue(mocks.supabase);
     mocks.revalidatePath.mockClear();
     mocks.redirect.mockClear();
     mocks.supabase.rpc.mockReset();
@@ -108,4 +112,31 @@ describe("monthly settlement actions", () => {
       "redirect:/settlements?month=2026-07&error=mutation-failed",
     );
   });
+
+  it.each([
+    [
+      "client creation",
+      () => mocks.createClient.mockRejectedValueOnce(new Error("client failed")),
+    ],
+    [
+      "RPC invocation",
+      () => mocks.supabase.rpc.mockRejectedValueOnce(new Error("rpc failed")),
+    ],
+  ])(
+    "maps rejected %s to a stable failure redirect outside the catch",
+    async (_source, rejectMutation) => {
+      rejectMutation();
+      const formData = new FormData();
+      formData.set("month", "2026-07");
+      formData.set("sort", "amount");
+      formData.set("direction", "desc");
+
+      await expect(closeMonthlySettlement(formData)).rejects.toThrow(
+        "redirect:/settlements?month=2026-07&sort=amount&direction=desc&error=mutation-failed",
+      );
+
+      expect(mocks.redirect).toHaveBeenCalledTimes(1);
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    },
+  );
 });

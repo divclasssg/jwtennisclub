@@ -69,12 +69,18 @@ async function runSettlementMutation(
     redirect("/settlements?error=invalid-month");
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.rpc(rpcName, {
-    requested_period_month: periodMonth,
-  });
+  let mutationFailed = false;
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc(rpcName, {
+      requested_period_month: periodMonth,
+    });
+    mutationFailed = Boolean(error);
+  } catch {
+    mutationFailed = true;
+  }
 
-  if (error) {
+  if (mutationFailed) {
     redirect(
       buildSettlementHref(periodMonth, formData, { error: "mutation-failed" }),
     );
