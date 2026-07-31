@@ -78,7 +78,7 @@ export function normalizeReportSnapshotId(
   if (typeof value !== "string") return null;
 
   const result = reportSnapshotIdSchema.safeParse(value);
-  return result.success ? result.data : null;
+  return result.success ? result.data.toLowerCase() : null;
 }
 
 export function buildMonthlyReportData(input: {

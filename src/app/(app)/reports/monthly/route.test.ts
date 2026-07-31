@@ -183,6 +183,21 @@ describe("monthly report route", () => {
     expect(await response.text()).toBe("%PDF monthly report");
   });
 
+  it("canonicalizes an uppercase snapshot UUID before auditing and comparing identity", async () => {
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/reports/monthly?snapshot=${closingId.toUpperCase()}`,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.supabase.rpc).toHaveBeenCalledWith(
+      "record_monthly_report_generation",
+      { requested_closing_id: closingId },
+    );
+    expect(mocks.renderMonthlyReportPdf).toHaveBeenCalledOnce();
+  });
+
   it("returns a filename identifying the exact reopened final snapshot", async () => {
     mocks.setReportGenerationResult({
       data: reopenedFinalClosing,
@@ -294,6 +309,23 @@ describe("monthly report route", () => {
   it("returns a controlled 500 when the audited closing DTO is malformed", async () => {
     mocks.setReportGenerationResult({
       data: { ...interimClosing, closing_kind: "draft" },
+      error: null,
+    });
+
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/reports/monthly?snapshot=${closingId}`,
+      ),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("마감 결산 데이터를 확인하지 못했습니다.");
+    expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
+  });
+
+  it("rejects an audited closing whose outer and snapshot months differ", async () => {
+    mocks.setReportGenerationResult({
+      data: { ...interimClosing, period_month: "2026-08-01" },
       error: null,
     });
 

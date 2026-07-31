@@ -68,6 +68,12 @@ describe("normalizeReportSnapshotId", () => {
     expect(normalizeReportSnapshotId(interimClosing.id)).toBe(interimClosing.id);
   });
 
+  it("canonicalizes an uppercase UUID to PostgreSQL lowercase form", () => {
+    expect(normalizeReportSnapshotId(interimClosing.id.toUpperCase())).toBe(
+      interimClosing.id,
+    );
+  });
+
   it.each([
     ["an array", [interimClosing.id]],
     ["a missing value", undefined],

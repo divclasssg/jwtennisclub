@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  parseMonthlySettlementClosing,
   parseMonthlySettlementPage,
   type MonthlySettlementSnapshot,
 } from "./settlement-snapshot";
@@ -406,6 +407,17 @@ describe("monthly settlement page parser", () => {
           can_close: true,
         }),
       ),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+});
+
+describe("monthly settlement closing parser", () => {
+  it("rejects a closing whose outer and snapshot months differ", () => {
+    expect(() =>
+      parseMonthlySettlementClosing({
+        ...databasePage().closing_history[0],
+        period_month: "2026-08-01",
+      }),
     ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
   });
 });

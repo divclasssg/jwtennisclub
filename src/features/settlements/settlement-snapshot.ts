@@ -184,6 +184,10 @@ const databaseClosingSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.period_month !== value.snapshot.period_month) {
+      context.addIssue({ code: "custom", message: "closing snapshot month" });
+    }
+
     if (
       value.closing_kind === "interim" &&
       (value.status !== "closed" || value.reopened_at !== null)
