@@ -2,6 +2,14 @@
 
 ## 2026-07-31
 
+### 월간 결산 PDF 장부형 미리보기 검증
+- 장부형 PDF 집중 Vitest: `src/features/reports/MonthlyReportPdf.test.tsx` 1개 파일, 4개 테스트 통과. 45개 지출 상세 행을 넣는 장기 페이지네이션 회귀 검사가 두 페이지 이상 생성되고 첫·마지막 행을 보존함을 포함한다.
+- 관련 집중 Vitest: `MonthlyReportPdf.test.tsx`, `monthly-report.test.ts` 2개 파일, 16개 테스트 통과. 전체 Vitest: `npm run test -- --exclude '.worktrees/**'` 102개 파일, 708개 테스트 통과.
+- `npx eslint . --ignore-pattern '.worktrees/**'`, `npx tsc --noEmit`, `git diff --check`는 모두 종료 코드 0으로 통과했다.
+- `output/pdf/monthly-report-ledger-style-preview.pdf`를 `pdfinfo`, `pdftotext -layout`, `pdffonts`와 150dpi PNG 렌더로 검사했다. A4(595.28×841.89pt) 1페이지이며 `IBMPlexSansKR-Regular` subset이 내장됐고, 장부 제목·소계·기말 장부 잔액이 추출됐다. 1241×1754 원본 PNG 육안검사에서 잘림·겹침·두부 문자·카드형 배경·개인정보 노출이 없었다.
+- 루트 `.env.local`을 값 출력 없이 로드한 `npm run build`는 `Creating an optimized production build ...` 뒤 2분 이상 진행 출력 없이 `.next/lock`을 유지해 완료하지 못했다. 해당 작업트리에서 시작한 빌드 PID만 중지했고, 이 빌드는 통과로 처리하지 않는다.
+- 프로덕션 배포와 실제 운영 결산 PDF 다운로드는 수행하지 않았다. 로컬 미리보기의 시각 승인 전에는 배포하지 않는다.
+
 ### 완료
 - 월별 중간 결산과 최종 마감이 유형별 독립 버전을 사용하도록 구현했다. 중간 결산은 원본을 잠그지 않고, 최종 마감만 해당 월 회비·지출 원본을 데이터베이스 트리거에서 잠근다.
 - 최종 마감본은 결산 재개 전까지 원본 변경을 차단하며, 재개 후 다시 최종 마감하면 이전 불변 이력을 유지한 채 다음 최종 버전을 생성한다.
