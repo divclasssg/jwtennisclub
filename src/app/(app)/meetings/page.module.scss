@@ -70,10 +70,13 @@
 .meeting-management-disclosure {
   display: grid;
   gap: var(--spacing-xs);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .meeting-management-panel {
   min-width: var(--members-status-filter-width);
+  max-width: 100%;
   padding-top: var(--spacing-xs);
   border-top: var(--hairline-width) solid var(--divider-soft);
 }
@@ -95,6 +98,8 @@
 .meeting-lifecycle-controls {
   display: grid;
   gap: var(--spacing-xs);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .meeting-lifecycle-form,
@@ -104,6 +109,8 @@
   align-items: flex-end;
   gap: var(--spacing-xs);
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .meeting-lifecycle-field {
@@ -144,5 +151,16 @@
 
   .meetings-mobile-list-view {
     display: block;
+  }
+
+  .meeting-management-panel {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .meeting-lifecycle-form,
+  .meeting-lightning-fields {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

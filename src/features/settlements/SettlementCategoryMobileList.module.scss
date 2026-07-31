@@ -1,0 +1,46 @@
+.settlement-mobile-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settlement-mobile-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--spacing-sm) var(--spacing-24);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.settlement-mobile-name {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-title-size);
+  font-weight: var(--text-title-weight);
+  line-height: var(--text-title-line-height);
+  overflow-wrap: anywhere;
+}
+
+.settlement-mobile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  color: var(--ink-muted-48);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line-height);
+
+  strong {
+    color: var(--ink);
+    white-space: nowrap;
+  }
+}

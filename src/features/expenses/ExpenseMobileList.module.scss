@@ -1,0 +1,68 @@
+.expense-mobile-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.expense-mobile-item {
+  display: grid;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--spacing-sm) var(--spacing-24);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.expense-mobile-header,
+.expense-mobile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.expense-mobile-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-title-size);
+  font-weight: var(--text-title-weight);
+  line-height: var(--text-title-line-height);
+  overflow-wrap: anywhere;
+}
+
+.expense-mobile-amount {
+  flex: 0 0 auto;
+  color: var(--ink);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line-height);
+  white-space: nowrap;
+}
+
+.expense-mobile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  color: var(--ink-muted-48);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line-height);
+}
+
+.expense-mobile-receipt {
+  color: var(--ink-muted-48);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line-height);
+
+  a {
+    color: var(--action-blue);
+  }
+}

@@ -1,4 +1,5 @@
 import { deleteExpense } from "./actions";
+import styles from "./page.module.scss";
 import { ActionLink, Button, SelectInput, TextInput } from "@/components/atoms";
 import {
   EmptyState,
@@ -23,6 +24,7 @@ import {
   type ExpenseListSearchParams,
 } from "@/features/expenses/expense-list";
 import { getMonthlySourceLockStatus } from "@/features/settlements/monthly-source-lock";
+import { ExpenseMobileList } from "@/features/expenses/ExpenseMobileList";
 
 type ExpensesPageProps = {
   searchParams: Promise<ExpenseListSearchParams>;
@@ -150,7 +152,9 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
           headerTitle={`${formatPeriodMonth(filters.periodMonth)} · 총 ${sortedExpenses.length}건`}
           >
             {sortedExpenses.length > 0 ? (
-            <DataTable>
+              <>
+                <div className={styles["expenses-table-view"]}>
+                  <DataTable>
               <thead>
                 <tr>
                   <SortableTableHeader label="사용일" pathname="/expenses" searchParams={sortSearchParams} sortKey="expenseDate" sortState={sortState} />
@@ -209,7 +213,16 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                   </tr>
                 ))}
               </tbody>
-            </DataTable>
+                  </DataTable>
+                </div>
+                <div className={styles["expenses-mobile-list-view"]}>
+                  <ExpenseMobileList
+                    deleteAction={deleteExpense}
+                    expenses={sortedExpenses}
+                    isLocked={isLocked}
+                  />
+                </div>
+              </>
             ) : null}
           </DataPanel>
         </>

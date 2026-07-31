@@ -1,3 +1,4 @@
+import styles from "./page.module.scss";
 import { ActionLink, Button, TextInput } from "@/components/atoms";
 import {
   EmptyState,
@@ -30,6 +31,7 @@ import {
   type SettlementSearchParams,
 } from "@/features/settlements/settlement-summary";
 import { createClient } from "@/lib/supabase/server";
+import { SettlementCategoryMobileList } from "@/features/settlements/SettlementCategoryMobileList";
 import {
   closeMonthlySettlement,
   createInterimMonthlySettlement,
@@ -260,24 +262,31 @@ export default async function SettlementsPage({
             headerTitle="카테고리별 지출"
           >
             {sortedCategoryRows.length > 0 ? (
-              <DataTable>
-                <thead>
-                  <tr>
-                    <SortableTableHeader label="카테고리" pathname="/settlements" searchParams={sortSearchParams} sortKey="category" sortState={sortState} />
-                    <SortableTableHeader label="건수" pathname="/settlements" searchParams={sortSearchParams} sortKey="count" sortState={sortState} />
-                    <SortableTableHeader label="금액" pathname="/settlements" searchParams={sortSearchParams} sortKey="amount" sortState={sortState} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedCategoryRows.map((row) => (
-                    <tr key={row.category}>
-                      <td>{formatExpenseCategory(row.category)}</td>
-                      <td>{row.count}건</td>
-                      <td>{formatCurrency(row.amount)}원</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </DataTable>
+              <>
+                <div className={styles["settlements-table-view"]}>
+                  <DataTable>
+                    <thead>
+                      <tr>
+                        <SortableTableHeader label="카테고리" pathname="/settlements" searchParams={sortSearchParams} sortKey="category" sortState={sortState} />
+                        <SortableTableHeader label="건수" pathname="/settlements" searchParams={sortSearchParams} sortKey="count" sortState={sortState} />
+                        <SortableTableHeader label="금액" pathname="/settlements" searchParams={sortSearchParams} sortKey="amount" sortState={sortState} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedCategoryRows.map((row) => (
+                        <tr key={row.category}>
+                          <td>{formatExpenseCategory(row.category)}</td>
+                          <td>{row.count}건</td>
+                          <td>{formatCurrency(row.amount)}원</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+                <div className={styles["settlements-mobile-list-view"]}>
+                  <SettlementCategoryMobileList rows={sortedCategoryRows} />
+                </div>
+              </>
             ) : null}
           </DataPanel>
           <ClosingHistoryPanel

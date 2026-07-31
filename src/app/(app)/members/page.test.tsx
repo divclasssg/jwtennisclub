@@ -115,20 +115,21 @@ describe("MembersPage", () => {
     expect(within(table).getAllByRole("cell", { name: "-" })).toHaveLength(2);
     expect(within(table).getByRole("cell", { name: "일반회원" })).toBeInTheDocument();
     const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
-    expect(within(mobileList).getByText("구분 -")).toBeInTheDocument();
-    expect(within(mobileList).getByText("직책 일반회원")).toBeInTheDocument();
+    expect(within(mobileList).getByText("-")).toBeInTheDocument();
+    expect(within(mobileList).getByText("일반회원")).toBeInTheDocument();
   });
 
-  it("renders member code, group, and protected contact on mobile", async () => {
+  it("renders only essential directory information on mobile", async () => {
     render(await MembersPage({ searchParams: Promise.resolve({}) }));
 
     const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
-    expect(within(mobileList).getByText("회원번호 JW-000001")).toBeInTheDocument();
-    expect(within(mobileList).getByText("연락처 010-****-5678")).toBeInTheDocument();
-    expect(within(mobileList).getByText("그룹 A")).toBeInTheDocument();
-    expect(within(mobileList).getByText("구분 운영진")).toBeInTheDocument();
-    expect(within(mobileList).getByText("직책 총무")).toBeInTheDocument();
-    expect(within(mobileList).getByText("휴회 시작 -")).toBeInTheDocument();
+    expect(within(mobileList).getByText("JW-000001")).toBeInTheDocument();
+    expect(within(mobileList).getByText("총무")).toBeInTheDocument();
+    expect(within(mobileList).getByText("운영진")).toBeInTheDocument();
+    expect(within(mobileList).getByText("활동중")).toBeInTheDocument();
+    expect(within(mobileList).queryByText(/010-/)).not.toBeInTheDocument();
+    expect(within(mobileList).queryByText(/^그룹 /)).not.toBeInTheDocument();
+    expect(within(mobileList).queryByText(/^가입일 /)).not.toBeInTheDocument();
   });
 
   it("renders the pause start month for paused members on desktop and mobile", async () => {

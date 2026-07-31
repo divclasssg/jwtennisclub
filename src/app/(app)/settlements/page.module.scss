@@ -1,0 +1,27 @@
+@use "../../_breakpoints" as bp;
+
+.settlements-table-view {
+  display: block;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settlements-mobile-list-view {
+  display: none;
+  height: 100%;
+  min-height: 0;
+  max-width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+@media (max-width: bp.$breakpoint-phone) {
+  .settlements-table-view {
+    display: none;
+  }
+
+  .settlements-mobile-list-view {
+    display: block;
+  }
+}

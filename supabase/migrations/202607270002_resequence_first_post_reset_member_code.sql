@@ -15,6 +15,8 @@ do $$
 declare
   source_member_count integer;
   reserved_code_count integer;
+  corrected_member_count integer;
+  corrected_member_id uuid;
   allocator_prefix text;
   allocator_next_suffix integer;
 begin
@@ -23,88 +25,111 @@ begin
   from public.members
   where member_code = '#0024';
 
-  if source_member_count <> 1 then
-    raise exception
-      'expected exactly one #0024 member, found %',
-      source_member_count;
-  end if;
-
   select pg_catalog.count(*)
   into reserved_code_count
   from public.members
   where member_code in ('#0020', '#0021', '#0022', '#0023');
 
-  if reserved_code_count <> 0 then
-    raise exception
-      'member codes #0020 through #0023 must be vacant, found %',
-      reserved_code_count;
-  end if;
+  select pg_catalog.count(*)
+  into corrected_member_count
+  from public.members
+  where member_code = '#0020';
 
   select prefix, next_suffix
   into allocator_prefix, allocator_next_suffix
   from public.member_code_allocator
   where singleton;
 
-  if not found
-    or allocator_prefix is distinct from '#'
-    or allocator_next_suffix is distinct from 25
-  then
-    raise exception
-      'expected member code allocator #/25, found %/%',
-      allocator_prefix,
-      allocator_next_suffix;
+  if not found then
+    raise exception 'member code allocator was not found';
   end if;
-end;
-$$;
 
--- The immutable-code trigger is disabled only inside this transaction. Any
--- failure rolls the DDL and all data changes back together.
-alter table public.members
-disable trigger members_prevent_member_code_change;
+  -- This repair was also applied directly in production. Treat its exact
+  -- postcondition as success when migration history later replays the file.
+  if allocator_prefix = '#'
+    and allocator_next_suffix = 21
+    and source_member_count = 0
+    and reserved_code_count = 1
+    and corrected_member_count = 1
+  then
+    select id
+    into corrected_member_id
+    from public.members
+    where member_code = '#0020';
 
-update public.members
-set member_code = '#0020'
-where member_code = '#0024';
+    if exists (
+      select 1
+      from public.meeting_month_roster_members
+      where member_id = corrected_member_id
+        and member_code_snapshot is distinct from '#0020'
+    ) or exists (
+      select 1
+      from public.meeting_attendance
+      where member_id = corrected_member_id
+        and member_code_snapshot is distinct from '#0020'
+    ) then
+      raise exception 'meeting member code snapshots were not corrected';
+    end if;
 
-alter table public.members
-enable trigger members_prevent_member_code_change;
+    raise notice 'member code #0020 repair is already applied';
+    return;
+  end if;
 
-update public.meeting_month_roster_members
-set member_code_snapshot = '#0020'
-where member_id = (
-  select id
-  from public.members
-  where member_code = '#0020'
-);
+  -- Other databases may have legitimate allocator/member states. Only mutate
+  -- the exact production incident fingerprint; otherwise this migration is a
+  -- deliberate no-op so clean migration replays remain portable.
+  if allocator_prefix is distinct from '#'
+    or allocator_next_suffix is distinct from 25
+    or source_member_count <> 1
+    or reserved_code_count <> 0
+  then
+    raise notice
+      'skipping #0024 repair for non-matching state: allocator %/%, source %, reserved %',
+      allocator_prefix,
+      allocator_next_suffix,
+      source_member_count,
+      reserved_code_count;
+    return;
+  end if;
 
-update public.meeting_attendance
-set member_code_snapshot = '#0020'
-where member_id = (
-  select id
-  from public.members
-  where member_code = '#0020'
-);
+  -- The immutable-code trigger is disabled only inside this transaction. Any
+  -- failure rolls the DDL and all data changes back together.
+  alter table public.members
+  disable trigger members_prevent_member_code_change;
 
-update public.member_code_allocator
-set next_suffix = 21
-where singleton
-  and prefix = '#'
-  and next_suffix = 25;
+  update public.members
+  set member_code = '#0020'
+  where member_code = '#0024';
 
-do $$
-declare
-  corrected_member_id uuid;
-  allocator_prefix text;
-  allocator_next_suffix integer;
-begin
+  get diagnostics corrected_member_count = row_count;
+
+  if corrected_member_count <> 1 then
+    raise exception
+      'expected exactly one corrected #0020 member, found %',
+      corrected_member_count;
+  end if;
+
+  alter table public.members
+  enable trigger members_prevent_member_code_change;
+
   select id
   into corrected_member_id
   from public.members
   where member_code = '#0020';
 
-  if not found then
-    raise exception 'corrected #0020 member was not found';
-  end if;
+  update public.meeting_month_roster_members
+  set member_code_snapshot = '#0020'
+  where member_id = corrected_member_id;
+
+  update public.meeting_attendance
+  set member_code_snapshot = '#0020'
+  where member_id = corrected_member_id;
+
+  update public.member_code_allocator
+  set next_suffix = 21
+  where singleton
+    and prefix = '#'
+    and next_suffix = 25;
 
   if exists (
     select 1

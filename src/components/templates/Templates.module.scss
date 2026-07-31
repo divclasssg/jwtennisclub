@@ -1,3 +1,5 @@
+@use "../../app/_breakpoints" as bp;
+
 .management-page,
 .form-page {
   display: grid;
@@ -20,4 +22,12 @@
 .form-page {
   align-content: start;
   overflow: auto;
+}
+
+@media (max-width: bp.$breakpoint-phone) {
+  .management-page,
+  .management-list {
+    min-width: 0;
+    max-width: 100%;
+  }
 }

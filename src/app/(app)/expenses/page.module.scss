@@ -1,0 +1,27 @@
+@use "../../_breakpoints" as bp;
+
+.expenses-table-view {
+  display: block;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.expenses-mobile-list-view {
+  display: none;
+  height: 100%;
+  min-height: 0;
+  max-width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+@media (max-width: bp.$breakpoint-phone) {
+  .expenses-table-view {
+    display: none;
+  }
+
+  .expenses-mobile-list-view {
+    display: block;
+  }
+}

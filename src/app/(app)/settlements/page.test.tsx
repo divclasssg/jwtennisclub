@@ -131,13 +131,25 @@ describe("SettlementsPage", () => {
     expect(screen.getAllByText("+395,000원")).not.toHaveLength(0);
     expect(screen.getByText("기초 장부 잔액")).toBeInTheDocument();
     expect(screen.getByText("기말 장부 잔액")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "중간 결산 생성" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "중간 결산 생성" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "최종 마감" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "결산 재개" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "PDF 다운로드" })).not.toBeInTheDocument();
     expect(document.body).not.toHaveTextContent("정산");
+
+    const categories = screen.getByRole("region", { name: "카테고리별 지출" });
+    expect(within(categories).getByRole("cell", { name: "코트" })).toBeInTheDocument();
+    expect(within(categories).getByRole("cell", { name: "120,000원" })).toBeInTheDocument();
+    expect(within(categories).getByRole("cell", { name: "공" })).toBeInTheDocument();
+    expect(within(categories).getByRole("cell", { name: "10,000원" })).toBeInTheDocument();
+
+    const mobileList = within(categories).getByRole("list", {
+      name: "모바일 카테고리별 지출",
+    });
+    expect(
+      within(mobileList).getByRole("heading", { name: "코트" }),
+    ).toBeInTheDocument();
+    expect(within(mobileList).getByText("120,000원")).toBeInTheDocument();
   });
 
   it("preserves the validated category sort state when looking up another month", async () => {
