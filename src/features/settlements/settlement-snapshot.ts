@@ -240,7 +240,8 @@ const databasePageSchema = z
     if (
       closing.closing_kind !== "final" ||
       closing.status !== "closed" ||
-      value.can_close
+      value.can_close ||
+      value.can_create_interim
     ) {
       context.addIssue({ code: "custom", message: "close with active closing" });
     }

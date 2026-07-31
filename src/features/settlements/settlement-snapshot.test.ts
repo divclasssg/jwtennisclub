@@ -323,6 +323,12 @@ describe("monthly settlement page parser", () => {
     ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
   });
 
+  it("rejects a page that allows an interim closing after final closing", () => {
+    expect(() =>
+      parseMonthlySettlementPage(databasePage({ can_create_interim: true })),
+    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+  });
+
   it("rejects a page that allows reopening without an active closing", () => {
     expect(() =>
       parseMonthlySettlementPage(
