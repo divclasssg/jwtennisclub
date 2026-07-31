@@ -107,6 +107,24 @@ describe("interim monthly settlement closing migration", () => {
     expect(finalClose).toMatch(
       /select coalesce\(max\(closings\.version\), 0\) \+ 1\s+into next_version\s+from public\.monthly_closings as closings\s+where closings\.period_month = normalized_period_month\s+and closings\.closing_kind = 'final'\s*;/,
     );
+    expect(finalClose).toContain(
+      "return public.get_monthly_settlement_page_v2(normalized_period_month)",
+    );
+  });
+
+  it("returns the v2 page payload from closing creation mutations", () => {
+    for (const functionName of [
+      "create_interim_monthly_settlement",
+      "close_monthly_settlement",
+    ]) {
+      expect(functionBody(functionName)).toContain(
+        "return public.get_monthly_settlement_page_v2(normalized_period_month)",
+      );
+    }
+
+    const reopen = functionBody("reopen_monthly_settlement");
+    expect(reopen).toContain("'closing_history'");
+    expect(reopen).toContain("'can_create_interim'");
   });
 
   it("chains ledger balances only from the prior active final closing", () => {
@@ -119,7 +137,7 @@ describe("interim monthly settlement closing migration", () => {
   });
 
   it("returns every interim and final version while selecting only an active final", () => {
-    const page = functionBody("get_monthly_settlement_page");
+    const page = functionBody("get_monthly_settlement_page_v2");
     const historyStart = page.indexOf("select coalesce(");
     const historyEnd = page.indexOf(") as closing_rows;", historyStart);
     const historyQuery = page.slice(historyStart, historyEnd);
@@ -155,6 +173,15 @@ describe("interim monthly settlement closing migration", () => {
     ]) {
       expect(page).toContain(key);
     }
+  });
+
+  it("keeps the legacy page RPC untouched while adding the v2 page contract", () => {
+    expect(executableSql).not.toMatch(
+      /create or replace function public\.get_monthly_settlement_page\(\s*requested_period_month date\s*\)/,
+    );
+    expect(executableSql).toMatch(
+      /create or replace function public\.get_monthly_settlement_page_v2\(\s*requested_period_month date\s*\)/,
+    );
   });
 
   it("audits and returns the exact requested immutable snapshot", () => {

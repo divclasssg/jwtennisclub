@@ -99,9 +99,9 @@ describe("buildMonthlyReportData", () => {
       closingStatus: "closed",
       closingLabel: "중간 결산 v1",
       closingVersion: 1,
-      closedAtLabel: "2026.08.02",
+      closedAtLabel: "2026.08.02 12:04:05",
       closedBy: "김마감",
-      generatedAtLabel: "2026.08.03",
+      generatedAtLabel: "2026.08.03 21:00:00",
       generatedBy: "김생성",
       activityMemberCount: 21,
       feeTargetCount: 20,
@@ -151,6 +151,20 @@ describe("buildMonthlyReportData", () => {
     expect(reopenedReport.closingKind).toBe("final");
     expect(reopenedReport.closingStatus).toBe("reopened");
     expect(reopenedReport.closingLabel).toBe("최종 마감 v2 · 재개됨");
+  });
+
+  it("keeps same-day closing and PDF generation times distinguishable in Seoul", () => {
+    const report = buildMonthlyReportData({
+      closing: {
+        ...interimClosing,
+        closedAt: "2026-08-02T03:04:05.000Z",
+      },
+      generatedAt: new Date("2026-08-02T03:04:06.000Z"),
+      generatedBy: "김생성",
+    });
+
+    expect(report.closedAtLabel).toBe("2026.08.02 12:04:05");
+    expect(report.generatedAtLabel).toBe("2026.08.02 12:04:06");
   });
 
   it("does not expose private member, payment, receipt, or memo data", () => {

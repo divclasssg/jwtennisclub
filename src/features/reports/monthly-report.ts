@@ -2,6 +2,7 @@ import {
   formatCurrency,
   formatExpenseCategory,
   formatPeriodMonth,
+  formatSeoulProcessedDateTime,
 } from "@/features/settlements/settlement-summary";
 import {
   getCurrentPeriodMonth,
@@ -101,9 +102,9 @@ export function buildMonthlyReportData(input: {
     closingStatus: closing.status,
     closingLabel,
     closingVersion: closing.version,
-    closedAtLabel: formatSeoulDateLabel(new Date(closing.closedAt)),
+    closedAtLabel: formatSeoulProcessedDateTime(closing.closedAt),
     closedBy: closing.closedBy,
-    generatedAtLabel: formatSeoulDateLabel(input.generatedAt),
+    generatedAtLabel: formatSeoulProcessedDateTime(input.generatedAt),
     generatedBy: input.generatedBy,
     activityMemberCount: snapshot.activityMemberCount,
     feeTargetCount: snapshot.feeTargetCount,
@@ -133,20 +134,6 @@ function formatReportTitle(periodMonth: string) {
   const [year, month] = periodMonth.split("-").map(Number);
 
   return `${year}년 ${month}월 테니스 클럽 월간 결산 보고서`;
-}
-
-function formatSeoulDateLabel(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date).reduce<Record<string, string>>((result, part) => {
-    if (part.type !== "literal") result[part.type] = part.value;
-    return result;
-  }, {});
-
-  return `${parts.year}.${parts.month}.${parts.day}`;
 }
 
 export function formatReportFileName(

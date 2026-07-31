@@ -15,6 +15,9 @@ type SettlementMutationSuccess =
   | "final-closed"
   | "final-reopened";
 
+const SETTLEMENT_SORT_KEYS = new Set(["category", "count", "amount"]);
+const SORT_DIRECTIONS = new Set(["asc", "desc"]);
+
 function normalizeSettlementPeriodMonth(value: string) {
   const periodMonth = normalizePeriodMonth(value);
   if (!/^\d{4}-(0[1-9]|1[0-2])-01$/.test(periodMonth)) {
@@ -45,8 +48,10 @@ function buildSettlementHref(
   const sort = readFormValue(formData, "sort");
   const direction = readFormValue(formData, "direction");
 
-  if (sort) params.set("sort", sort);
-  if (direction) params.set("direction", direction);
+  if (SETTLEMENT_SORT_KEYS.has(sort) && SORT_DIRECTIONS.has(direction)) {
+    params.set("sort", sort);
+    params.set("direction", direction);
+  }
 
   if ("status" in statusOrError) {
     params.set("status", statusOrError.status);

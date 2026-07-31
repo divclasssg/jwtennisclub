@@ -24,6 +24,7 @@ import {
   formatCurrency,
   formatExpenseCategory,
   formatPeriodMonth,
+  formatSeoulProcessedDateTime,
   formatSettlementBalance,
   normalizeSettlementFilters,
   type SettlementSearchParams,
@@ -47,7 +48,7 @@ type SettlementSortKey = (typeof SETTLEMENT_SORT_KEYS)[number];
 
 async function getMonthlySettlementPage(periodMonth: string) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_monthly_settlement_page", {
+  const { data, error } = await supabase.rpc("get_monthly_settlement_page_v2", {
     requested_period_month: periodMonth,
   });
 
@@ -100,23 +101,6 @@ function getSettlementMessage(
   return null;
 }
 
-function formatProcessedDate(value: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(Date.parse(value)).reduce<Record<string, string>>(
-    (result, part) => {
-      if (part.type !== "literal") result[part.type] = part.value;
-      return result;
-    },
-    {},
-  );
-
-  return `${parts.year}.${parts.month}.${parts.day}`;
-}
-
 function formatClosingStatus(closing: MonthlySettlementClosing) {
   if (closing.status === "reopened") {
     return "재개됨";
@@ -161,7 +145,7 @@ function ClosingHistoryPanel({
             {closings.map((closing) => (
               <tr key={closing.id}>
                 <td>{kindLabel} v{closing.version}</td>
-                <td>{formatProcessedDate(closing.closedAt)}</td>
+                <td>{formatSeoulProcessedDateTime(closing.closedAt)}</td>
                 <td>{closing.closedBy}</td>
                 <td>{formatClosingStatus(closing)}</td>
                 <td>
@@ -327,7 +311,7 @@ export default async function SettlementsPage({
             {settlementPage.activeClosing ? (
               <>
                 <SummaryCard label="최종 마감 버전" value={`v${settlementPage.activeClosing.version}`} />
-                <SummaryCard label="최종 마감일" value={formatProcessedDate(settlementPage.activeClosing.closedAt)} />
+                <SummaryCard label="최종 마감일" value={formatSeoulProcessedDateTime(settlementPage.activeClosing.closedAt)} />
                 <SummaryCard label="최종 마감 처리자" value={settlementPage.activeClosing.closedBy} />
               </>
             ) : null}

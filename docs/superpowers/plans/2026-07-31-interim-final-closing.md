@@ -34,7 +34,8 @@
 
 **Interfaces:**
 - Consumes: `public.build_monthly_settlement_snapshot(date)` and the existing permissions `settlements.close` / `settlements.reopen`.
-- Produces: `public.monthly_closing_kind`, `public.create_interim_monthly_settlement(date)`, extended `public.get_monthly_settlement_page(date)`, final-only `public.close_monthly_settlement(date)` / `public.reopen_monthly_settlement(date)`, and `public.record_monthly_report_generation(uuid)`.
+- Produces: `public.monthly_closing_kind`, `public.create_interim_monthly_settlement(date)`, additive `public.get_monthly_settlement_page_v2(date)`, final-only `public.close_monthly_settlement(date)` / `public.reopen_monthly_settlement(date)`, and `public.record_monthly_report_generation(uuid)`.
+- Preserves during staged rollout: legacy `public.get_monthly_settlement_page(date)` and `public.record_monthly_report_generation(uuid, date, integer)`, both authenticated-only.
 - Produces page JSON keys: `preview`, `active_closing`, `closing_history`, `can_create_interim`, `can_close`, `can_reopen`, and `close_blocked_reason`.
 
 - [ ] **Step 1: Write the failing additive-migration contract tests**
@@ -140,7 +141,7 @@ where prior_closing.period_month = prior_period_month
   and prior_closing.status = 'closed'
 ```
 
-In `get_monthly_settlement_page`, return:
+Keep the deployed `get_monthly_settlement_page(date)` body unchanged for the strict Task-1-era parser. In `get_monthly_settlement_page_v2`, return:
 
 ```sql
 return pg_catalog.jsonb_build_object(
@@ -1057,9 +1058,11 @@ Expected: every migration through `202607300002` is local/remote matched, and on
 
 Do not use an unrestricted all-pending push if any unrelated migration appears.
 
-- [ ] **Step 5: Apply the two additive migrations in order**
+- [ ] **Step 5: Apply the two additive migrations in order before the app deploy**
 
 Apply `202607310001`, verify kind, RPC and existing-row backfill, then record its migration history. Apply `202607310002`, verify triggers and lock-status RPC, then record its history.
+
+This is a staged compatibility rollout: keep the legacy page and three-argument report RPCs authenticated-only while old app traffic exists, and deploy the new app only after both database migrations pass their checks. After old app traffic is confirmed gone, create a separate future cleanup migration to remove those legacy RPCs. Do not create or apply that cleanup migration in this rollout.
 
 Use the established Management API path:
 

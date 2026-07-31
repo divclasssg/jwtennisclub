@@ -18,9 +18,9 @@ const report = {
   closingStatus: "reopened" as const,
   closingLabel: "최종 마감 v2 · 재개됨",
   closingVersion: 2,
-  closedAtLabel: "2026.08.02",
+  closedAtLabel: "2026.08.02 12:04:05",
   closedBy: "김마감",
-  generatedAtLabel: "2026.08.03",
+  generatedAtLabel: "2026.08.03 21:00:00",
   generatedBy: "김생성",
   activityMemberCount: 21,
   feeTargetCount: 20,
@@ -63,8 +63,10 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).toContain("결산 구분");
     expect(text).toContain("최종 마감 v2 · 재개됨");
     expect(text).toContain("결산일");
+    expect(text).toContain("2026.08.02 12:04:05");
     expect(text).toContain("결산 처리자");
     expect(text).toContain("PDF 생성일");
+    expect(text).toContain("2026.08.03 21:00:00");
     expect(text).toContain("생성자");
     expect(text).toContain("월말 활동 회원");
     expect(text).toContain("회비 부과 대상");

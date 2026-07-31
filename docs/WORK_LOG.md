@@ -7,22 +7,28 @@
 - 최종 마감본은 결산 재개 전까지 원본 변경을 차단하며, 재개 후 다시 최종 마감하면 이전 불변 이력을 유지한 채 다음 최종 버전을 생성한다.
 - 중간 결산과 최종 마감 PDF를 생성 당일부터 정확한 스냅샷 ID로 다운로드하도록 변경했다. PDF에는 결산 유형·버전·처리자·처리일시를 표시하고 원본 테이블을 다시 조회하지 않는다.
 - 메뉴, 화면, 작업, 안내, 오류와 PDF의 사용자용 `정산` 표현을 `결산`으로 변경했다. 내부 `settlement` 식별자는 배포 호환성을 위해 유지했다.
+- DB 우선 혼합 버전 배포를 위해 기존 `get_monthly_settlement_page(date)`와 3인자 PDF 감사 RPC를 유지하고, 새 앱 전용 `get_monthly_settlement_page_v2(date)`와 1인자 PDF 감사 RPC를 분리했다. 전환 RPC는 모두 `authenticated`만 실행할 수 있다.
+- 결산 처리일시와 PDF 생성일시를 서울 시간의 초 단위까지 표시해 같은 날 생성한 여러 기록을 구분할 수 있게 했다. 결산 Action은 `category|count|amount`와 `asc|desc`의 유효한 정렬 쌍만 리다이렉트에 보존한다.
 
 ### 검증 근거
-- 전체 Vitest: `npm run test -- --exclude '.worktrees/**'` — 99개 파일, 691개 테스트 통과.
+- 최종 수정 RED에서 호환 RPC 분리, 서울 초 단위 표시, 정렬 FormData 화이트리스트가 없어 집중 테스트 11건이 의도한 이유로 실패했고, 생성 mutation의 v2 반환 계약 2건도 별도 RED로 확인했다.
+- 최종 수정 집중 Vitest — 6개 파일, 64개 테스트 통과.
+- 전체 Vitest: `npm run test -- --exclude '.worktrees/**'` — 99개 파일, 698개 테스트 통과.
 - `npx eslint . --ignore-pattern '.worktrees/**'`, `npx tsc --noEmit`, `git diff --check` — 종료 코드 0으로 통과.
-- 환경 변수 없이 실행한 `npm run build`는 컴파일과 TypeScript 검사까지 성공한 뒤 `/(.)expenses/new` 사전 렌더에서 `Missing or invalid Supabase environment variables`로 실패했다.
+- 대표 최종 마감 PDF를 `tmp/pdfs`에 생성해 `pdfinfo`, `pdftotext -layout`, `pdffonts`, `pdftoppm -png -r 150`으로 검사했다. 1페이지 A4, 서로 다른 결산·생성 초 단위 시각, 내장된 IBM Plex Sans KR subset을 확인했고 1241×1754 PNG 원본 해상도 육안검사에서 잘림·겹침·두부 문자·개인정보 노출이 없었다. 검사 뒤 PDF·텍스트·PNG와 임시 생성 테스트를 삭제했다.
+- 환경 변수 없이 실행한 `npm run build`는 컴파일과 TypeScript 검사까지 성공한 뒤 `/(.)expenses/new` 사전 렌더에서 `Missing or invalid Supabase environment variables`로 실패했다. 빌드 통과로 처리하지 않았다.
 - 루트 작업 공간의 무시된 `.env.local`을 값 출력이나 복사 없이 실행 환경으로 로드한 빌드는 두 번 모두 오류 출력 없이 `Creating an optimized production build ...`에서 2분 이상 정체돼 해당 빌드 프로세스만 중단했다. 빌드 통과로 처리하지 않았다.
 - 기존 `202607300002_add_monthly_settlement_closings.sql`이 구현 기준 커밋에서 변경되지 않았고, 새 순서가 `202607310001_add_interim_monthly_closings.sql` 다음 `202607310002_lock_finalized_month_sources.sql`임을 확인했다.
 - 소스 계약과 변경 검토에서 기존 행의 `final` 기본 백필, 직전 활성 최종 마감만 사용하는 기초 잔액, 정확한 스냅샷 PDF RPC, API 역할의 트리거 헬퍼 실행 차단, 활성 운영자·권한 검사, 스냅샷에서 제외된 회비 메모의 편집 허용, 영수증 업로드와 최종 잠금 경합 시 신규 객체 정리를 확인했다.
-- Task 1~6의 집중 검토와 수정 라운드를 확인했다. 별도 보류 Minor인 결산 Action의 `sort`·`direction` FormData 화이트리스트는 이번 배포 문서 작업에서 변경하지 않았다.
+- Task 1~6의 집중 검토와 최종 수정 라운드를 확인했다. 보류했던 결산 Action의 `sort`·`direction` FormData 화이트리스트도 회귀 테스트와 함께 반영했다.
 
 ### 배포 차단
 - 읽기 전용 `supabase migration list --linked --output-format json` 결과 `202607290001`, `202607300001`, `202607300002`는 로컬·원격이 일치했고 `202607310001`, `202607310002`는 로컬에만 있는 대기 상태였다.
 - 그러나 원격에만 `202607270001`, `202607270002`가 기록돼 모든 선행 마이그레이션의 로컬·원격 일치 조건을 만족하지 않았다. 두 원격 전용 버전의 출처와 로컬 대응 파일을 확인하기 전에는 신규 SQL을 적용하지 않는다.
 - 배포 안전 게이트에 따라 `202607310001`·`202607310002` SQL 실행과 migration repair를 모두 수행하지 않았다. SQL 실패 뒤 이력을 적용 상태로 표시하는 작업도 없었다.
 - 필수 마이그레이션이 적용되지 않아 인증 운영자 프로덕션 브라우저 QA와 2026년 7월 운영 결산 생성·최종 마감을 수행하지 않았다. 실제 회비·지출·회원 데이터를 QA 목적으로 만들거나 수정하지 않았다.
-- 운영 배포, 브라우저 QA와 프로덕션 빌드는 완료로 처리하지 않는다. 원격 전용 이력 정합성을 해결하고 빌드 정체 원인을 확인한 뒤 안전 게이트부터 다시 실행한다.
+- 차단 조건이 해소되면 `202607310001`과 `202607310002`를 순서대로 DB에 먼저 적용·검증하고 새 앱을 배포한다. 구 앱 트래픽이 사라진 뒤에만 레거시 페이지·PDF RPC를 제거하는 별도 정리 마이그레이션을 새로 작성하며, 이번 작업에서는 해당 정리 마이그레이션을 만들거나 적용하지 않았다.
+- 운영 배포, 브라우저 QA와 프로덕션 빌드는 완료로 처리하지 않는다. 원격 전용 이력 정합성을 해결하고 유효한 Supabase 환경으로 프로덕션 빌드를 통과시킨 뒤 안전 게이트부터 다시 실행한다.
 
 ## 2026-07-30
 

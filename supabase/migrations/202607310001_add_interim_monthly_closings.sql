@@ -364,7 +364,7 @@ begin
 end;
 $$;
 
-create or replace function public.get_monthly_settlement_page(
+create or replace function public.get_monthly_settlement_page_v2(
   requested_period_month date
 )
 returns jsonb
@@ -661,7 +661,7 @@ begin
     closing_occurred_at
   );
 
-  return public.get_monthly_settlement_page(normalized_period_month);
+  return public.get_monthly_settlement_page_v2(normalized_period_month);
 end;
 $$;
 
@@ -831,7 +831,7 @@ begin
     closing_occurred_at
   );
 
-  return public.get_monthly_settlement_page(normalized_period_month);
+  return public.get_monthly_settlement_page_v2(normalized_period_month);
 end;
 $$;
 
@@ -1090,11 +1090,18 @@ from public, anon, authenticated, service_role;
 revoke execute on function public.record_monthly_report_generation(
   uuid, date, integer
 ) from public, anon, authenticated, service_role;
-drop function public.record_monthly_report_generation(uuid, date, integer);
+grant execute on function public.record_monthly_report_generation(
+  uuid, date, integer
+) to authenticated;
 
 revoke execute on function public.get_monthly_settlement_page(date)
 from public, anon, authenticated, service_role;
 grant execute on function public.get_monthly_settlement_page(date)
+to authenticated;
+
+revoke execute on function public.get_monthly_settlement_page_v2(date)
+from public, anon, authenticated, service_role;
+grant execute on function public.get_monthly_settlement_page_v2(date)
 to authenticated;
 
 revoke execute on function public.create_interim_monthly_settlement(date)

@@ -77,6 +77,22 @@ describe("monthly settlement actions", () => {
     });
   });
 
+  it.each([
+    ["an unknown sort key", "drop table", "desc"],
+    ["an unknown direction", "amount", "sideways"],
+    ["a sort key without a direction", "amount", ""],
+    ["a direction without a sort key", "", "desc"],
+  ])("drops %s instead of reflecting noisy FormData", async (_case, sort, direction) => {
+    const formData = new FormData();
+    formData.set("month", "2026-07");
+    if (sort) formData.set("sort", sort);
+    if (direction) formData.set("direction", direction);
+
+    await expect(closeMonthlySettlement(formData)).rejects.toThrow(
+      "redirect:/settlements?month=2026-07&status=final-closed",
+    );
+  });
+
   it("uses the reopen RPC with a final-reopen-specific success redirect", async () => {
     const formData = new FormData();
     formData.set("month", "2026-07");

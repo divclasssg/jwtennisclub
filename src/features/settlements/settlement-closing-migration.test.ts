@@ -464,30 +464,29 @@ describe("monthly settlement closing migration", () => {
     expect(reportAudit).not.toContain("return true");
   });
 
-  it("exposes only the five authenticated page, mutation, and exact PDF-audit RPCs", () => {
+  it("keeps legacy compatibility RPCs and exposes every rollout RPC only to authenticated users", () => {
+    const normalizedMigrationSql = additiveMigrationSql.replace(/\s+/g, " ");
     for (const signature of [
       "get_monthly_settlement_page(date)",
+      "get_monthly_settlement_page_v2(date)",
       "create_interim_monthly_settlement(date)",
       "close_monthly_settlement(date)",
       "reopen_monthly_settlement(date)",
       "record_monthly_report_generation(uuid)",
+      "record_monthly_report_generation( uuid, date, integer )",
     ]) {
-      expect(additiveMigrationSql).toMatch(
-        new RegExp(
-          `revoke execute on function public\\.${signature.replace(/[()]/g, "\\$&")}\\s+from public, anon(?:, authenticated, service_role)?`,
-        ),
+      expect(normalizedMigrationSql).toContain(
+        `revoke execute on function public.${signature} from public, anon`,
       );
-      expect(additiveMigrationSql).toMatch(
-        new RegExp(
-          `grant execute on function public\\.${signature.replace(/[()]/g, "\\$&")}\\s+to authenticated`,
-        ),
+      expect(normalizedMigrationSql).toContain(
+        `grant execute on function public.${signature} to authenticated`,
       );
     }
-    expect(additiveMigrationSql).toMatch(
-      /revoke execute on function public\.record_monthly_report_generation\(\s*uuid, date, integer\s*\)\s+from public, anon, authenticated, service_role/,
-    );
-    expect(additiveMigrationSql).toContain(
+    expect(additiveMigrationSql).not.toContain(
       "drop function public.record_monthly_report_generation(uuid, date, integer)",
+    );
+    expect(additiveMigrationSql).not.toMatch(
+      /revoke execute on function public\.record_monthly_report_generation\(\s*uuid, date, integer\s*\)\s+from public, anon, authenticated, service_role\s*;\s*(?:drop function|$)/,
     );
   });
 });

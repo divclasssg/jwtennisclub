@@ -104,7 +104,7 @@ describe("SettlementsPage", () => {
       }),
     );
 
-    expect(rpc).toHaveBeenCalledWith("get_monthly_settlement_page", {
+    expect(rpc).toHaveBeenCalledWith("get_monthly_settlement_page_v2", {
       requested_period_month: "2026-07-01",
     });
     expect(screen.getByText("월말 활동 회원")).toBeInTheDocument();
@@ -236,12 +236,17 @@ describe("SettlementsPage", () => {
     expect(document.body).not.toHaveTextContent("정산");
   });
 
-  it("formats a UTC closing timestamp on the next Seoul calendar day", async () => {
+  it("formats same-day closing timestamps with distinguishable Seoul times", async () => {
     const finalClosing = buildClosing();
+    const interimClosing = buildClosing({
+      id: "bfb6a92b-7a96-45ce-9fc8-f94176193bcc",
+      closing_kind: "interim",
+      closed_at: "2026-07-31T15:31:02+00:00",
+    });
     pageState.data = {
       preview: buildSnapshot(),
       active_closing: finalClosing,
-      closing_history: [finalClosing],
+      closing_history: [interimClosing, finalClosing],
       can_create_interim: false,
       can_close: false,
       can_reopen: true,
@@ -254,7 +259,8 @@ describe("SettlementsPage", () => {
       }),
     );
 
-    expect(screen.getAllByText("2026.08.01")).not.toHaveLength(0);
+    expect(screen.getAllByText("2026.08.01 00:30:00")).not.toHaveLength(0);
+    expect(screen.getByText("2026.08.01 00:31:02")).toBeInTheDocument();
     expect(screen.queryByText("2026.07.31")).not.toBeInTheDocument();
   });
 
