@@ -364,6 +364,101 @@ begin
 end;
 $$;
 
+create or replace function public.get_monthly_settlement_page(
+  requested_period_month date
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  normalized_period_month date := pg_catalog.date_trunc(
+    'month', requested_period_month
+  )::date;
+  current_period_month date := pg_catalog.date_trunc(
+    'month',
+    (pg_catalog.statement_timestamp() at time zone 'Asia/Seoul')::date
+  )::date;
+  actor_profile_id uuid;
+  preview_snapshot jsonb;
+  active_closing jsonb;
+  can_close boolean := false;
+  can_reopen boolean := false;
+  close_blocked_reason text;
+begin
+  if requested_period_month is null
+    or requested_period_month <> normalized_period_month
+  then
+    raise exception 'period month must be the first day'
+      using errcode = '22023';
+  end if;
+
+  select profiles.id
+  into actor_profile_id
+  from public.profiles as profiles
+  where profiles.id = auth.uid()
+    and profiles.status = 'active';
+
+  if actor_profile_id is null then
+    raise exception 'active operator required'
+      using errcode = '42501';
+  end if;
+
+  select pg_catalog.jsonb_build_object(
+    'id', closings.id,
+    'period_month', closings.period_month,
+    'version', closings.version,
+    'status', closings.status,
+    'snapshot', closings.snapshot,
+    'closed_at', closings.closed_at,
+    'closed_by', closings.closed_by_name
+  )
+  into active_closing
+  from public.monthly_closings as closings
+  where closings.period_month = normalized_period_month
+    and closings.closing_kind = 'final'
+    and closings.status = 'closed';
+
+  if active_closing is null then
+    preview_snapshot := public.build_monthly_settlement_snapshot(
+      normalized_period_month
+    );
+  else
+    preview_snapshot := active_closing->'snapshot';
+  end if;
+
+  can_close := active_closing is null
+    and normalized_period_month < current_period_month
+    and public.has_permission('settlements.close');
+
+  can_reopen := active_closing is not null
+    and public.has_permission('settlements.reopen')
+    and not exists (
+      select 1
+      from public.monthly_closings as later_closings
+      where later_closings.period_month > normalized_period_month
+        and later_closings.closing_kind = 'final'
+        and later_closings.status = 'closed'
+    );
+
+  close_blocked_reason := case
+    when active_closing is not null then 'already-closed'
+    when normalized_period_month >= current_period_month then 'period-not-ended'
+    when not public.has_permission('settlements.close') then 'permission-required'
+    else null
+  end;
+
+  return pg_catalog.jsonb_build_object(
+    'preview', preview_snapshot,
+    'active_closing', active_closing,
+    'can_close', can_close,
+    'can_reopen', can_reopen,
+    'close_blocked_reason', close_blocked_reason
+  );
+end;
+$$;
+
 create or replace function public.get_monthly_settlement_page_v2(
   requested_period_month date
 )

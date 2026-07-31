@@ -20,13 +20,17 @@ const executableSql = stripSqlComments(sql);
 
 function functionBody(functionName: string) {
   const start = sql.indexOf(
-    `create or replace function public.${functionName}`,
+    `create or replace function public.${functionName}(`,
   );
   const end = sql.indexOf("$$;", start);
 
   expect(start, functionName).toBeGreaterThan(-1);
   expect(end, functionName).toBeGreaterThan(start);
   return sql.slice(start, end);
+}
+
+function jsonObjectKeys(source: string) {
+  return [...source.matchAll(/'([a-z_]+)'\s*,/g)].map((match) => match[1]);
 }
 
 describe("interim monthly settlement closing migration", () => {
@@ -175,8 +179,76 @@ describe("interim monthly settlement closing migration", () => {
     }
   });
 
-  it("keeps the legacy page RPC untouched while adding the v2 page contract", () => {
-    expect(executableSql).not.toMatch(
+  it("returns the exact strict-compatible legacy page and closing DTO shapes", () => {
+    const legacy = functionBody("get_monthly_settlement_page");
+    const activeDtoStart = legacy.indexOf(
+      "select pg_catalog.jsonb_build_object(",
+    );
+    const activeDtoEnd = legacy.indexOf(
+      ")\n  into active_closing",
+      activeDtoStart,
+    );
+    const returnDtoStart = legacy.lastIndexOf(
+      "return pg_catalog.jsonb_build_object(",
+    );
+    const returnDtoEnd = legacy.indexOf(");\nend;", returnDtoStart);
+
+    expect(activeDtoStart).toBeGreaterThan(-1);
+    expect(activeDtoEnd).toBeGreaterThan(activeDtoStart);
+    expect(returnDtoStart).toBeGreaterThan(activeDtoEnd);
+    expect(returnDtoEnd).toBeGreaterThan(returnDtoStart);
+    expect(
+      jsonObjectKeys(legacy.slice(activeDtoStart, activeDtoEnd)),
+    ).toEqual([
+      "id",
+      "period_month",
+      "version",
+      "status",
+      "snapshot",
+      "closed_at",
+      "closed_by",
+    ]);
+    expect(
+      jsonObjectKeys(legacy.slice(returnDtoStart, returnDtoEnd)),
+    ).toEqual([
+      "preview",
+      "active_closing",
+      "can_close",
+      "can_reopen",
+      "close_blocked_reason",
+    ]);
+  });
+
+  it("keeps interim rows out of every legacy active and blocking lookup", () => {
+    const legacy = functionBody("get_monthly_settlement_page");
+    const activeLookupStart = legacy.indexOf(
+      "from public.monthly_closings as closings",
+    );
+    const activeLookupEnd = legacy.indexOf(";", activeLookupStart);
+    const laterLookupStart = legacy.indexOf(
+      "from public.monthly_closings as later_closings",
+    );
+    const laterLookupEnd = legacy.indexOf(");", laterLookupStart);
+    const activeLookup = legacy.slice(activeLookupStart, activeLookupEnd);
+    const laterLookup = legacy.slice(laterLookupStart, laterLookupEnd);
+
+    expect(activeLookup).toContain("closings.closing_kind = 'final'");
+    expect(activeLookup).toContain("closings.status = 'closed'");
+    expect(laterLookup).toContain(
+      "later_closings.closing_kind = 'final'",
+    );
+    expect(laterLookup).toContain("later_closings.status = 'closed'");
+  });
+
+  it("keeps the v2 page RPC separate from the strict legacy contract", () => {
+    const legacy = functionBody("get_monthly_settlement_page");
+    const v2 = functionBody("get_monthly_settlement_page_v2");
+
+    expect(legacy).not.toContain("'closing_history'");
+    expect(legacy).not.toContain("'can_create_interim'");
+    expect(v2).toContain("'closing_history'");
+    expect(v2).toContain("'can_create_interim'");
+    expect(executableSql).toMatch(
       /create or replace function public\.get_monthly_settlement_page\(\s*requested_period_month date\s*\)/,
     );
     expect(executableSql).toMatch(

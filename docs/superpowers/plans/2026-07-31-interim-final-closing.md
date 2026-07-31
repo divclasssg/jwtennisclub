@@ -141,7 +141,7 @@ where prior_closing.period_month = prior_period_month
   and prior_closing.status = 'closed'
 ```
 
-Keep the deployed `get_monthly_settlement_page(date)` body unchanged for the strict Task-1-era parser. In `get_monthly_settlement_page_v2`, return:
+Redefine `get_monthly_settlement_page(date)` with the exact strict Task-1-era DTO shape, while making its active and later-closing lookups final-only. In `get_monthly_settlement_page_v2`, return:
 
 ```sql
 return pg_catalog.jsonb_build_object(
