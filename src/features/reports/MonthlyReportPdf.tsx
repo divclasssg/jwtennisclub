@@ -201,7 +201,7 @@ export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
             />
           ))}
           <LedgerRow
-            label="지출 합계"
+            label={`지출 합계 (${report.expenseCount}건)`}
             value={`${formatCurrency(report.expenseTotal)}원`}
             total
           />

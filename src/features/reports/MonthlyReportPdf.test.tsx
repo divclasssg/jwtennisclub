@@ -66,6 +66,7 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).toContain("수입 합계");
     expect(text).toContain("지출");
     expect(text).toContain("지출 합계");
+    expect(text).toContain("지출 합계 (2건)");
     expect(text).toContain("잔액");
     expect(text).toContain("기말 장부 잔액");
     expect(text).toContain("지출 상세");
