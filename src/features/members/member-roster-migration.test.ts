@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -41,6 +41,14 @@ const meetingRecoverySql = readFileSync(
   ),
   "utf8",
 ).toLowerCase();
+
+const memberSaveAmbiguityFixPath = join(
+  process.cwd(),
+  "supabase/migrations/202607270001_fix_member_save_parameter_ambiguity.sql",
+);
+const memberSaveAmbiguityFixSql = existsSync(memberSaveAmbiguityFixPath)
+  ? readFileSync(memberSaveAmbiguityFixPath, "utf8").toLowerCase()
+  : "";
 
 describe("member roster preparation migration", () => {
   it("backfills codes before making them required and assigns every insert", () => {
@@ -402,6 +410,25 @@ describe("member roster finalization migration", () => {
 });
 
 describe("meeting roster member-write integration", () => {
+  it("removes every member_id parameter ambiguity from the public save RPC", () => {
+    const saveStart = memberSaveAmbiguityFixSql.indexOf(
+      "create or replace function public.save_member_with_contact",
+    );
+    const saveEnd = memberSaveAmbiguityFixSql.indexOf(
+      "revoke execute on function public.save_member_with_contact",
+      saveStart,
+    );
+    const saveFunction = memberSaveAmbiguityFixSql.slice(saveStart, saveEnd);
+
+    expect(saveStart).toBeGreaterThan(-1);
+    expect(saveFunction).toContain("save_member_with_contact.member_id");
+    expect(saveFunction).not.toMatch(/\bdistinct from member_id\b/);
+    expect(saveFunction).toContain(
+      "on conflict on constraint member_contacts_pkey",
+    );
+    expect(saveFunction).not.toContain("on conflict (member_id)");
+  });
+
   it("does not share-lock every member row before an authenticated member write", () => {
     const lockStart = meetingMigrationSql.indexOf(
       "create or replace function public.lock_meeting_automation_rows",
