@@ -7,7 +7,7 @@
 - 관련 집중 Vitest: `MonthlyReportPdf.test.tsx`, `monthly-report.test.ts` 2개 파일, 16개 테스트 통과. 전체 Vitest: `npm run test -- --exclude '.worktrees/**'` 102개 파일, 708개 테스트 통과.
 - `npx eslint . --ignore-pattern '.worktrees/**'`, `npx tsc --noEmit`, `git diff --check`는 모두 종료 코드 0으로 통과했다.
 - `output/pdf/monthly-report-ledger-style-preview.pdf`를 `pdfinfo`, `pdftotext -layout`, `pdffonts`와 150dpi PNG 렌더로 검사했다. A4(595.28×841.89pt) 1페이지이며 `IBMPlexSansKR-Regular` subset이 내장됐고, 장부 제목·소계·기말 장부 잔액이 추출됐다. 1241×1754 원본 PNG 육안검사에서 잘림·겹침·두부 문자·카드형 배경·개인정보 노출이 없었다.
-- 루트 `.env.local`을 값 출력 없이 로드한 `npm run build`는 `Creating an optimized production build ...` 뒤 2분 이상 진행 출력 없이 `.next/lock`을 유지해 완료하지 못했다. 해당 작업트리에서 시작한 빌드 PID만 중지했고, 이 빌드는 통과로 처리하지 않는다.
+- 제한된 샌드박스에서 루트 `.env.local`을 값 출력 없이 로드한 첫 `npm run build`는 `Creating an optimized production build ...` 뒤 2분 이상 진행 출력 없이 `.next/lock`을 유지해 완료하지 못했다. 해당 작업트리에서 시작한 빌드 PID만 중지했다. 이후 컨트롤러가 제한 없는 환경에서 같은 환경 변수 로딩 빌드를 재실행해 Next.js 16.2.10 컴파일 2.7초, TypeScript 3.0초, 26개 정적 페이지 생성까지 총 6.9345초·종료 코드 0으로 통과를 확인했다.
 - 프로덕션 배포와 실제 운영 결산 PDF 다운로드는 수행하지 않았다. 로컬 미리보기의 시각 승인 전에는 배포하지 않는다.
 
 ### 완료
