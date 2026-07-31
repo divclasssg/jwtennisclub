@@ -1,4 +1,8 @@
+import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const closingId = "f0331b6c-99e0-4d6b-ab47-6e0d3ae57c00";
+const finalClosingId = "a0331b6c-99e0-4d6b-ab47-6e0d3ae57c00";
 
 const snapshot = {
   schema_version: 1,
@@ -38,31 +42,39 @@ const snapshot = {
   ],
 };
 
-const activeClosing = {
-  id: "f0331b6c-99e0-4d6b-ab47-6e0d3ae57c00",
+const interimClosing = {
+  id: closingId,
   period_month: "2026-07-01",
-  version: 2,
+  closing_kind: "interim",
+  version: 1,
   status: "closed",
   snapshot,
-  closed_at: "2026-08-02T03:04:05.000Z",
-  closed_by_name: "김마감",
+  closed_at: "2026-07-31T03:04:05.000Z",
+  closed_by: "김마감",
+  reopened_at: null,
+};
+
+const reopenedFinalClosing = {
+  ...interimClosing,
+  id: finalClosingId,
+  closing_kind: "final",
+  version: 2,
+  status: "reopened",
+  reopened_at: "2026-07-31T04:04:05.000Z",
+};
+
+type RpcResult = {
+  data: unknown;
+  error: { code?: string; message: string } | null;
 };
 
 const mocks = vi.hoisted(() => {
-  let closingResult: { data: unknown; error: { message: string } | null } = {
+  let reportGenerationResult: RpcResult = {
     data: null,
-    error: null,
-  };
-  let generationAuditResult: { error: { message: string } | null } = {
     error: null,
   };
   let authenticated = true;
 
-  const closingsQuery = {
-    eq: vi.fn(() => closingsQuery),
-    maybeSingle: vi.fn(() => Promise.resolve(closingResult)),
-    select: vi.fn(() => closingsQuery),
-  };
   const profilesQuery = {
     eq: vi.fn(() => profilesQuery),
     maybeSingle: vi.fn(() =>
@@ -86,13 +98,12 @@ const mocks = vi.hoisted(() => {
       ),
     },
     from: vi.fn((table: string) => {
-      if (table === "monthly_closings") return closingsQuery;
       if (table === "profiles") return profilesQuery;
       throw new Error(`Unexpected raw source table: ${table}`);
     }),
     rpc: vi.fn((functionName: string) => {
       if (functionName === "record_monthly_report_generation") {
-        return Promise.resolve({ data: true, ...generationAuditResult });
+        return Promise.resolve(reportGenerationResult);
       }
 
       throw new Error(`Unexpected RPC: ${functionName}`);
@@ -100,18 +111,17 @@ const mocks = vi.hoisted(() => {
   };
 
   return {
-    closingsQuery,
+    rejectReportGeneration(error: Error) {
+      supabase.rpc.mockRejectedValueOnce(error);
+    },
     renderMonthlyReportPdf: vi.fn(() =>
       Promise.resolve(Buffer.from("%PDF monthly report")),
     ),
-    setGenerationAuditResult(result: { error: { message: string } | null }) {
-      generationAuditResult = result;
-    },
     setAuthenticated(value: boolean) {
       authenticated = value;
     },
-    setClosingResult(result: { data: unknown; error: { message: string } | null }) {
-      closingResult = result;
+    setReportGenerationResult(result: RpcResult) {
+      reportGenerationResult = result;
     },
     supabase,
   };
@@ -130,102 +140,188 @@ import { GET } from "./route";
 describe("monthly report route", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-08-03T12:00:00Z"));
+    vi.setSystemTime(new Date("2026-07-31T03:05:00.000Z"));
     vi.clearAllMocks();
     mocks.setAuthenticated(true);
-    mocks.setGenerationAuditResult({ error: null });
-    mocks.setClosingResult({ data: activeClosing, error: null });
+    mocks.setReportGenerationResult({ data: interimClosing, error: null });
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("renders an active stored closing, atomically verifies and audits it, then returns the stable filename", async () => {
+  it("audits and downloads the exact interim snapshot immediately on the same day", async () => {
     const response = await GET(
-      new Request("http://localhost/reports/monthly?month=2026-07"),
+      new NextRequest(
+        `http://localhost/reports/monthly?snapshot=${closingId}`,
+      ),
     );
 
-    expect(mocks.supabase.from).toHaveBeenCalledWith("monthly_closings");
-    expect(mocks.closingsQuery.eq).toHaveBeenNthCalledWith(
-      1,
-      "period_month",
-      "2026-07-01",
+    expect(mocks.supabase.rpc).toHaveBeenCalledWith(
+      "record_monthly_report_generation",
+      { requested_closing_id: closingId },
     );
-    expect(mocks.closingsQuery.eq).toHaveBeenNthCalledWith(2, "status", "closed");
     expect(mocks.renderMonthlyReportPdf).toHaveBeenCalledWith(
       expect.objectContaining({
-        closingVersion: 2,
+        closingKind: "interim",
+        closingStatus: "closed",
+        closingLabel: "중간 결산 v1",
         closedBy: "김마감",
         actualFeeIncome: 525000,
         closingLedgerBalance: 395000,
       }),
     );
-    expect(mocks.supabase.rpc).toHaveBeenCalledWith(
-      "record_monthly_report_generation",
-      {
-        requested_closing_id: activeClosing.id,
-        requested_period_month: "2026-07-01",
-        requested_version: 2,
-      },
-    );
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("monthly_closings");
     expect(mocks.supabase.from).not.toHaveBeenCalledWith("audit_logs");
     expect(mocks.supabase.from).not.toHaveBeenCalledWith("fee_payments");
     expect(mocks.supabase.from).not.toHaveBeenCalledWith("members");
     expect(mocks.supabase.from).not.toHaveBeenCalledWith("expenses");
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(response.headers.get("content-disposition")).toContain(
-      "jw-tennis-club-2026-07-report.pdf",
+      "jw-tennis-club-2026-07-interim-v1.pdf",
     );
     expect(await response.text()).toBe("%PDF monthly report");
+  });
+
+  it("returns a filename identifying the exact reopened final snapshot", async () => {
+    mocks.setReportGenerationResult({
+      data: reopenedFinalClosing,
+      error: null,
+    });
+
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/reports/monthly?snapshot=${finalClosingId}`,
+      ),
+    );
+
+    expect(response.headers.get("content-disposition")).toContain(
+      "jw-tennis-club-2026-07-final-v2.pdf",
+    );
+    expect(mocks.renderMonthlyReportPdf).toHaveBeenCalledWith(
+      expect.objectContaining({
+        closingLabel: "최종 마감 v2 · 재개됨",
+      }),
+    );
   });
 
   it("requires an authenticated user", async () => {
     mocks.setAuthenticated(false);
 
     const response = await GET(
-      new Request("http://localhost/reports/monthly?month=2026-07"),
+      new NextRequest(
+        `http://localhost/reports/monthly?snapshot=${closingId}`,
+      ),
     );
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost/login");
-    expect(mocks.supabase.from).not.toHaveBeenCalled();
-  });
-
-  it("rejects report generation before the next month begins in Seoul", async () => {
-    vi.setSystemTime(new Date("2026-07-31T14:59:59.000Z"));
-
-    const response = await GET(
-      new Request("http://localhost/reports/monthly?month=2026-07"),
-    );
-
-    expect(response.status).toBe(403);
-    expect(await response.text()).toBe("이 월의 PDF 생성 기간이 아직 시작되지 않았습니다.");
-    expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
     expect(mocks.supabase.rpc).not.toHaveBeenCalled();
   });
 
-  it("returns a controlled response when no active closing exists", async () => {
-    mocks.setClosingResult({ data: null, error: null });
+  it.each([
+    ["a missing snapshot", "http://localhost/reports/monthly"],
+    ["a blank snapshot", "http://localhost/reports/monthly?snapshot="],
+    [
+      "duplicate snapshots",
+      `http://localhost/reports/monthly?snapshot=${closingId}&snapshot=${finalClosingId}`,
+    ],
+    [
+      "an invalid snapshot",
+      "http://localhost/reports/monthly?snapshot=not-a-uuid",
+    ],
+  ])("returns 400 for %s", async (_, url) => {
+    const response = await GET(new NextRequest(url));
 
-    const response = await GET(
-      new Request("http://localhost/reports/monthly?month=2026-07"),
-    );
-
-    expect(response.status).toBe(404);
-    expect(await response.text()).toBe("마감된 월별 정산을 찾을 수 없습니다.");
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe("결산 스냅샷 식별자가 올바르지 않습니다.");
+    expect(mocks.supabase.rpc).not.toHaveBeenCalled();
     expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
   });
 
-  it("does not return a PDF when the atomic closing verification and audit RPC fails", async () => {
-    mocks.setGenerationAuditResult({ error: { message: "closing reopened" } });
+  it("returns 404 when the exact snapshot no longer exists", async () => {
+    mocks.setReportGenerationResult({
+      data: null,
+      error: { code: "P0002", message: "monthly settlement closing not found" },
+    });
 
     const response = await GET(
-      new Request("http://localhost/reports/monthly?month=2026-07"),
+      new NextRequest(
+        `http://localhost/reports/monthly?snapshot=${closingId}`,
+      ),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe("결산 스냅샷을 찾을 수 없습니다.");
+    expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
+  });
+
+  it("returns a controlled 500 when the atomic audit fails", async () => {
+    mocks.setReportGenerationResult({
+      data: null,
+      error: { code: "42501", message: "raw database permission failure" },
+    });
+
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/reports/monthly?snapshot=${closingId}`,
+      ),
     );
 
     expect(response.status).toBe(500);
-    expect(response.headers.get("content-type")).not.toBe("application/pdf");
-    expect(await response.text()).toBe("PDF 생성 기록을 저장하지 못했습니다.");
+    const responseText = await response.text();
+    expect(responseText).toBe("PDF 생성 기록을 저장하지 못했습니다.");
+    expect(responseText).not.toContain("raw database permission failure");
+    expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
+  });
+
+  it("keeps a rejected audit request private", async () => {
+    mocks.rejectReportGeneration(new Error("raw transport failure"));
+
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/reports/monthly?snapshot=${closingId}`,
+      ),
+    );
+
+    expect(response.status).toBe(500);
+    const responseText = await response.text();
+    expect(responseText).toBe("PDF 생성 기록을 저장하지 못했습니다.");
+    expect(responseText).not.toContain("raw transport failure");
+    expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
+  });
+
+  it("returns a controlled 500 when the audited closing DTO is malformed", async () => {
+    mocks.setReportGenerationResult({
+      data: { ...interimClosing, closing_kind: "draft" },
+      error: null,
+    });
+
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/reports/monthly?snapshot=${closingId}`,
+      ),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("마감 결산 데이터를 확인하지 못했습니다.");
+    expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
+  });
+
+  it("rejects an audited DTO whose UUID does not match the requested snapshot", async () => {
+    mocks.setReportGenerationResult({
+      data: reopenedFinalClosing,
+      error: null,
+    });
+
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/reports/monthly?snapshot=${closingId}`,
+      ),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("마감 결산 데이터를 확인하지 못했습니다.");
+    expect(mocks.renderMonthlyReportPdf).not.toHaveBeenCalled();
   });
 });

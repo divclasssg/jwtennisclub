@@ -45,6 +45,16 @@ const styles = StyleSheet.create({
     color: "#666666",
     fontSize: 9,
   },
+  metaRow: {
+    display: "flex",
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  metaItem: {
+    color: "#666666",
+    fontSize: 9,
+  },
   section: {
     marginBottom: 18,
   },
@@ -127,6 +137,14 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
   );
 }
 
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <Text style={styles.metaItem}>
+      {label} {value}
+    </Text>
+  );
+}
+
 export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
   const hasNoFeeTargets = report.feeTargetCount === 0;
 
@@ -134,9 +152,11 @@ export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
     <Document title={report.title}>
       <Page size="A4" style={styles.page}>
         <Text style={styles.title}>{report.title}</Text>
-        <Text style={styles.meta}>
-          마감 버전 v{report.closingVersion} · 마감일 {report.closedAtLabel} · 마감 처리자 {report.closedBy}
-        </Text>
+        <View style={styles.metaRow}>
+          <MetaItem label="결산 구분" value={report.closingLabel} />
+          <MetaItem label="결산일" value={report.closedAtLabel} />
+          <MetaItem label="결산 처리자" value={report.closedBy} />
+        </View>
         <Text style={styles.meta}>
           PDF 생성일 {report.generatedAtLabel} · 생성자 {report.generatedBy}
         </Text>

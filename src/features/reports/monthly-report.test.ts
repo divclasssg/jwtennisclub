@@ -3,16 +3,18 @@ import type { MonthlySettlementClosing } from "@/features/settlements/settlement
 import {
   buildMonthlyReportData,
   formatReportFileName,
-  normalizeReportFilters,
+  normalizeReportSnapshotId,
 } from "./monthly-report";
 
-const closing: MonthlySettlementClosing = {
+const interimClosing: MonthlySettlementClosing = {
   id: "f0331b6c-99e0-4d6b-ab47-6e0d3ae57c00",
   periodMonth: "2026-07-01",
-  version: 2,
+  closingKind: "interim",
+  version: 1,
   status: "closed",
   closedAt: "2026-08-02T03:04:05.000Z",
   closedBy: "김마감",
+  reopenedAt: null,
   snapshot: {
     schemaVersion: 1,
     periodMonth: "2026-07-01",
@@ -52,32 +54,45 @@ const closing: MonthlySettlementClosing = {
   },
 };
 
-describe("normalizeReportFilters", () => {
-  it("normalizes a report month query to the first day of the month", () => {
-    expect(normalizeReportFilters({ month: "2026-07" }, "2026-08-01")).toEqual({
-      periodMonth: "2026-07-01",
-    });
+const reopenedFinalClosing: MonthlySettlementClosing = {
+  ...interimClosing,
+  id: "a0331b6c-99e0-4d6b-ab47-6e0d3ae57c00",
+  closingKind: "final",
+  version: 2,
+  status: "reopened",
+  reopenedAt: "2026-08-03T03:04:05.000Z",
+};
+
+describe("normalizeReportSnapshotId", () => {
+  it("accepts one exact UUID snapshot identity", () => {
+    expect(normalizeReportSnapshotId(interimClosing.id)).toBe(interimClosing.id);
   });
 
-  it("falls back when the report month is invalid", () => {
-    expect(normalizeReportFilters({ month: "invalid" }, "2026-07-01")).toEqual({
-      periodMonth: "2026-07-01",
-    });
+  it.each([
+    ["an array", [interimClosing.id]],
+    ["a missing value", undefined],
+    ["a blank value", "  "],
+    ["an invalid UUID", "not-a-uuid"],
+  ])("rejects %s", (_, value) => {
+    expect(normalizeReportSnapshotId(value)).toBeNull();
   });
 });
 
 describe("buildMonthlyReportData", () => {
-  it("maps only immutable closing metadata and the public snapshot", () => {
+  it("labels an immutable interim closing and maps only its public snapshot", () => {
     const report = buildMonthlyReportData({
-      closing,
+      closing: interimClosing,
       generatedAt: new Date("2026-08-03T12:00:00Z"),
       generatedBy: "김생성",
     });
 
     expect(report).toEqual({
-      title: "2026년 7월 테니스 클럽 월간 정산 보고서",
+      title: "2026년 7월 테니스 클럽 월간 결산 보고서",
       periodLabel: "2026.07",
-      closingVersion: 2,
+      closingKind: "interim",
+      closingStatus: "closed",
+      closingLabel: "중간 결산 v1",
+      closingVersion: 1,
       closedAtLabel: "2026.08.02",
       closedBy: "김마감",
       generatedAtLabel: "2026.08.03",
@@ -115,11 +130,26 @@ describe("buildMonthlyReportData", () => {
         },
       ],
     });
+
+    expect(report.title).toContain("월간 결산 보고서");
+    expect(report.closingLabel).toBe("중간 결산 v1");
+  });
+
+  it("labels a reopened final closing without changing its exact snapshot", () => {
+    const reopenedReport = buildMonthlyReportData({
+      closing: reopenedFinalClosing,
+      generatedAt: new Date("2026-08-03T12:00:00Z"),
+      generatedBy: "김생성",
+    });
+
+    expect(reopenedReport.closingKind).toBe("final");
+    expect(reopenedReport.closingStatus).toBe("reopened");
+    expect(reopenedReport.closingLabel).toBe("최종 마감 v2 · 재개됨");
   });
 
   it("does not expose private member, payment, receipt, or memo data", () => {
     const report = buildMonthlyReportData({
-      closing,
+      closing: interimClosing,
       generatedAt: new Date("2026-08-03T12:00:00Z"),
       generatedBy: "김생성",
     });
@@ -133,9 +163,15 @@ describe("buildMonthlyReportData", () => {
 });
 
 describe("formatReportFileName", () => {
-  it("uses the report month in a stable filename", () => {
-    expect(formatReportFileName("2026-07-01")).toBe(
-      "jw-tennis-club-2026-07-report.pdf",
+  it("identifies an interim closing by kind and version", () => {
+    expect(formatReportFileName("2026-07-01", "interim", 1)).toBe(
+      "jw-tennis-club-2026-07-interim-v1.pdf",
+    );
+  });
+
+  it("identifies a final closing by kind and version", () => {
+    expect(formatReportFileName("2026-07-01", "final", 2)).toBe(
+      "jw-tennis-club-2026-07-final-v2.pdf",
     );
   });
 });

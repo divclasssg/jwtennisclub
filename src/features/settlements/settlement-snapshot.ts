@@ -334,6 +334,17 @@ export function parseMonthlySettlementPage(value: unknown): MonthlySettlementPag
   };
 }
 
+export function parseMonthlySettlementClosing(
+  value: unknown,
+): MonthlySettlementClosing {
+  const parsed = databaseClosingSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error(PARSE_ERROR_MESSAGE);
+  }
+
+  return mapClosing(parsed.data);
+}
+
 function mapSnapshot(
   value: z.infer<typeof databaseSnapshotSchema>,
 ): MonthlySettlementSnapshot {

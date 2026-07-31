@@ -12,8 +12,11 @@ const execFileAsync = promisify(execFile);
 const KOREAN_GLYPH_PROBE = ["가", "나", "다", "라", "마", "바", "사", "아"];
 
 const report = {
-  title: "2026년 7월 테니스 클럽 월간 정산 보고서",
+  title: "2026년 7월 테니스 클럽 월간 결산 보고서",
   periodLabel: "2026.07",
+  closingKind: "final" as const,
+  closingStatus: "reopened" as const,
+  closingLabel: "최종 마감 v2 · 재개됨",
   closingVersion: 2,
   closedAtLabel: "2026.08.02",
   closedBy: "김마감",
@@ -57,9 +60,10 @@ describe("renderMonthlyReportPdf", () => {
     expect(darkPixelCounts.notices).toBeGreaterThan(500);
 
     const text = await extractPdfText(pdf);
-    expect(text).toContain("마감 버전");
-    expect(text).toContain("마감일");
-    expect(text).toContain("마감 처리자");
+    expect(text).toContain("결산 구분");
+    expect(text).toContain("최종 마감 v2 · 재개됨");
+    expect(text).toContain("결산일");
+    expect(text).toContain("결산 처리자");
     expect(text).toContain("PDF 생성일");
     expect(text).toContain("생성자");
     expect(text).toContain("월말 활동 회원");
@@ -80,6 +84,7 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).not.toContain("주요 지출 내역");
     expect(text).toContain("회비는 귀속월 기준이며 지출은 사용일 기준입니다.");
     expect(text).toContain("개별 납부 내역");
+    expect(text).not.toContain("정산");
   }, PDF_RENDER_TIMEOUT_MS);
 
   it("omits only the adjustment income card when its value is zero", async () => {
