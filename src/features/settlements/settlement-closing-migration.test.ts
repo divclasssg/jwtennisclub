@@ -9,6 +9,9 @@ const migrationPaths = [
 const additiveMigrationSql = existsSync(migrationPaths[1])
   ? readFileSync(migrationPaths[1], "utf8").toLowerCase()
   : "";
+const executableAdditiveMigrationSql = additiveMigrationSql
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/--.*$/gm, "");
 const migrationSql = migrationPaths
   .filter((path) => existsSync(path))
   .map((path) => readFileSync(path, "utf8").toLowerCase())
@@ -39,14 +42,14 @@ describe("monthly settlement closing migration", () => {
       "create type public.monthly_closing_status as enum ('closed', 'reopened')",
     );
     expect(migrationSql).toContain("create table public.monthly_closings");
-    expect(additiveMigrationSql).toContain(
-      "drop constraint monthly_closings_period_month_version_key",
+    expect(executableAdditiveMigrationSql).toMatch(
+      /alter table public\.monthly_closings\s+drop constraint monthly_closings_period_month_version_key\s*;/,
     );
     expect(additiveMigrationSql).toContain(
       "unique (period_month, closing_kind, version)",
     );
-    expect(additiveMigrationSql).toContain(
-      "drop index public.monthly_closings_one_active_month_idx",
+    expect(executableAdditiveMigrationSql).toMatch(
+      /drop index public\.monthly_closings_one_active_month_idx\s*;/,
     );
     expect(additiveMigrationSql).toMatch(
       /create unique index monthly_closings_one_active_final_month_idx\s+on public\.monthly_closings\s*\(period_month\)\s*where closing_kind = 'final' and status = 'closed'/,
@@ -311,7 +314,7 @@ describe("monthly settlement closing migration", () => {
       /public\.build_monthly_settlement_snapshot\(\s*normalized_period_month\s*\)/,
     );
     expect(close).toMatch(
-      /select coalesce\(max\(closings\.version\), 0\) \+ 1\s+into next_version\s+from public\.monthly_closings as closings\s+where closings\.period_month = normalized_period_month\s+and closings\.closing_kind = 'final'/,
+      /select coalesce\(max\(closings\.version\), 0\) \+ 1\s+into next_version\s+from public\.monthly_closings as closings\s+where closings\.period_month = normalized_period_month\s+and closings\.closing_kind = 'final'\s*;/,
     );
   });
 

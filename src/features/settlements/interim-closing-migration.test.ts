@@ -10,6 +10,14 @@ const sql = existsSync(migrationPath)
   ? readFileSync(migrationPath, "utf8").toLowerCase()
   : "";
 
+function stripSqlComments(source: string) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/--.*$/gm, "");
+}
+
+const executableSql = stripSqlComments(sql);
+
 function functionBody(functionName: string) {
   const start = sql.indexOf(
     `create or replace function public.${functionName}`,
@@ -29,14 +37,14 @@ describe("interim monthly settlement closing migration", () => {
     expect(sql).toContain(
       "add column closing_kind public.monthly_closing_kind not null default 'final'",
     );
-    expect(sql).toContain(
-      "drop constraint monthly_closings_period_month_version_key",
+    expect(executableSql).toMatch(
+      /alter table public\.monthly_closings\s+drop constraint monthly_closings_period_month_version_key\s*;/,
     );
     expect(sql).toContain(
       "unique (period_month, closing_kind, version)",
     );
-    expect(sql).toContain(
-      "drop index public.monthly_closings_one_active_month_idx",
+    expect(executableSql).toMatch(
+      /drop index public\.monthly_closings_one_active_month_idx\s*;/,
     );
     expect(sql).toContain(
       "where closing_kind = 'final' and status = 'closed'",
@@ -68,7 +76,7 @@ describe("interim monthly settlement closing migration", () => {
       "monthly_settlement.interim_created",
     );
     expect(interim).toMatch(
-      /select coalesce\(max\(closings\.version\), 0\) \+ 1\s+into next_version\s+from public\.monthly_closings as closings\s+where closings\.period_month = normalized_period_month\s+and closings\.closing_kind = 'interim'/,
+      /select coalesce\(max\(closings\.version\), 0\) \+ 1\s+into next_version\s+from public\.monthly_closings as closings\s+where closings\.period_month = normalized_period_month\s+and closings\.closing_kind = 'interim'\s*;/,
     );
     expect(interim).toContain("profiles.status = 'active'");
     expect(interim).toContain("pg_advisory_xact_lock");
@@ -97,7 +105,7 @@ describe("interim monthly settlement closing migration", () => {
       "normalized_period_month >= current_period_month",
     );
     expect(finalClose).toMatch(
-      /select coalesce\(max\(closings\.version\), 0\) \+ 1\s+into next_version\s+from public\.monthly_closings as closings\s+where closings\.period_month = normalized_period_month\s+and closings\.closing_kind = 'final'/,
+      /select coalesce\(max\(closings\.version\), 0\) \+ 1\s+into next_version\s+from public\.monthly_closings as closings\s+where closings\.period_month = normalized_period_month\s+and closings\.closing_kind = 'final'\s*;/,
     );
   });
 
