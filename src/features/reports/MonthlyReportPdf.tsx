@@ -29,213 +29,227 @@ Font.register({
 
 const styles = StyleSheet.create({
   page: {
-    padding: 36,
-    color: "#1d1d1f",
+    paddingHorizontal: 72,
+    paddingVertical: 54,
+    color: "#000000",
     fontFamily: "IBM Plex Sans KR",
-    fontSize: 10,
-    fontWeight: 400,
-    lineHeight: 1.5,
-  },
-  title: {
-    marginBottom: 8,
-    fontSize: 20,
-  },
-  meta: {
-    marginBottom: 8,
-    color: "#666666",
     fontSize: 9,
+    fontWeight: 400,
+    lineHeight: 1.4,
   },
-  metaRow: {
+  header: {
     display: "flex",
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 8,
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
-  metaItem: {
-    color: "#666666",
-    fontSize: 9,
+  clubName: {
+    fontSize: 14,
+  },
+  reportTitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  period: {
+    fontSize: 10,
+    marginTop: 4,
+  },
+  metaColumn: {
+    display: "flex",
+    alignItems: "flex-end",
+    fontSize: 8.5,
+    lineHeight: 1.4,
   },
   section: {
-    marginBottom: 18,
+    marginBottom: 14,
   },
   sectionTitle: {
-    marginBottom: 8,
-    fontSize: 13,
-  },
-  summaryGrid: {
-    display: "flex",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  summaryCard: {
-    flexGrow: 1,
-    flexBasis: "22%",
-    padding: 10,
-    border: "1 solid #e0e0e0",
-  },
-  summaryLabel: {
     marginBottom: 4,
-    color: "#666666",
-    fontSize: 9,
-  },
-  summaryValue: {
     fontSize: 12,
   },
-  table: {
-    border: "1 solid #e0e0e0",
-  },
-  row: {
+  ledgerRow: {
     display: "flex",
     flexDirection: "row",
-    borderBottom: "1 solid #eeeeee",
+    justifyContent: "space-between",
+    paddingVertical: 2,
   },
-  headerCell: {
-    padding: 7,
-    backgroundColor: "#f5f5f7",
-    color: "#666666",
+  rowLabel: {
     fontSize: 9,
   },
-  cell: {
-    padding: 7,
+  rowValue: {
     fontSize: 9,
+    textAlign: "right",
   },
-  categoryColumn: {
-    width: "40%",
+  totalRow: {
+    borderBottom: "0.5 solid #1d1d1f",
+    borderTop: "0.5 solid #1d1d1f",
+    marginTop: 2,
+    paddingVertical: 4,
   },
-  countColumn: {
-    width: "20%",
+  totalLabel: {
+    fontSize: 10,
   },
-  amountColumn: {
-    width: "40%",
+  totalValue: {
+    fontSize: 10,
+    textAlign: "right",
+  },
+  expenseHeader: {
+    display: "flex",
+    flexDirection: "row",
+    borderBottom: "0.5 solid #1d1d1f",
+    paddingBottom: 3,
+  },
+  expenseDetailRow: {
+    display: "flex",
+    flexDirection: "row",
+    paddingVertical: 3,
   },
   dateColumn: {
-    width: "22%",
+    width: "21%",
   },
   expenseCategoryColumn: {
-    width: "20%",
+    width: "19%",
   },
   descriptionColumn: {
-    width: "36%",
+    width: "38%",
   },
   expenseAmountColumn: {
     width: "22%",
+    textAlign: "right",
   },
   notice: {
-    marginTop: 10,
-    color: "#666666",
-    fontSize: 8,
+    fontSize: 8.5,
+    lineHeight: 1.4,
+    marginTop: 4,
   },
 });
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+function LedgerRow({
+  label,
+  value,
+  total = false,
+}: {
+  label: string;
+  value: string;
+  total?: boolean;
+}) {
   return (
-    <View style={styles.summaryCard}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryValue}>{value}</Text>
+    <View style={total ? [styles.ledgerRow, styles.totalRow] : styles.ledgerRow} wrap={false}>
+      <Text style={total ? styles.totalLabel : styles.rowLabel}>{label}</Text>
+      <Text style={total ? styles.totalValue : styles.rowValue}>{value}</Text>
     </View>
   );
 }
 
-function MetaItem({ label, value }: { label: string; value: string }) {
-  return (
-    <Text style={styles.metaItem}>
-      {label} {value}
-    </Text>
-  );
+function SectionTitle({ children }: { children: string }) {
+  return <Text style={styles.sectionTitle}>{children}</Text>;
 }
 
 export function MonthlyReportPdf({ report }: { report: MonthlyReportData }) {
-  const hasNoFeeTargets = report.feeTargetCount === 0;
-
   return (
     <Document title={report.title}>
       <Page size="A4" style={styles.page}>
-        <Text style={styles.title}>{report.title}</Text>
-        <View style={styles.metaRow}>
-          <MetaItem label="결산 구분" value={report.closingLabel} />
-          <MetaItem label="결산일" value={report.closedAtLabel} />
-          <MetaItem label="결산 처리자" value={report.closedBy} />
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.clubName}>JW TENNIS CLUB</Text>
+            <Text style={styles.reportTitle}>월간 결산 보고서</Text>
+            <Text style={styles.period}>{report.periodLabel}</Text>
+          </View>
+          <View style={styles.metaColumn}>
+            <Text>{report.closingLabel}</Text>
+            <Text>결산일 {report.closedAtLabel}</Text>
+            <Text>결산 처리자 {report.closedBy}</Text>
+            <Text>PDF 생성일 {report.generatedAtLabel}</Text>
+            <Text>생성자 {report.generatedBy}</Text>
+          </View>
         </View>
-        <Text style={styles.meta}>
-          PDF 생성일 {report.generatedAtLabel} · 생성자 {report.generatedBy}
-        </Text>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>회원 및 회비 현황</Text>
-          <View style={styles.summaryGrid}>
-            <SummaryCard label="월말 활동 회원" value={`${report.activityMemberCount}명`} />
-            <SummaryCard label="회비 부과 대상" value={`${report.feeTargetCount}명`} />
-            <SummaryCard label="완납 회원" value={`${report.fullyPaidCount}명`} />
-            <SummaryCard label="미납 회원" value={`${report.unpaidCount}명`} />
-          </View>
-          {hasNoFeeTargets ? (
-            <Text style={styles.notice}>해당 월 회비 부과 대상 회원이 없습니다.</Text>
+          <SectionTitle>회원 현황</SectionTitle>
+          <LedgerRow label="활동 회원" value={`${report.activityMemberCount}명`} />
+          <LedgerRow label="회비 부과 대상" value={`${report.feeTargetCount}명`} />
+          <LedgerRow label="완납 회원" value={`${report.fullyPaidCount}명`} />
+          <LedgerRow label="미납 회원" value={`${report.unpaidCount}명`} />
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>수입</SectionTitle>
+          <LedgerRow label="총 청구액" value={`${formatCurrency(report.billedTotal)}원`} />
+          <LedgerRow label="실제 회비 수납액" value={`${formatCurrency(report.actualFeeIncome)}원`} />
+          <LedgerRow label="인정 납부액" value={`${formatCurrency(report.recognizedPaidTotal)}원`} />
+          {report.adjustmentIncome !== 0 ? (
+            <LedgerRow label="조정 수납액" value={`${formatCurrency(report.adjustmentIncome)}원`} />
           ) : null}
+          <LedgerRow
+            label={`미납액 (${report.unpaidCount}명)`}
+            value={`${formatCurrency(report.unpaidTotal)}원`}
+          />
+          <LedgerRow
+            label="수입 합계"
+            value={`${formatCurrency(report.actualFeeIncome)}원`}
+            total
+          />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>회비 및 지출 현황</Text>
-          <View style={styles.summaryGrid}>
-            <SummaryCard label="총 청구액" value={`${formatCurrency(report.billedTotal)}원`} />
-            <SummaryCard label="실제 회비 수납액" value={`${formatCurrency(report.actualFeeIncome)}원`} />
-            <SummaryCard label="인정 납부액" value={`${formatCurrency(report.recognizedPaidTotal)}원`} />
-            {report.adjustmentIncome !== 0 ? (
-              <SummaryCard label="조정 수납액" value={`${formatCurrency(report.adjustmentIncome)}원`} />
-            ) : null}
-            <SummaryCard label="미납액" value={`${formatCurrency(report.unpaidTotal)}원`} />
-            <SummaryCard label="운영 지출" value={`${formatCurrency(report.expenseTotal)}원`} />
-            <SummaryCard label="당월 귀속 수지" value={formatSettlementBalance(report.attributedNet)} />
-            <SummaryCard label="기초 장부 잔액" value={formatSettlementBalance(report.openingLedgerBalance)} />
-            <SummaryCard label="기말 장부 잔액" value={formatSettlementBalance(report.closingLedgerBalance)} />
+          <SectionTitle>지출</SectionTitle>
+          {report.expenseCategoryRows.map((row) => (
+            <LedgerRow
+              key={row.category}
+              label={`${formatExpenseCategory(row.category)} (${row.count}건)`}
+              value={`${formatCurrency(row.amount)}원`}
+            />
+          ))}
+          <LedgerRow
+            label="지출 합계"
+            value={`${formatCurrency(report.expenseTotal)}원`}
+            total
+          />
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>잔액</SectionTitle>
+          <LedgerRow
+            label="기초 장부 잔액"
+            value={formatSettlementBalance(report.openingLedgerBalance)}
+          />
+          <LedgerRow label="당월 귀속 수지" value={formatSettlementBalance(report.attributedNet)} />
+          <LedgerRow
+            label="기말 장부 잔액"
+            value={formatSettlementBalance(report.closingLedgerBalance)}
+            total
+          />
+          <Text style={styles.notice}>
+            기초 장부 잔액 + 당월 귀속 수지 = 기말 장부 잔액
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>지출 상세</SectionTitle>
+          <View style={styles.expenseHeader}>
+            <Text style={[styles.rowLabel, styles.dateColumn]}>사용일</Text>
+            <Text style={[styles.rowLabel, styles.expenseCategoryColumn]}>카테고리</Text>
+            <Text style={[styles.rowLabel, styles.descriptionColumn]}>내용</Text>
+            <Text style={[styles.rowLabel, styles.expenseAmountColumn]}>금액</Text>
           </View>
-          <Text style={styles.notice}>운영 지출 {report.expenseCount}건</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>카테고리별 지출</Text>
-          <View style={styles.table}>
-            <View style={styles.row}>
-              <Text style={[styles.headerCell, styles.categoryColumn]}>카테고리</Text>
-              <Text style={[styles.headerCell, styles.countColumn]}>건수</Text>
-              <Text style={[styles.headerCell, styles.amountColumn]}>금액</Text>
+          {report.expenseRows.map((row) => (
+            <View
+              key={`${row.expenseDate}-${row.categoryLabel}-${row.description}`}
+              style={styles.expenseDetailRow}
+              wrap={false}
+            >
+              <Text style={[styles.rowLabel, styles.dateColumn]}>{row.expenseDate}</Text>
+              <Text style={[styles.rowLabel, styles.expenseCategoryColumn]}>{row.categoryLabel}</Text>
+              <Text style={[styles.rowLabel, styles.descriptionColumn]}>{row.description}</Text>
+              <Text style={[styles.rowLabel, styles.expenseAmountColumn]}>
+                {formatCurrency(row.amount)}원
+              </Text>
             </View>
-            {report.expenseCategoryRows.map((row) => (
-              <View key={row.category} style={styles.row}>
-                <Text style={[styles.cell, styles.categoryColumn]}>
-                  {formatExpenseCategory(row.category)}
-                </Text>
-                <Text style={[styles.cell, styles.countColumn]}>{row.count}건</Text>
-                <Text style={[styles.cell, styles.amountColumn]}>
-                  {formatCurrency(row.amount)}원
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>지출 내역</Text>
-          <View style={styles.table}>
-            <View style={styles.row}>
-              <Text style={[styles.headerCell, styles.dateColumn]}>사용일</Text>
-              <Text style={[styles.headerCell, styles.expenseCategoryColumn]}>카테고리</Text>
-              <Text style={[styles.headerCell, styles.descriptionColumn]}>내용</Text>
-              <Text style={[styles.headerCell, styles.expenseAmountColumn]}>금액</Text>
-            </View>
-            {report.expenseRows.map((row) => (
-              <View key={`${row.expenseDate}-${row.categoryLabel}-${row.description}`} style={styles.row}>
-                <Text style={[styles.cell, styles.dateColumn]}>{row.expenseDate}</Text>
-                <Text style={[styles.cell, styles.expenseCategoryColumn]}>{row.categoryLabel}</Text>
-                <Text style={[styles.cell, styles.descriptionColumn]}>{row.description}</Text>
-                <Text style={[styles.cell, styles.expenseAmountColumn]}>{formatCurrency(row.amount)}원</Text>
-              </View>
-            ))}
-          </View>
+          ))}
         </View>
 
         <Text style={styles.notice}>
-          회비는 귀속월 기준이며 지출은 사용일 기준입니다. 당월 귀속 수지는 실제 회비 수납액에서 운영 지출을 뺀 금액입니다.
+          회비는 귀속월 기준이며 지출은 사용일 기준입니다.
         </Text>
         <Text style={styles.notice}>
           이 보고서는 회원 공유용으로 개별 납부 내역, 미납 회원명, 영수증 원본, 내부 메모를 포함하지 않습니다.

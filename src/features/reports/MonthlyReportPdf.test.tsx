@@ -48,19 +48,27 @@ const report = {
 };
 
 describe("renderMonthlyReportPdf", () => {
-  it("renders every public snapshot label and renamed expense section", async () => {
+  it("renders the public ledger report without private settlement details", async () => {
     const pdf = await renderMonthlyReportPdf(report);
 
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
     const darkPixelCounts = await getRenderedDarkPixelCounts(pdf);
-    expect(darkPixelCounts.titleAndMeta).toBeGreaterThan(500);
-    expect(darkPixelCounts.memberCards).toBeGreaterThan(300);
-    expect(darkPixelCounts.feeCards).toBeGreaterThan(1000);
-    expect(darkPixelCounts.tables).toBeGreaterThan(1000);
-    expect(darkPixelCounts.notices).toBeGreaterThan(500);
+    expect(darkPixelCounts.header).toBeGreaterThan(0);
+    expect(darkPixelCounts.ledger).toBeGreaterThan(0);
+    expect(darkPixelCounts.expenseDetails).toBeGreaterThan(0);
+    expect(darkPixelCounts.footer).toBeGreaterThan(0);
 
     const text = await extractPdfText(pdf);
-    expect(text).toContain("결산 구분");
+    expect(text).toContain("JW TENNIS CLUB");
+    expect(text).toContain("월간 결산 보고서");
+    expect(text).toContain("회원 현황");
+    expect(text).toContain("수입");
+    expect(text).toContain("수입 합계");
+    expect(text).toContain("지출");
+    expect(text).toContain("지출 합계");
+    expect(text).toContain("잔액");
+    expect(text).toContain("기말 장부 잔액");
+    expect(text).toContain("지출 상세");
     expect(text).toContain("최종 마감 v2 · 재개됨");
     expect(text).toContain("결산일");
     expect(text).toContain("2026.08.02 12:04:05");
@@ -68,7 +76,7 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).toContain("PDF 생성일");
     expect(text).toContain("2026.08.03 21:00:00");
     expect(text).toContain("생성자");
-    expect(text).toContain("월말 활동 회원");
+    expect(text).toContain("활동 회원");
     expect(text).toContain("회비 부과 대상");
     expect(text).toContain("완납 회원");
     expect(text).toContain("미납 회원");
@@ -77,15 +85,15 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).toContain("인정 납부액");
     expect(text).toContain("조정 수납액");
     expect(text).toContain("미납액");
-    expect(text).toContain("운영 지출");
+    expect(text).toContain("지출 합계");
     expect(text).toContain("당월 귀속 수지");
     expect(text).toContain("기초 장부 잔액");
     expect(text).toContain("기말 장부 잔액");
-    expect(text).toContain("카테고리별 지출");
-    expect(text).toContain("지출 내역");
-    expect(text).not.toContain("주요 지출 내역");
+    expect(text).toContain("지출 상세");
     expect(text).toContain("회비는 귀속월 기준이며 지출은 사용일 기준입니다.");
     expect(text).toContain("개별 납부 내역");
+    expect(text).not.toContain("문의사항");
+    expect(text).not.toContain("010-");
     expect(text).not.toContain("정산");
   }, PDF_RENDER_TIMEOUT_MS);
 
@@ -96,7 +104,7 @@ describe("renderMonthlyReportPdf", () => {
     expect(text).not.toContain("조정 수납액");
     expect(text).toContain("인정 납부액");
     expect(text).toContain("미납액");
-    expect(text).toContain("운영 지출");
+    expect(text).toContain("지출 합계");
   }, PDF_RENDER_TIMEOUT_MS);
 
   it("renders distinct Korean glyph shapes instead of repeated tofu boxes", async () => {
@@ -144,11 +152,10 @@ async function getRenderedDarkPixelCounts(pdf: Buffer) {
   const { ppm, pixelStart, width } = await renderFirstPageToPpm(pdf);
 
   return {
-    titleAndMeta: countDarkPixels(ppm, pixelStart, width, 50, 180),
-    memberCards: countDarkPixels(ppm, pixelStart, width, 180, 320),
-    feeCards: countDarkPixels(ppm, pixelStart, width, 320, 620),
-    tables: countDarkPixels(ppm, pixelStart, width, 620, 1200),
-    notices: countDarkPixels(ppm, pixelStart, width, 1200, 1500),
+    header: countDarkPixels(ppm, pixelStart, width, 50, 300),
+    ledger: countDarkPixels(ppm, pixelStart, width, 250, 800),
+    expenseDetails: countDarkPixels(ppm, pixelStart, width, 800, 1_250),
+    footer: countDarkPixels(ppm, pixelStart, width, 1_200, 1_500),
   };
 }
 
