@@ -2,16 +2,20 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const migrationPath = join(
-  process.cwd(),
+const migrationPaths = [
   "supabase/migrations/202607300002_add_monthly_settlement_closings.sql",
-);
-const migrationSql = existsSync(migrationPath)
-  ? readFileSync(migrationPath, "utf8").toLowerCase()
+  "supabase/migrations/202607310001_add_interim_monthly_closings.sql",
+].map((path) => join(process.cwd(), path));
+const additiveMigrationSql = existsSync(migrationPaths[1])
+  ? readFileSync(migrationPaths[1], "utf8").toLowerCase()
   : "";
+const migrationSql = migrationPaths
+  .filter((path) => existsSync(path))
+  .map((path) => readFileSync(path, "utf8").toLowerCase())
+  .join("\n");
 
 function migrationFunctionBody(functionName: string) {
-  const start = migrationSql.indexOf(
+  const start = migrationSql.lastIndexOf(
     `create or replace function public.${functionName}`,
   );
   const end = migrationSql.indexOf("$$;", start);
@@ -274,11 +278,11 @@ describe("monthly settlement closing migration", () => {
     expect(activeClosingQuery).toBeGreaterThan(-1);
     expect(builderCall).toBeGreaterThan(activeClosingQuery);
     expect(page).toMatch(
-      /if active_closing is null then\s+preview_snapshot := public\.build_monthly_settlement_snapshot\([\s\S]*?\);\s+else\s+preview_snapshot := active_closing->'snapshot';\s+end if/,
+      /if active_final_closing is null then\s+preview_snapshot := public\.build_monthly_settlement_snapshot\([\s\S]*?\);\s+else\s+preview_snapshot := active_final_closing->'snapshot';\s+end if/,
     );
   });
 
-  it("closes only completed Seoul months under the exact permission and serializes the ledger chain", () => {
+  it("closes current or past Seoul months under the exact permission and serializes the final ledger chain", () => {
     const close = migrationFunctionBody("close_monthly_settlement");
 
     expect(close).toContain("public.has_permission('settlements.close')");
@@ -286,7 +290,10 @@ describe("monthly settlement closing migration", () => {
     expect(close).toContain("profiles.display_name");
     expect(close).toContain("closed_by_name");
     expect(close).toContain("at time zone 'asia/seoul'");
-    expect(close).toContain("current or future month cannot be closed");
+    expect(close).toContain("future month cannot be closed");
+    expect(close).toContain(
+      "normalized_period_month > current_period_month",
+    );
     expect(close).toContain("pg_advisory_xact_lock");
     expect(close).toContain("'monthly-settlement-chain'");
     expect(close).toContain(
@@ -299,6 +306,7 @@ describe("monthly settlement closing migration", () => {
       /public\.build_monthly_settlement_snapshot\(\s*normalized_period_month\s*\)/,
     );
     expect(close).toContain("coalesce(max(closings.version), 0) + 1");
+    expect(close).toContain("closings.closing_kind = 'final'");
   });
 
   it("rechecks and locks close authorization after every advisory and source-table wait", () => {
@@ -423,7 +431,7 @@ describe("monthly settlement closing migration", () => {
     }
   });
 
-  it("atomically locks the exact active closing and audits PDF generation before a response", () => {
+  it("atomically locks the exact immutable closing and audits PDF generation before returning its DTO", () => {
     const reportAudit = migrationFunctionBody("record_monthly_report_generation");
 
     expect(reportAudit).toContain("security definer");
@@ -431,34 +439,46 @@ describe("monthly settlement closing migration", () => {
     expect(reportAudit).toContain("profiles.id = auth.uid()");
     expect(reportAudit).toContain("profiles.status = 'active'");
     expect(reportAudit).toContain("closings.id = requested_closing_id");
-    expect(reportAudit).toContain("closings.period_month = requested_period_month");
-    expect(reportAudit).toContain("closings.version = requested_version");
-    expect(reportAudit).toContain("closings.status = 'closed'");
+    expect(reportAudit).toContain("closings.closing_kind = 'interim'");
+    expect(reportAudit).toContain("closings.closing_kind = 'final'");
+    expect(reportAudit).toContain(
+      "closings.status in ('closed', 'reopened')",
+    );
     expect(reportAudit).toContain("for update");
     expect(reportAudit).toContain("insert into public.audit_logs");
     expect(reportAudit).toContain("'monthly_report.generated'");
     expect(reportAudit).toContain("'period_month'");
+    expect(reportAudit).toContain("'closing_kind'");
     expect(reportAudit).toContain("'version'");
-    expect(reportAudit).toContain("return true");
+    expect(reportAudit).toContain("'status'");
+    expect(reportAudit).toContain("'snapshot'");
+    expect(reportAudit).not.toContain("return true");
   });
 
-  it("exposes only the four authenticated page, mutation, and PDF-audit RPCs", () => {
+  it("exposes only the five authenticated page, mutation, and exact PDF-audit RPCs", () => {
     for (const signature of [
       "get_monthly_settlement_page(date)",
+      "create_interim_monthly_settlement(date)",
       "close_monthly_settlement(date)",
       "reopen_monthly_settlement(date)",
-      "record_monthly_report_generation(uuid, date, integer)",
+      "record_monthly_report_generation(uuid)",
     ]) {
-      expect(migrationSql).toMatch(
+      expect(additiveMigrationSql).toMatch(
         new RegExp(
           `revoke execute on function public\\.${signature.replace(/[()]/g, "\\$&")}\\s+from public, anon(?:, authenticated, service_role)?`,
         ),
       );
-      expect(migrationSql).toMatch(
+      expect(additiveMigrationSql).toMatch(
         new RegExp(
           `grant execute on function public\\.${signature.replace(/[()]/g, "\\$&")}\\s+to authenticated`,
         ),
       );
     }
+    expect(additiveMigrationSql).toMatch(
+      /revoke execute on function public\.record_monthly_report_generation\(\s*uuid, date, integer\s*\)\s+from public, anon, authenticated, service_role/,
+    );
+    expect(additiveMigrationSql).toContain(
+      "drop function public.record_monthly_report_generation(uuid, date, integer)",
+    );
   });
 });
