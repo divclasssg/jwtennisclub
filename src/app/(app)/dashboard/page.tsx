@@ -6,7 +6,7 @@ const metrics = [
   { label: "회비 수입", value: "0원", note: "이번 달 입금 합계" },
   { label: "운영비 지출", value: "0원", note: "코트비, 공, 기타 비용" },
   { label: "미납 회원", value: "0명", note: "확인 대기" },
-  { label: "정산 상태", value: "진행 중", note: "월말 확정 전" },
+  { label: "결산 상태", value: "진행 중", note: "월말 확정 전" },
 ];
 
 const utilityItems = [
@@ -16,7 +16,7 @@ const utilityItems = [
     href: "/members",
   },
   {
-    label: "정산",
+    label: "결산",
     title: "월말 회비, 운영비, 잔액을 빠르게 대조",
     href: "/settlements",
   },
@@ -36,7 +36,7 @@ export default function DashboardPage() {
           <h1>이번 달 클럽 운영 상태</h1>
         </div>
         <p>
-          회원, 회비, 지출, 정산 흐름을 한 화면에서 확인할 수 있도록
+          회원, 회비, 지출, 결산 흐름을 한 화면에서 확인할 수 있도록
           foundation 화면을 준비했습니다.
         </p>
       </header>

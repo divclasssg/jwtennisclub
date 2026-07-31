@@ -175,7 +175,7 @@ describe("monthly settlement page parser", () => {
       parseMonthlySettlementPage(
         databasePage({ preview: databaseSnapshot(snapshotOverrides) }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects a malformed settlement month", () => {
@@ -183,7 +183,7 @@ describe("monthly settlement page parser", () => {
       parseMonthlySettlementPage(
         databasePage({ preview: databaseSnapshot({ period_month: "2026-07-12" }) }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects snapshot shapes that contain prohibited personal or internal data", () => {
@@ -193,7 +193,7 @@ describe("monthly settlement page parser", () => {
           preview: databaseSnapshot({ member_name: "홍길동" }),
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
 
     expect(() =>
       parseMonthlySettlementPage(
@@ -217,7 +217,7 @@ describe("monthly settlement page parser", () => {
           }),
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects a closing whose snapshot month does not match the preview month", () => {
@@ -248,7 +248,7 @@ describe("monthly settlement page parser", () => {
           ],
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects an interim closing that was reopened", () => {
@@ -264,7 +264,7 @@ describe("monthly settlement page parser", () => {
           ],
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects an active closing that is not final and closed", () => {
@@ -277,7 +277,7 @@ describe("monthly settlement page parser", () => {
           },
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects closing history with duplicate kind and version pairs", () => {
@@ -294,7 +294,7 @@ describe("monthly settlement page parser", () => {
           ],
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects closing history that is not ordered newest first", () => {
@@ -315,19 +315,19 @@ describe("monthly settlement page parser", () => {
           ],
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects a page that allows closing an already closed month", () => {
     expect(() =>
       parseMonthlySettlementPage(databasePage({ can_close: true })),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects a page that allows an interim closing after final closing", () => {
     expect(() =>
       parseMonthlySettlementPage(databasePage({ can_create_interim: true })),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects a page that allows reopening without an active closing", () => {
@@ -339,7 +339,7 @@ describe("monthly settlement page parser", () => {
           can_reopen: true,
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects settlement snapshots before the July 2026 ledger start", () => {
@@ -351,7 +351,7 @@ describe("monthly settlement page parser", () => {
           can_close: true,
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("requires July 2026 to start from a zero ledger balance", () => {
@@ -366,7 +366,7 @@ describe("monthly settlement page parser", () => {
           can_close: true,
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects expense rows outside the snapshot month", () => {
@@ -393,7 +393,7 @@ describe("monthly settlement page parser", () => {
           can_close: true,
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 
   it("rejects numeric values beyond JavaScript's safe integer range", () => {
@@ -407,7 +407,7 @@ describe("monthly settlement page parser", () => {
           can_close: true,
         }),
       ),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 });
 
@@ -418,7 +418,7 @@ describe("monthly settlement closing parser", () => {
         ...databasePage().closing_history[0],
         period_month: "2026-08-01",
       }),
-    ).toThrow("월별 정산 데이터 형식이 올바르지 않습니다.");
+    ).toThrow("월별 결산 데이터 형식이 올바르지 않습니다.");
   });
 });
 

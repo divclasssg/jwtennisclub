@@ -11,7 +11,7 @@ const notoSansKr = Noto_Sans_KR({
 
 export const metadata: Metadata = {
   title: "JW TENNIS CLUB 운영 관리",
-  description: "JW TENNIS CLUB 회원, 회비, 지출, 일정, 정산 운영 관리",
+  description: "JW TENNIS CLUB 회원, 회비, 지출, 일정, 결산 운영 관리",
 };
 
 export default function RootLayout({

@@ -10,7 +10,7 @@ const baseNavigationItems = [
     { href: "/fees", label: "회비" },
     { href: "/expenses", label: "지출" },
     { href: "/schedule", label: "일정" },
-    { href: "/settlements", label: "정산" },
+    { href: "/settlements", label: "결산" },
 ];
 
 type AppShellProps = {

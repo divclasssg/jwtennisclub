@@ -6,7 +6,7 @@ import {
 
 const SETTLEMENT_SCHEMA_VERSION = 1;
 const FIRST_LEDGER_MONTH = "2026-07-01";
-const PARSE_ERROR_MESSAGE = "월별 정산 데이터 형식이 올바르지 않습니다.";
+const PARSE_ERROR_MESSAGE = "월별 결산 데이터 형식이 올바르지 않습니다.";
 
 const calendarDateSchema = z.string().refine(isCalendarDate);
 const periodMonthSchema = calendarDateSchema.refine(
