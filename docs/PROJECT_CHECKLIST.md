@@ -89,6 +89,8 @@
 - [ ] 최종 `NOT NULL` 전에는 운영자 계정 생성과 확인된 활동 시작 월을 원자적으로 함께 받도록 자동 회원 생성 흐름 재설계
 - [ ] 2026년 7월을 기초 장부 잔액 0원으로 최초 마감한 뒤, 이후 월을 순서대로 마감
 - [ ] DB 적용 후 인증된 운영자 브라우저에서 회원·회비·정모·정산 마감/재개·PDF와 권한 경계 QA
+- [ ] 선행 마이그레이션·배포 게이트 확인 뒤 롤백 가능한 환경에 `202608010001_add_dashboard_page.sql`을 적용하고 활성 운영자 집계·개인정보 비노출·기존 결산 미리보기 일치·최종 마감 전용 추이·비활성/비인증 거부를 검증
+- [ ] 대시보드 RPC 배포 뒤 인증된 운영 데이터로 1440×900·375×812 프로덕션 대시보드와 네트워크 요청을 다시 QA
 - [x] 필요한 Supabase 환경 변수를 제공한 상태에서 프로덕션 빌드를 다시 실행해 통과
 - [x] Implement `docs/superpowers/plans/2026-07-13-club-meeting-attendance.md`
 - [x] Supabase에 `202607130002_add_club_meetings.sql` 적용
@@ -110,7 +112,7 @@
 - [x] Consolidate page titles into the shell sub navigation
 
 ## Deferred Work
-- [ ] Revisit and finalize the dashboard after enough real operational data has accumulated
+- [x] Revisit and finalize the dashboard after enough real operational data has accumulated
 - [ ] Verify CSV member import with a real CSV file
 - [ ] Verify member and fee operator/general kind columns after real operator/member data exists
 - [ ] Verify operator-first sorting after real club positions are assigned

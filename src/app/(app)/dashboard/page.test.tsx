@@ -127,4 +127,34 @@ describe("DashboardPage", () => {
     expect(container.querySelector('a[href="/meetings"]')).not.toBeInTheDocument();
     expect(container.querySelector('a[href="/schedule"]')).not.toBeInTheDocument();
   });
+
+  it("keeps club context, the latest final, and settlement recovery together when finance is blocked", async () => {
+    mocks.loadDashboardPage.mockResolvedValue({
+      ...dashboard,
+      currentFinance: {
+        status: "blocked",
+        blockedReason: "prior-final-closing-required",
+        source: null,
+        summary: null,
+        activeFinal: null,
+        latestInterim: null,
+      },
+      trends: [],
+    });
+
+    render(await DashboardPage());
+
+    expect(screen.getByText("활동 회원")).toBeInTheDocument();
+    expect(screen.getByText("20명")).toBeInTheDocument();
+    expect(screen.getAllByText("계산 대기")).toHaveLength(2);
+    expect(screen.getByText("최종 마감 v2")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "월별 결산 보기" })).toHaveAttribute(
+      "href",
+      "/settlements?month=2026-08",
+    );
+    expect(screen.getByRole("link", { name: "결산 보기" })).toHaveAttribute(
+      "href",
+      "/settlements?month=2026-07",
+    );
+  });
 });
