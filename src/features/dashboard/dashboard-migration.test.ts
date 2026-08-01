@@ -10,6 +10,17 @@ const sql = existsSync(migrationPath)
   ? readFileSync(migrationPath, "utf8").toLowerCase()
   : "";
 
+function functionBody(functionName: string) {
+  const start = sql.indexOf(
+    `create or replace function public.${functionName}(`,
+  );
+  const end = sql.indexOf("$$;", start);
+
+  expect(start, functionName).toBeGreaterThan(-1);
+  expect(end, functionName).toBeGreaterThan(start);
+  return sql.slice(start, end);
+}
+
 describe("dashboard page migration", () => {
   it("exposes only the secured privacy-safe dashboard aggregate", () => {
     expect(sql).toContain("function public.get_dashboard_page()\nreturns jsonb");
@@ -31,5 +42,25 @@ describe("dashboard page migration", () => {
     expect(sql).not.toContain("members.name");
     expect(sql).not.toContain("phone_number");
     expect(sql).not.toContain("expense_rows");
+    expect(sql).not.toContain("'closed_by'");
+    expect(sql).not.toContain("closed_by_name");
+  });
+
+  it("locks every mutable aggregate source before dashboard reads", () => {
+    const page = functionBody("get_dashboard_page");
+    const sourceLock = page.indexOf(
+      "lock table public.members, public.fee_payments, public.expenses, public.monthly_closings in share mode",
+    );
+
+    expect(sourceLock).toBeGreaterThan(-1);
+    for (const aggregateRead of [
+      "from public.members as members",
+      "from public.monthly_closings as closings",
+      "public.build_monthly_settlement_snapshot(",
+    ]) {
+      expect(page.indexOf(aggregateRead), aggregateRead).toBeGreaterThan(
+        sourceLock,
+      );
+    }
   });
 });

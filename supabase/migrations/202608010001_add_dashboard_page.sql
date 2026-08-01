@@ -37,6 +37,8 @@ begin
       using errcode = '42501';
   end if;
 
+  lock table public.members, public.fee_payments, public.expenses, public.monthly_closings in share mode;
+
   select pg_catalog.jsonb_build_object(
     'active_count', member_counts.active_count,
     'upcoming_count', member_counts.upcoming_count,
@@ -173,7 +175,6 @@ begin
     'status', closings.status,
     'period_month', closings.period_month,
     'closed_at', closings.closed_at,
-    'closed_by', closings.closed_by_name,
     'billed_total', (closings.snapshot->>'billed_total')::bigint,
     'actual_fee_income', (closings.snapshot->>'actual_fee_income')::bigint,
     'expense_total', (closings.snapshot->>'expense_total')::bigint,
