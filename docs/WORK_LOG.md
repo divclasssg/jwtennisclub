@@ -2,6 +2,20 @@
 
 ## 2026-08-01
 
+### 대시보드 라우트 상태 최종 검토 보정
+- 시각적으로 숨긴 `홈` 1단계 제목과 `data-hide-shell-title-bar="true"` 신호를 비동기 `page.tsx`에서 `/dashboard` 구간 `layout.tsx`로 이동했다. 같은 구간에 로컬 `loading.tsx`를 추가해 부모 `(app)/loading.tsx`보다 안쪽에서 페이지 정지를 처리하므로 성공·로딩·오류 상태 모두 공용 셸 작업 공간 안에 제목 숨김 신호가 남는다.
+- 정상 화면 회귀 검사는 실제 `PageTitle` publisher가 `회원 관리`를 `.shell-title-bar`의 1단계 제목으로 발행하고 본문에는 별도 1단계 제목을 만들지 않는지 확인하도록 강화했다.
+- 대시보드 전진 마이그레이션 검사는 공백을 정규화한 초기·전진 SQL 전체를 비교한다. 전진 SQL에서 `active_count`의 단일 `members.member_code <> '#0000' and` 조건만 제거하면 트랜잭션, 함수 본문, `security definer`, 고정 `search_path`, 활성 운영자 검사, 원본 테이블 공유 잠금, 개인정보 비노출 JSON, revoke/grant와 PostgREST reload까지 초기 SQL과 정확히 같아야 한다.
+
+### 최종 검토 RED→GREEN 및 검증
+- 최초 RED: 대시보드 성공·대기·오류 구성을 새 구간 layout과 로컬 loading 경계로 검사한 집중 명령은 두 suite가 `./layout` 부재로 실패했고, 정상 경로 `PageTitle`와 마이그레이션 전체 동등성 검사는 통과했다. layout만 추가한 두 번째 RED에서는 성공 화면이 중복 `홈` 제목 2개로 실패하고 대기 화면 suite가 `./loading` 부재로 실패해 marker 소유권과 로컬 경계 누락을 각각 확인했다.
+- 최소 구현 뒤 `npm test -- 'src/app/(app)/dashboard/page.test.tsx' 'src/app/(app)/dashboard/layout.test.tsx' 'src/app/(app)/dashboard/error.test.tsx' src/features/shell/AppShell.test.tsx src/features/shell/AppShellStyles.test.ts src/features/dashboard/dashboard-migration.test.ts` — 6개 파일, 13개 테스트 통과.
+- 실제로 완료되지 않는 `loadDashboardPage()` Promise와 실제 reject를 사용하는 구간 상태 검사는 1개 파일, 3개 테스트 통과. 대시보드·셸 전체 집중 게이트는 `npm test -- src/features/dashboard 'src/app/(app)/dashboard' src/features/shell` — 11개 파일, 56개 테스트 통과.
+- 최종 `npm test` — 111개 파일, 764개 테스트 통과. `npm run lint`, `npx tsc --noEmit`, `git diff --check`도 모두 종료 코드 0으로 통과했다.
+- 루트의 무시된 `.env.local`을 값 출력 없이 로드한 최종 `npm run build` — Next.js 16.2.10 Turbopack 컴파일 3.2초, TypeScript 3.4초, 26/26개 정적 페이지 생성과 `/dashboard` 포함, 종료 코드 0. 제한 네트워크의 첫 실행은 최적화 단계에서 1분 이상 출력을 내지 않고 `.next/lock`을 유지해 해당 빌드 PID만 종료했으며 통과 근거로 사용하지 않았다.
+- 강제 로딩·오류 브라우저 검사는 런타임 데이터 소스를 임시 변경해야 해 수행하지 않았다. 이번 변경은 시각 스타일을 바꾸지 않으며, 실제 미해결·거부 loader를 사용해 실제 `AppShell` 안의 layout·loading·error 구성과 marker 위치를 결정적으로 검사하는 테스트가 해당 두 상태에 더 직접적인 근거다. 기존 성공 상태의 1440×900·375×812 인증 브라우저 QA 근거는 바로 아래 기록에 유지된다.
+- 전진 마이그레이션 적용, 배포와 푸시는 수행하지 않았다.
+
 ### 대시보드 라인 레이아웃 및 회장 제외 표시 검증
 - `/dashboard`에서만 공용 셸의 56px 제목 표시줄과 빈 제목 행을 제거하고, 문서에는 시각적으로 숨긴 `홈` 1단계 제목을 유지했다. `/members` 등 다른 경로의 셸 제목 표시줄은 그대로 유지한다.
 - 활동 회원 요약에 `회장(#0000) 제외` 근거를 항상 보이게 추가하고, 대시보드 RPC의 `active_count`에만 `members.member_code <> '#0000'`를 적용하는 전진 마이그레이션 `202608010002_exclude_president_from_dashboard_activity.sql`을 추가했다.

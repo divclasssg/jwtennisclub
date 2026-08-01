@@ -16,12 +16,6 @@ export default async function DashboardPage() {
 
   return (
     <section className={styles["dashboard-page"]}>
-      <h1
-        className={styles["dashboard-page-title"]}
-        data-hide-shell-title-bar="true"
-      >
-        홈
-      </h1>
       <DashboardOverview data={dashboard} />
       <CurrentMonthFinance
         finance={dashboard.currentFinance}

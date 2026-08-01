@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
+import { PageTitle } from "./PageTitleContext";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -46,7 +47,8 @@ describe("AppShell", () => {
         userPositionLabel="부총무"
         userRoleLabel="관리자"
       >
-        <h1>업무 화면</h1>
+        <PageTitle title="회원 관리" />
+        <p>업무 화면</p>
       </AppShell>,
     );
 
@@ -94,7 +96,18 @@ describe("AppShell", () => {
     })) {
       expect(passwordLink).toHaveAttribute("href", "/settings/password");
     }
-    expect(screen.getByRole("heading", { name: "업무 화면" })).toBeInTheDocument();
+    const shellContent = screen.getByRole("main");
+    const shellTitleBar = shellContent.previousElementSibling;
+
+    expect(shellTitleBar).not.toBeNull();
+    expect(
+      within(shellTitleBar as HTMLElement).getByRole("heading", {
+        name: "회원 관리",
+        level: 1,
+      }),
+    ).toBeInTheDocument();
+    expect(within(shellContent).queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(within(shellContent).getByText("업무 화면")).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "등록 모달" })).toHaveTextContent(
       "모달 내용",
     );

@@ -28,6 +28,10 @@ function functionBody(sqlText: string, functionName: string) {
   return sqlText.slice(start, end);
 }
 
+function normalizedSql(sqlText: string) {
+  return sqlText.replace(/\s+/g, " ").trim();
+}
+
 describe("dashboard page migration", () => {
   it("exposes only the secured privacy-safe dashboard aggregate", () => {
     expect(sql).toContain("function public.get_dashboard_page()\nreturns jsonb");
@@ -71,20 +75,18 @@ describe("dashboard page migration", () => {
     }
   });
 
-  it("excludes only the president from the active member total", () => {
+  it("keeps the forward migration identical except for the president predicate", () => {
     const forwardFunction = functionBody(forwardSql, "get_dashboard_page");
+    const intendedPredicate = "members.member_code <> '#0000' and ";
+    const normalizedInitial = normalizedSql(sql);
+    const normalizedForward = normalizedSql(forwardSql);
 
     expect(forwardSql).toContain("function public.get_dashboard_page()\nreturns jsonb");
     expect(forwardFunction).toMatch(
       /count\(\*\) filter \(\s*where members\.member_code <> '#0000'[\s\S]*?\) as active_count/,
     );
     expect(forwardFunction.match(/members\.member_code <> '#0000'/g)).toHaveLength(1);
-    expect(forwardSql).toContain("set search_path = ''");
-    expect(forwardSql).toContain(
-      "revoke execute on function public.get_dashboard_page() from public, anon",
-    );
-    expect(forwardSql).toContain(
-      "grant execute on function public.get_dashboard_page() to authenticated",
-    );
+    expect(normalizedForward.match(/members\.member_code <> '#0000'/g)).toHaveLength(1);
+    expect(normalizedForward.replace(intendedPredicate, "")).toBe(normalizedInitial);
   });
 });

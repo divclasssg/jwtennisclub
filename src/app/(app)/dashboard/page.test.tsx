@@ -12,6 +12,7 @@ vi.mock("@/features/dashboard/dashboard-data", () => ({
 }));
 
 import DashboardPage from "./page";
+import DashboardLayout from "./layout";
 
 const dashboard: DashboardPageData = {
   asOf: "2026-08-01T00:30:00+00:00",
@@ -91,7 +92,7 @@ describe("DashboardPage", () => {
   });
 
   it("loads one aggregate and composes the approved finance-led route in order", async () => {
-    render(await DashboardPage());
+    render(<DashboardLayout>{await DashboardPage()}</DashboardLayout>);
 
     expect(mocks.loadDashboardPage).toHaveBeenCalledTimes(1);
     const pageTitle = screen.getByRole("heading", { name: "홈", level: 1 });
