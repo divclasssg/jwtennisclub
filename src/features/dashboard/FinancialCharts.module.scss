@@ -1,3 +1,5 @@
+@use "../../app/breakpoints" as bp;
+
 .chart-card {
   display: grid;
   min-width: 0;
@@ -163,15 +165,40 @@
   line-height: var(--text-body-line-height);
 }
 
-.visually-hidden {
-  position: absolute;
-  width: var(--hairline-width);
-  height: var(--hairline-width);
-  padding: 0;
-  margin: calc(-1 * var(--hairline-width));
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
+.chart-values-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--ink-muted-80);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-line-height);
+
+  tr {
+    border-top: var(--hairline-width) solid var(--hairline);
+  }
+
+  th,
+  td {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  th {
+    text-align: right;
+  }
+
+  th:first-child,
+  tbody th {
+    text-align: left;
+  }
+
+  td {
+    text-align: right;
+  }
+
+  @media (max-width: bp.$breakpoint-phone) {
+    th,
+    td {
+      padding: var(--spacing-xxs) var(--spacing-xs);
+    }
+  }
 }

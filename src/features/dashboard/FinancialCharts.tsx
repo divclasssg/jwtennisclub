@@ -135,7 +135,7 @@ export function MonthlyCashFlowChart({
         })}
       </svg>
       <ChartMonthLabels points={points} />
-      <table className={styles["visually-hidden"]} aria-label="월별 수납 및 지출 수치">
+      <table className={styles["chart-values-table"]} aria-label="월별 수납 및 지출 수치">
         <thead>
           <tr>
             <th scope="col">월</th>
@@ -259,7 +259,7 @@ export function LedgerBalanceChart({
         ))}
       </svg>
       <ChartMonthLabels points={points} />
-      <table className={styles["visually-hidden"]} aria-label="월별 장부 잔액 수치">
+      <table className={styles["chart-values-table"]} aria-label="월별 장부 잔액 수치">
         <thead>
           <tr>
             <th scope="col">월</th>

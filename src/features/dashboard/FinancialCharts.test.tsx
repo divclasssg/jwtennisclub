@@ -85,11 +85,11 @@ describe("finance chart semantics", () => {
     }
   });
 
-  it("renders current cash flow and balance as accessible, provisional charts", () => {
+  it("keeps exact cash flow and balance amounts visible", () => {
     render(
       <>
-        <MonthlyCashFlowChart points={[currentPoint]} />
-        <LedgerBalanceChart points={[currentPoint]} />
+        <MonthlyCashFlowChart points={[finalPoint, currentPoint]} />
+        <LedgerBalanceChart points={[finalPoint, currentPoint]} />
       </>,
     );
 
@@ -103,11 +103,18 @@ describe("finance chart semantics", () => {
     expect(screen.getAllByText("변동 가능").length).toBeGreaterThanOrEqual(1);
 
     const cashTable = screen.getByRole("table", { name: "월별 수납 및 지출 수치" });
-    expect(within(cashTable).getByText("510,000원")).toBeInTheDocument();
-    expect(within(cashTable).getByText("130,000원")).toBeInTheDocument();
+    expect(cashTable.className).toContain("chart-values-table");
+    expect(cashTable.className).not.toContain("visually-hidden");
+    expect(within(cashTable).getByText("600,000원")).toBeVisible();
+    expect(within(cashTable).getByText("510,000원")).toBeVisible();
+    expect(within(cashTable).getByText("205,000원")).toBeVisible();
+    expect(within(cashTable).getByText("130,000원")).toBeVisible();
 
     const balanceTable = screen.getByRole("table", { name: "월별 장부 잔액 수치" });
-    expect(within(balanceTable).getByText("775,000원")).toBeInTheDocument();
+    expect(within(balanceTable).getByText("395,000원")).toBeVisible();
+    expect(within(balanceTable).getByText("775,000원")).toBeVisible();
+    expect(within(balanceTable).getByText("확정")).toBeVisible();
+    expect(within(balanceTable).getByText("변동 가능")).toBeVisible();
 
     for (const chart of screen.getAllByRole("img")) {
       expect(chart).toHaveAttribute("aria-labelledby");
