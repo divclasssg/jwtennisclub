@@ -8,7 +8,6 @@ import {
   LatestFinalClosing,
 } from "@/features/dashboard/DashboardSections";
 import { loadDashboardPage } from "@/features/dashboard/dashboard-data";
-import { PageTitle } from "@/features/shell/PageTitleContext";
 
 import styles from "./page.module.scss";
 
@@ -17,7 +16,12 @@ export default async function DashboardPage() {
 
   return (
     <section className={styles["dashboard-page"]}>
-      <PageTitle title="홈" />
+      <h1
+        className={styles["dashboard-page-title"]}
+        data-hide-shell-title-bar="true"
+      >
+        홈
+      </h1>
       <DashboardOverview data={dashboard} />
       <CurrentMonthFinance
         finance={dashboard.currentFinance}

@@ -86,6 +86,16 @@
     background: var(--canvas);
 }
 
+.shell-workspace:has([data-hide-shell-title-bar="true"]) {
+    grid-template-rows:
+        var(--shell-user-bar-height)
+        minmax(0, 1fr);
+
+    > .shell-title-bar {
+        display: none;
+    }
+}
+
 .shell-user-bar,
 .shell-title-bar {
     display: flex;
@@ -368,6 +378,10 @@
         grid-template-rows: var(--spacing-56) minmax(0, 1fr);
         min-width: 0;
         max-width: 100%;
+    }
+
+    .shell-workspace:has([data-hide-shell-title-bar="true"]) {
+        grid-template-rows: minmax(0, 1fr);
     }
 
     .shell-user-bar {

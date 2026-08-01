@@ -16,6 +16,19 @@
   }
 }
 
+.dashboard-page-title {
+  position: absolute;
+  width: var(--hairline-width);
+  height: var(--hairline-width);
+  padding: 0;
+  margin: calc(-1 * var(--hairline-width));
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 .dashboard-section {
   display: grid;
   min-width: 0;

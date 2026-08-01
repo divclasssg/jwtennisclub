@@ -94,7 +94,9 @@ describe("DashboardPage", () => {
     render(await DashboardPage());
 
     expect(mocks.loadDashboardPage).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("heading", { name: "홈", level: 1 })).toBeInTheDocument();
+    const pageTitle = screen.getByRole("heading", { name: "홈", level: 1 });
+    expect(pageTitle).toHaveAttribute("data-hide-shell-title-bar", "true");
+    expect(pageTitle.className).toContain("dashboard-page-title");
 
     const orderedHeadings = [
       screen.getByRole("heading", { name: "클럽 요약" }),
