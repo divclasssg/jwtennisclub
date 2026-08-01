@@ -2,6 +2,38 @@
 
 ## 2026-08-01
 
+### 대시보드 라인 레이아웃 및 회장 제외 표시 검증
+- `/dashboard`에서만 공용 셸의 56px 제목 표시줄과 빈 제목 행을 제거하고, 문서에는 시각적으로 숨긴 `홈` 1단계 제목을 유지했다. `/members` 등 다른 경로의 셸 제목 표시줄은 그대로 유지한다.
+- 활동 회원 요약에 `회장(#0000) 제외` 근거를 항상 보이게 추가하고, 대시보드 RPC의 `active_count`에만 `members.member_code <> '#0000'`를 적용하는 전진 마이그레이션 `202608010002_exclude_president_from_dashboard_activity.sql`을 추가했다.
+- 수납·지출 및 장부 잔액 차트의 정확한 월별 원화 값을 접근성 전용 숨김 표가 아니라 항상 보이는 표로 전환했다.
+- 요약, 이번 달 재무, 추이 차트, 최근 최종 마감과 오류·빈 상태를 흰색 캔버스와 1px 구분선 중심의 평면 레이아웃으로 통일하고, 카드형 외곽선·둥근 모서리·검은 잔액 배경을 제거했다.
+
+### 작업별 RED→GREEN 근거
+- Task 1 RED: `npm test -- 'src/app/(app)/dashboard/page.test.tsx' src/features/shell/AppShellStyles.test.ts` — 대시보드 마커와 셸 숨김 선택자가 없어 2개 파일, 2개 테스트 실패·2개 통과. GREEN: `npm test -- 'src/app/(app)/dashboard/page.test.tsx' src/features/shell/AppShell.test.tsx src/features/shell/AppShellStyles.test.ts` — 3개 파일, 6개 테스트 통과.
+- Task 2 RED: `npm test -- src/features/dashboard/dashboard-migration.test.ts src/features/dashboard/DashboardSections.test.tsx` — 전진 마이그레이션과 `회장(#0000) 제외` 문구가 없어 2개 파일, 2개 테스트 실패·9개 통과. GREEN: `npm test -- src/features/dashboard/dashboard-migration.test.ts src/features/dashboard/DashboardSections.test.tsx src/features/dashboard/dashboard-page.test.ts src/features/dashboard/dashboard-data.test.ts` — 4개 파일, 31개 테스트 통과.
+- Task 3 RED: `npm test -- src/features/dashboard/FinancialCharts.test.tsx` — Vitest DOM이 지원하지 않는 비대칭 `toHaveClass` 사용을 실제 클래스 문자열 검사로 교정한 뒤 숨김 표가 `chart-values-table`을 갖지 않아 의도대로 1개 테스트 실패. GREEN: `npm test -- src/features/dashboard/FinancialCharts.test.tsx src/features/dashboard/dashboard-page.test.ts` — 2개 파일, 28개 테스트 통과.
+- Task 4 RED: `npm test -- 'src/app/(app)/dashboard/page-styles.test.ts' 'src/app/(app)/dashboard/error.test.tsx' src/features/dashboard/FinancialCharts.test.tsx` — 기존 카드 외곽선·둥근 모서리·검은 잔액 배경 때문에 1개 파일·1개 테스트 실패, 2개 파일·15개 테스트 통과. GREEN: `npm test -- src/features/dashboard 'src/app/(app)/dashboard' src/features/shell` — 10개 파일, 53개 테스트 통과.
+
+### 최종 자동 검증
+- `npm test` — 110개 파일, 761개 테스트 전부 통과, 종료 코드 0, 13.58초.
+- `npm run lint`, `npx tsc --noEmit`, `git diff --check` — 모두 종료 코드 0.
+- 루트의 무시된 `.env.local`을 값 출력 없이 로드한 `zsh -c 'set -a; source ../../.env.local; set +a; npm run build'` — Next.js 16.2.10 Turbopack 컴파일 5.5초, TypeScript 3.1초, 26/26개 정적 페이지 생성, `/dashboard` 포함, 종료 코드 0.
+- 제한된 네트워크의 첫 동일 빌드는 최적화 단계에서 90초 이상 새 출력 없이 정체돼 해당 실행만 종료 코드 130으로 중지했고 통과로 처리하지 않았다. 정상 네트워크를 허용한 위 재실행 결과만 최종 빌드 근거로 사용한다.
+
+### 인증 브라우저 QA
+- 루트 환경 변수를 값 출력 없이 로드해 Next.js 16.2.10 개발 서버를 `http://localhost:3002`에서 시작하고, 기존 인증 쿠키가 있는 인앱 브라우저에서 검사했다. `127.0.0.1`은 별도 출처라 로그인으로 이동했으며 인증 QA 근거로 사용하지 않았다.
+- 1440×900: `/dashboard` 셸 제목 표시줄은 `display: none`, 0×0이고 콘텐츠는 셸 사용자 바 바로 아래에서 시작했다. `/members`에서는 `회원 관리` 제목 표시줄이 `display: flex`, 높이 56px로 유지됐다. 문서 `scrollWidth === clientWidth === 1440`이었다.
+- 1440×900: `회장(#0000) 제외`가 화면에 보이고, 수납·지출 표는 `7월 540,000원 / 506,500원`, `8월 540,000원 / 0원`, 잔액 표는 `7월 33,500원 확정`, `8월 573,500원 변동 가능`을 항상 보이는 표로 표시했다.
+- 1440×900: 요약 두 면, 이번 달 재무, 두 차트, 최근 최종 마감은 모두 계산된 배경색 `rgb(255, 255, 255)`, 반지름 0px이었다. 그룹 외곽은 위·아래 1px 선, 데스크톱의 두 요약·두 차트 사이는 오른쪽 1px 선으로 구분됐다.
+- 375×812: 셸 제목 표시줄은 `display: none`, 0×0이고 대시보드 콘텐츠는 64px 모바일 헤더와 56px 주 메뉴 직후 y=120에서 시작해 별도 56px 빈 제목 행이 없었다. `document.documentElement.scrollWidth === document.documentElement.clientWidth === 375`를 확인했다.
+- 375×812: 요약 카드는 375px 한 열로 쌓이며 사이에 아래쪽 1px 선 하나만 남았다. 차트 카드도 375px 한 열로 쌓이고 첫 차트의 아래쪽 1px 선 하나로 구분됐다. 두 값 표는 각각 x=16, 너비 343px이고 `scrollWidth === clientWidth === 343`으로 모든 열과 정확한 금액·상태가 잘림 없이 보였다. `회장(#0000) 제외` 근거도 유지됐다.
+- 인증된 `/dashboard` 데스크톱·모바일 요청과 `/members` 요청은 모두 HTTP 200이었다. 브라우저 콘솔의 오류·경고는 0건이었고 실패한 인증 QA 요청은 없었다. QA 중 보인 사용자 신원·회원 연락처가 포함된 화면은 파일로 저장하거나 커밋하지 않았고, 브라우저 뷰포트 override를 해제한 뒤 로컬 서버를 종료했다.
+
+### 배포 게이트
+- `202608010002_exclude_president_from_dashboard_activity.sql`은 이번 작업에서 로컬 또는 운영 DB에 적용하지 않았으며, **프로덕션에 아직 적용되지 않았다**. 따라서 현재 브라우저의 RPC 집계 값은 새 회장 제외 DB 동작의 프로덕션 검증 근거가 아니다.
+- 검토와 병합 승인 뒤 깨끗한 `main` 통합 작업트리에서 `supabase db push --linked --dry-run`을 실행하고, 출력에 `202608010002_exclude_president_from_dashboard_activity.sql` 하나만 있는 경우에만 앱 배포 전에 마이그레이션을 적용한다.
+- 적용 뒤 마이그레이션 이력, 함수 보안·실행 권한, 인증 RPC 출력에서 `#0000` 제외를 확인하고 1440×900·375×812 프로덕션 대시보드의 값·요청·콘솔을 다시 QA한다. 이번 구현 단계에서는 마이그레이션 적용, 배포, 푸시를 수행하지 않았다.
+
 ### 재무 중심 대시보드 완료
 - 인증 운영자 전용 `get_dashboard_page()` 집계 계약, Zod 서버 경계, 서버 렌더링 재무 차트, 클럽 요약·이번 달 재무·재무 추이·최근 최종 마감 화면을 통합했다.
 - `/dashboard` 구간에 원문 예외를 노출하지 않는 `대시보드를 불러오지 못했습니다` 오류 경계와 `다시 시도` 복구 작업을 추가했다. 설치된 Next 16.2.10 문서에 따라 다시 시도는 콘텐츠를 재조회하는 `unstable_retry()`를 사용하고, 공용 `Button`의 기존 `onClick` 계약과 프로젝트 토큰을 유지한다.
