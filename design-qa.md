@@ -2,7 +2,7 @@
 
 ## Comparison Target
 
-- Source visual truth: `/Users/seikpark/Desktop/projects/jwtennisclub/.superpowers/brainstorm/32523-1785542447/content/financial-dashboard-layout.html`.
+- Source visual truth: repository-local approved artifact `.superpowers/brainstorm/32523-1785542447/content/financial-dashboard-layout.html`.
 - Durable source capture: `design-qa-assets/dashboard-reference-375x812.png` (375 × 812 px).
 - Durable implementation capture: `design-qa-assets/dashboard-implementation-available-375x812.png` (375 × 812 px).
 - Both retained captures were made at a 375 × 812 CSS viewport with `devicePixelRatio` 1. Browser output is JPEG data despite the `.png` suffix.

@@ -360,7 +360,7 @@ Expected: all commands exit 0 with no output.
 
 ```bash
 set -a
-source /Users/seikpark/Desktop/projects/jwtennisclub/.env.local
+source .env.local
 npm run build
 ```
 
