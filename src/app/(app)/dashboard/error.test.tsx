@@ -5,12 +5,12 @@ import DashboardError from "./error";
 
 describe("DashboardError", () => {
   it("offers one safe retry without exposing the original exception", () => {
-    const reset = vi.fn();
+    const unstableRetry = vi.fn();
 
     render(
       <DashboardError
         error={new Error("private database connection detail")}
-        reset={reset}
+        unstable_retry={unstableRetry}
       />,
     );
 
@@ -23,6 +23,6 @@ describe("DashboardError", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
-    expect(reset).toHaveBeenCalledTimes(1);
+    expect(unstableRetry).toHaveBeenCalledTimes(1);
   });
 });
