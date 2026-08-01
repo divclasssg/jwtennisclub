@@ -436,17 +436,24 @@ git commit -m "feat: detect database changes without exposing row data"
 - Create: `src/runner.ts`
 - Create: `src/manifest.ts`
 - Create: `src/capture.ts`
+- Modify: `src/contracts.ts`
 - Modify: `src/fingerprint.ts`
 - Modify: `sql/catalog.sql`
 - Modify: `sql/fingerprint.sql`
 - Test: `tests/runner_test.ts`
 - Test: `tests/manifest_test.ts`
 - Test: `tests/capture_test.ts`
+- Test: `tests/contracts_test.ts`
 - Test: `tests/fingerprint_test.ts`
 
 **Interfaces:**
 - Consumes: `BackupConfig`, `BackupTrigger`, `CommandRunner`, and `CapturedBackup`.
 - Produces: `captureBackup(config: BackupConfig, trigger: BackupTrigger, runner: CommandRunner): Promise<CapturedBackup>` and `canonicalJson(value: unknown): string`.
+
+Add `BackupManifestDraftV1` with `restoreVerification: null` and make
+`CapturedBackup.manifest` use that draft type. Add `VerifiedBackup`, whose manifest is
+the existing `BackupManifestV1` with `restoreVerification.passed: true`. Task 5 writes
+the canonical draft to `manifest.json`; it must never claim restore success.
 
 - [ ] **Step 1: Write failing runner redaction tests**
 
@@ -519,7 +526,11 @@ git commit -m "feat: capture canonical full recovery bundles"
 
 **Interfaces:**
 - Consumes: `CapturedBackup`, `CommandRunner`, and `RestoreVerification`.
-- Produces: `verifyRestore(captured: CapturedBackup, runner: CommandRunner): Promise<RestoreVerification>`.
+- Produces: `verifyRestore(captured: CapturedBackup, runner: CommandRunner): Promise<VerifiedBackup>`.
+
+Only after source/restored hashes match, atomically replace the draft `manifest.json`
+with a canonical `BackupManifestV1` containing the measured `RestoreVerification` and
+return `VerifiedBackup`. Any failure leaves no manifest that claims `passed: true`.
 
 - [ ] **Step 1: Write failing restore-order tests**
 
@@ -564,8 +575,8 @@ git commit -m "feat: prove backup bundles restore before retention"
 - Test: `tests/retention_test.ts`
 
 **Interfaces:**
-- Consumes: `CapturedBackup`, `CommandRunner`, `EncryptedBackup`, `RetentionEntry`, `UsageSnapshot`, and `RetentionPlan`.
-- Produces: `encryptBundle(captured: CapturedBackup, recipient: string, runner: CommandRunner): Promise<EncryptedBackup>` and `retentionPlan(index: RetentionEntry[], usage: UsageSnapshot): RetentionPlan`.
+- Consumes: `VerifiedBackup`, `CommandRunner`, `EncryptedBackup`, `RetentionEntry`, `UsageSnapshot`, and `RetentionPlan`.
+- Produces: `encryptBundle(captured: VerifiedBackup, recipient: string, runner: CommandRunner): Promise<EncryptedBackup>` and `retentionPlan(index: RetentionEntry[], usage: UsageSnapshot): RetentionPlan`.
 
 - [ ] **Step 1: Write failing encryption tests**
 
