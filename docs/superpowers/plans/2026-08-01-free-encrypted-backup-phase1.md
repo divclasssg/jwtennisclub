@@ -440,6 +440,7 @@ git commit -m "feat: detect database changes without exposing row data"
 - Modify: `src/fingerprint.ts`
 - Modify: `sql/catalog.sql`
 - Modify: `sql/fingerprint.sql`
+- Create: `sql/export-snapshot.sql`
 - Test: `tests/runner_test.ts`
 - Test: `tests/manifest_test.ts`
 - Test: `tests/capture_test.ts`
@@ -479,10 +480,13 @@ manifest.json
 
 Assert every `pg_dump` call uses `--no-owner`, `--no-acl`, custom format where applicable, explicit schemas/table allowlists, snapshot-consistent capture, no URL argument, and read-only libpq environment.
 
-Use one long-lived `psql` process to begin a repeatable-read, read-only transaction,
-emit a validated `pg_export_snapshot()` identifier, and remain alive until capture
-finishes. Extend the concrete runner with the smallest streaming-process interface
-needed to read that identifier and terminate the keeper in `finally`; keep the public
+Use one long-lived `psql` process running `sql/export-snapshot.sql`. It validates the
+approved catalog, begins a repeatable-read read-only transaction, acquires every
+approved relation's `ACCESS SHARE` lock in deterministic order before exporting the
+snapshot, emits one validated `pg_export_snapshot()` identifier, and waits for one
+stdin release signal before rolling back. Extend the concrete runner with the smallest
+streaming-process interface needed to read that identifier, write the release signal,
+and terminate the keeper in `finally`; keep the public
 `captureBackup(..., runner: CommandRunner)` signature and fail closed when a supplied
 runner lacks streaming support. Every data `pg_dump`, `catalog.sql`, and
 `fingerprint.sql` invocation must import that exact snapshot. The SQL files accept it
@@ -495,6 +499,11 @@ the exact catalog comparison. The current application migrations create no custo
 database roles, so do not invent any; an empty approved subset produces a canonical
 `roles.sql` stating that no custom roles require recreation. Platform-managed roles are
 provided by the disposable Supabase restore target and must not be recreated.
+
+Load approval only from the exact repo path `config/approved-catalog.json`. Unit tests
+use synthetic fixtures, but Phase 1 must not commit a guessed production baseline.
+Task 10 creates and separately reviews the real file from the read-only catalog capture
+before enabling any workflow.
 
 - [ ] **Step 4: Implement the minimal runner, manifest, and capture pipeline**
 
@@ -673,6 +682,7 @@ git commit -m "feat: automate scheduled and manual encrypted backups"
 
 **Files:**
 - Modify: `README.md`
+- Create after reviewed read-only inventory: `config/approved-catalog.json`
 - Create: `docs/key-custody.md`
 - Create: `docs/github-controls.md`
 
