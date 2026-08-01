@@ -75,6 +75,7 @@ describe("DashboardOverview", () => {
 
     expect(within(overview).getByText("활동 회원")).toBeInTheDocument();
     expect(within(overview).getByText("20명")).toBeInTheDocument();
+    expect(within(overview).getByText("회장(#0000) 제외")).toBeInTheDocument();
     expect(within(overview).getByText("활동 예정 1 · 휴회 2")).toBeInTheDocument();
     expect(
       within(overview).getByText("이번 달 신규 1 · 휴회 1 · 탈퇴 0"),

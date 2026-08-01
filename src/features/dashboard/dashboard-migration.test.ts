@@ -2,23 +2,30 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const migrationPath = join(
+const initialMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202608010001_add_dashboard_page.sql",
 );
-const sql = existsSync(migrationPath)
-  ? readFileSync(migrationPath, "utf8").toLowerCase()
+const forwardMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202608010002_exclude_president_from_dashboard_activity.sql",
+);
+const sql = existsSync(initialMigrationPath)
+  ? readFileSync(initialMigrationPath, "utf8").toLowerCase()
+  : "";
+const forwardSql = existsSync(forwardMigrationPath)
+  ? readFileSync(forwardMigrationPath, "utf8").toLowerCase()
   : "";
 
-function functionBody(functionName: string) {
-  const start = sql.indexOf(
+function functionBody(sqlText: string, functionName: string) {
+  const start = sqlText.indexOf(
     `create or replace function public.${functionName}(`,
   );
-  const end = sql.indexOf("$$;", start);
+  const end = sqlText.indexOf("$$;", start);
 
   expect(start, functionName).toBeGreaterThan(-1);
   expect(end, functionName).toBeGreaterThan(start);
-  return sql.slice(start, end);
+  return sqlText.slice(start, end);
 }
 
 describe("dashboard page migration", () => {
@@ -47,7 +54,7 @@ describe("dashboard page migration", () => {
   });
 
   it("locks every mutable aggregate source before dashboard reads", () => {
-    const page = functionBody("get_dashboard_page");
+    const page = functionBody(sql, "get_dashboard_page");
     const sourceLock = page.indexOf(
       "lock table public.members, public.fee_payments, public.expenses, public.monthly_closings in share mode",
     );
@@ -62,5 +69,22 @@ describe("dashboard page migration", () => {
         sourceLock,
       );
     }
+  });
+
+  it("excludes only the president from the active member total", () => {
+    const forwardFunction = functionBody(forwardSql, "get_dashboard_page");
+
+    expect(forwardSql).toContain("function public.get_dashboard_page()\nreturns jsonb");
+    expect(forwardFunction).toMatch(
+      /count\(\*\) filter \(\s*where members\.member_code <> '#0000'[\s\S]*?\) as active_count/,
+    );
+    expect(forwardFunction.match(/members\.member_code <> '#0000'/g)).toHaveLength(1);
+    expect(forwardSql).toContain("set search_path = ''");
+    expect(forwardSql).toContain(
+      "revoke execute on function public.get_dashboard_page() from public, anon",
+    );
+    expect(forwardSql).toContain(
+      "grant execute on function public.get_dashboard_page() to authenticated",
+    );
   });
 });

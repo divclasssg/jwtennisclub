@@ -73,6 +73,7 @@
 
 .dashboard-card-label,
 .dashboard-member-count,
+.dashboard-member-exclusion,
 .dashboard-supporting-copy,
 .dashboard-balance-value,
 .dashboard-balance-meta,
@@ -96,6 +97,13 @@
   font-size: var(--font-size-display-md);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-display-lg);
+}
+
+.dashboard-member-exclusion {
+  color: var(--ink-muted-48);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-line-height);
 }
 
 .dashboard-supporting-copy {

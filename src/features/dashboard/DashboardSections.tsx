@@ -60,6 +60,9 @@ export function DashboardOverview({ data }: { data: DashboardPageData }) {
           <p className={styles["dashboard-member-count"]}>
             {data.members.activeCount}명
           </p>
+          <p className={styles["dashboard-member-exclusion"]}>
+            회장(#0000) 제외
+          </p>
           <p className={styles["dashboard-supporting-copy"]}>
             활동 예정 {data.members.upcomingCount} · 휴회 {data.members.pausedCount}
           </p>
