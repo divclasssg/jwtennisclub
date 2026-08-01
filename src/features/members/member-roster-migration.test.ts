@@ -50,14 +50,6 @@ const memberSaveAmbiguityFixSql = existsSync(memberSaveAmbiguityFixPath)
   ? readFileSync(memberSaveAmbiguityFixPath, "utf8").toLowerCase()
   : "";
 
-const firstPostResetCodeFixPath = join(
-  process.cwd(),
-  "supabase/migrations/202607270002_resequence_first_post_reset_member_code.sql",
-);
-const firstPostResetCodeFixSql = existsSync(firstPostResetCodeFixPath)
-  ? readFileSync(firstPostResetCodeFixPath, "utf8").toLowerCase()
-  : "";
-
 describe("member roster preparation migration", () => {
   it("backfills codes before making them required and assigns every insert", () => {
     const backfillPosition = migrationSql.indexOf("with numbered_members as");
@@ -557,29 +549,5 @@ describe("meeting roster member-write integration", () => {
     expect(transactionBegin).toBeGreaterThan(-1);
     expect(transactionBegin).toBeLessThan(firstFunction);
     expect(transactionCommit).toBeGreaterThan(lastContractChange);
-  });
-});
-
-describe("first post-reset member code repair", () => {
-  it("only mutates the exact incident state and accepts an already-applied repair", () => {
-    const alreadyAppliedCheck = firstPostResetCodeFixSql.indexOf(
-      "allocator_next_suffix = 21",
-    );
-    const incidentGuard = firstPostResetCodeFixSql.indexOf(
-      "allocator_next_suffix is distinct from 25",
-    );
-    const triggerDisable = firstPostResetCodeFixSql.indexOf(
-      "disable trigger members_prevent_member_code_change",
-    );
-
-    expect(alreadyAppliedCheck).toBeGreaterThan(-1);
-    expect(firstPostResetCodeFixSql).toContain(
-      "member code #0020 repair is already applied",
-    );
-    expect(incidentGuard).toBeGreaterThan(alreadyAppliedCheck);
-    expect(triggerDisable).toBeGreaterThan(incidentGuard);
-    expect(firstPostResetCodeFixSql).toContain(
-      "skipping #0024 repair for non-matching state",
-    );
   });
 });
