@@ -436,9 +436,13 @@ git commit -m "feat: detect database changes without exposing row data"
 - Create: `src/runner.ts`
 - Create: `src/manifest.ts`
 - Create: `src/capture.ts`
+- Modify: `src/fingerprint.ts`
+- Modify: `sql/catalog.sql`
+- Modify: `sql/fingerprint.sql`
 - Test: `tests/runner_test.ts`
 - Test: `tests/manifest_test.ts`
 - Test: `tests/capture_test.ts`
+- Test: `tests/fingerprint_test.ts`
 
 **Interfaces:**
 - Consumes: `BackupConfig`, `BackupTrigger`, `CommandRunner`, and `CapturedBackup`.
@@ -467,6 +471,23 @@ manifest.json
 ```
 
 Assert every `pg_dump` call uses `--no-owner`, `--no-acl`, custom format where applicable, explicit schemas/table allowlists, snapshot-consistent capture, no URL argument, and read-only libpq environment.
+
+Use one long-lived `psql` process to begin a repeatable-read, read-only transaction,
+emit a validated `pg_export_snapshot()` identifier, and remain alive until capture
+finishes. Extend the concrete runner with the smallest streaming-process interface
+needed to read that identifier and terminate the keeper in `finally`; keep the public
+`captureBackup(..., runner: CommandRunner)` signature and fail closed when a supplied
+runner lacks streaming support. Every data `pg_dump`, `catalog.sql`, and
+`fingerprint.sql` invocation must import that exact snapshot. The SQL files accept it
+only through a validated child-environment value and call `SET TRANSACTION SNAPSHOT`
+before their first snapshot-bearing query. Never place the password in arguments.
+
+Complete the catalog contract's role coverage from the File Map: add deterministic,
+password-free role metadata plus an explicit approved restorable-custom-role subset to
+the exact catalog comparison. The current application migrations create no custom
+database roles, so do not invent any; an empty approved subset produces a canonical
+`roles.sql` stating that no custom roles require recreation. Platform-managed roles are
+provided by the disposable Supabase restore target and must not be recreated.
 
 - [ ] **Step 4: Implement the minimal runner, manifest, and capture pipeline**
 
