@@ -531,7 +531,14 @@ git commit -m "feat: capture canonical full recovery bundles"
 - Create: `supabase/config.toml`
 - Create: `src/restore_verify.ts`
 - Create: `scripts/integration-local.sh`
+- Modify: `src/capture.ts`
+- Modify: `src/fingerprint.ts`
+- Modify: `sql/catalog.sql`
+- Modify: `sql/fingerprint.sql`
+- Modify: `sql/export-snapshot.sql`
 - Test: `tests/restore_verify_test.ts`
+- Test: `tests/capture_test.ts`
+- Test: `tests/fingerprint_test.ts`
 
 **Interfaces:**
 - Consumes: `CapturedBackup`, `CommandRunner`, and `RestoreVerification`.
@@ -543,7 +550,10 @@ return `VerifiedBackup`. Any failure leaves no manifest that claims `passed: tru
 
 - [ ] **Step 1: Write failing restore-order tests**
 
-Assert the exact order: approved roles, app schema, migration history, app data, Auth data, Storage metadata, fingerprint. Assert cleanup runs in `finally`, checksum mismatch fails, and no production or hosted validation ref may appear in restore command arguments.
+Assert the exact order: approved roles, app pre-data/schema, migration history, app
+data, Auth data, Storage metadata, app post-data (constraints, indexes, policies, and
+triggers), fingerprint. Assert cleanup runs in `finally`, checksum mismatch fails, and
+no production or hosted validation ref may appear in restore command arguments.
 
 - [ ] **Step 2: Run unit tests and verify RED**
 
@@ -553,9 +563,21 @@ Run: `deno test tests/restore_verify_test.ts`
 
 Pin Supabase CLI `2.109.1`. Start a unique local stack, verify its database identity is neither production nor hosted validation, restore the bundle, run `sql/fingerprint.sql`, compare the approved source/restored table counts and hashes, and stop the stack in `finally`.
 
+The synthetic integration may override the expected database-system-identifier hash
+only when all of these are true: `BACKUP_LOCAL_INTEGRATION=1`, the database host is
+loopback, the supplied hash is lowercase SHA-256, and it differs from both production
+`b3dec0860649b8a3191331e954790c8b8838a2d1a84a26a2f24895f5f0894cdf` and validation
+`7d71885605b8dc006c0c379b0b8d50d2011647707c4820d0fd33839a37cfa06f`. Production mode
+rejects any override and retains the hardcoded production identity. The local flag and
+override are child-environment-only test controls and never enter a manifest.
+
 - [ ] **Step 4: Add a synthetic integration fixture**
 
 `scripts/integration-local.sh` must seed one member, one Auth user/identity fixture, one match record, and one Storage metadata fixture in the local source; capture, restore into a second local stack, and assert matching hashes. It must use synthetic values only.
+
+Use unique Supabase project IDs and a trap that stops only those two IDs. Existing local
+Supabase containers must be left untouched. The script must confirm no container with
+either unique ID remains after success or failure.
 
 - [ ] **Step 5: Run unit and local integration tests**
 
