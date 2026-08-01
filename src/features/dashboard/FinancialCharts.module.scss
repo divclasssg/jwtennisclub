@@ -6,9 +6,13 @@
   gap: var(--spacing-md);
   padding: var(--spacing-md);
   overflow: hidden;
+  border: 0;
+  border-radius: var(--rounded-none);
   background: var(--canvas);
-  border: var(--hairline-width) solid var(--hairline);
-  border-radius: var(--rounded-lg);
+}
+
+.chart-card:first-child {
+  border-right: var(--hairline-width) solid var(--hairline);
 }
 
 .chart-header {
@@ -200,5 +204,12 @@
     td {
       padding: var(--spacing-xxs) var(--spacing-xs);
     }
+  }
+}
+
+@media (max-width: bp.$breakpoint-tablet-landscape) {
+  .chart-card:first-child {
+    border-right: 0;
+    border-bottom: var(--hairline-width) solid var(--hairline);
   }
 }

@@ -47,7 +47,9 @@
   display: grid;
   grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.45fr);
   min-width: 0;
-  gap: var(--spacing-sm);
+  gap: 0;
+  border-top: var(--hairline-width) solid var(--hairline);
+  border-bottom: var(--hairline-width) solid var(--hairline);
 
   > * {
     min-width: 0;
@@ -55,12 +57,10 @@
 }
 
 .dashboard-member-card,
-.dashboard-balance-card,
-.dashboard-current-finance,
-.dashboard-closing-card,
-.dashboard-empty-state {
-  border: var(--hairline-width) solid var(--hairline);
-  border-radius: var(--rounded-lg);
+.dashboard-balance-card {
+  border: 0;
+  border-radius: var(--rounded-none);
+  background: var(--canvas);
 }
 
 .dashboard-member-card {
@@ -68,7 +68,7 @@
   align-content: start;
   gap: var(--spacing-xs);
   padding: var(--spacing-md);
-  background: var(--canvas);
+  border-right: var(--hairline-width) solid var(--hairline);
 }
 
 .dashboard-card-label,
@@ -119,12 +119,11 @@
   align-items: end;
   gap: var(--spacing-md);
   padding: var(--spacing-lg);
-  background: var(--surface-black);
-  color: var(--on-dark);
+  color: var(--ink);
 
   .dashboard-card-label,
   .dashboard-balance-meta {
-    color: var(--body-muted);
+    color: var(--ink-muted-48);
   }
 }
 
@@ -160,6 +159,10 @@
 .dashboard-current-finance {
   min-width: 0;
   overflow: hidden;
+  border: 0;
+  border-top: var(--hairline-width) solid var(--hairline);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-none);
   background: var(--canvas);
 }
 
@@ -268,8 +271,10 @@
   justify-items: start;
   gap: var(--spacing-sm);
   padding: var(--spacing-lg);
-  border: var(--hairline-width) solid var(--hairline);
-  border-radius: var(--rounded-lg);
+  border: 0;
+  border-top: var(--hairline-width) solid var(--hairline);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-none);
   background: var(--canvas);
 
   h2,
@@ -296,7 +301,9 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   min-width: 0;
-  gap: var(--spacing-sm);
+  gap: 0;
+  border-top: var(--hairline-width) solid var(--hairline);
+  border-bottom: var(--hairline-width) solid var(--hairline);
 
   > * {
     min-width: 0;
@@ -308,6 +315,10 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) auto;
   min-width: 0;
   overflow: hidden;
+  border: 0;
+  border-top: var(--hairline-width) solid var(--hairline);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-none);
   background: var(--canvas);
 
   > * {
@@ -383,6 +394,10 @@
 
 .dashboard-empty-state {
   padding: var(--spacing-lg);
+  border: 0;
+  border-top: var(--hairline-width) solid var(--hairline);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+  border-radius: var(--rounded-none);
   background: var(--canvas);
   color: var(--ink-muted-48);
   font-size: var(--text-body-size);
@@ -398,6 +413,11 @@
 
   .dashboard-finance-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-member-card {
+    border-right: 0;
+    border-bottom: var(--hairline-width) solid var(--hairline);
   }
 
   .dashboard-finance-metrics > .dashboard-finance-metric {
