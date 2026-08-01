@@ -68,6 +68,7 @@
 
 .expense-legend-key {
   background: var(--dashboard-expense-series);
+  border: var(--selected-ring-width) dashed var(--ink);
 }
 
 .final-legend-key {
@@ -105,6 +106,8 @@
 
 .expense-bar {
   fill: var(--dashboard-expense-series);
+  stroke: var(--ink);
+  stroke-width: var(--selected-ring-width);
 }
 
 .final-balance-segment,
@@ -135,12 +138,21 @@
   stroke: var(--dashboard-provisional-series);
 }
 
-.chart-month-label {
-  fill: var(--ink-muted-48);
-  font-family: var(--font-text);
+.chart-month-labels {
+  display: flex;
+  padding: 0;
+  margin: 0;
+  color: var(--ink-muted-48);
   font-size: var(--text-caption-size);
   font-weight: var(--text-caption-weight);
-  text-anchor: middle;
+  line-height: var(--text-caption-line-height);
+  list-style: none;
+
+  li {
+    min-width: 0;
+    flex: 1 1 0;
+    text-align: center;
+  }
 }
 
 .chart-empty-state {

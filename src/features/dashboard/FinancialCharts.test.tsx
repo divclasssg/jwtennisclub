@@ -48,6 +48,43 @@ describe("finance chart geometry", () => {
 });
 
 describe("finance chart semantics", () => {
+  it("distinguishes income and expense with non-color bar and legend encoding", () => {
+    const { container } = render(<MonthlyCashFlowChart points={[currentPoint]} />);
+
+    const incomeBar = container.querySelector('[data-cash-flow-series="income"]');
+    const expenseBar = container.querySelector('[data-cash-flow-series="expense"]');
+    const incomeKey = container.querySelector('[data-series-key="income"]');
+    const expenseKey = container.querySelector('[data-series-key="expense"]');
+
+    expect(incomeBar).not.toHaveAttribute("stroke-dasharray");
+    expect(expenseBar).toHaveAttribute("stroke-dasharray");
+    expect(incomeKey).toHaveAttribute("data-series-encoding", "solid");
+    expect(expenseKey).toHaveAttribute("data-series-encoding", "dashed");
+    expect(
+      screen.getByRole("img", { name: "월별 실제 회비 수납액과 운영 지출" }),
+    ).toHaveAccessibleDescription(/점선 테두리/);
+  });
+
+  it("keeps month labels outside the scalable SVG viewport", () => {
+    const { container } = render(
+      <>
+        <MonthlyCashFlowChart points={[currentPoint]} />
+        <LedgerBalanceChart points={[currentPoint]} />
+      </>,
+    );
+
+    expect(container.querySelector("svg text")).not.toBeInTheDocument();
+
+    const monthLists = screen.getAllByRole("list", { name: "표시 월" });
+    expect(monthLists).toHaveLength(2);
+
+    for (const monthList of monthLists) {
+      const monthLabel = within(monthList).getByText("8월");
+      expect(monthLabel.tagName).toBe("LI");
+      expect(monthLabel).not.toBeInstanceOf(SVGElement);
+    }
+  });
+
   it("renders current cash flow and balance as accessible, provisional charts", () => {
     render(
       <>

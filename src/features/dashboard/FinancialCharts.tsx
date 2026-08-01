@@ -2,12 +2,11 @@ import type { DashboardTrendPoint } from "./dashboard-page";
 import styles from "./FinancialCharts.module.scss";
 
 const CHART_WIDTH = 560;
-const CHART_HEIGHT = 240;
-const PLOT_LEFT = 48;
-const PLOT_RIGHT = 536;
+const CHART_HEIGHT = 216;
+const PLOT_LEFT = 0;
+const PLOT_RIGHT = CHART_WIDTH;
 const PLOT_TOP = 32;
 const PLOT_BOTTOM = 208;
-const MONTH_LABEL_Y = 228;
 
 const currencyFormatter = new Intl.NumberFormat("ko-KR");
 
@@ -69,11 +68,21 @@ export function MonthlyCashFlowChart({
     <ChartFrame heading="월별 수납·지출">
       <ul className={styles["chart-legend"]} aria-label="범례">
         <li>
-          <span className={styles["income-legend-key"]} aria-hidden="true" />
+          <span
+            className={styles["income-legend-key"]}
+            data-series-key="income"
+            data-series-encoding="solid"
+            aria-hidden="true"
+          />
           실제 회비 수납액
         </li>
         <li>
-          <span className={styles["expense-legend-key"]} aria-hidden="true" />
+          <span
+            className={styles["expense-legend-key"]}
+            data-series-key="expense"
+            data-series-encoding="dashed"
+            aria-hidden="true"
+          />
           운영 지출
         </li>
       </ul>
@@ -87,7 +96,8 @@ export function MonthlyCashFlowChart({
       >
         <title id="cash-flow-chart-title">월별 실제 회비 수납액과 운영 지출</title>
         <desc id="cash-flow-chart-description">
-          최근 6개월의 실제 회비 수납액과 운영 지출을 월별 그룹 막대로 비교합니다.
+          최근 6개월의 실제 회비 수납액은 단색 막대, 운영 지출은 점선 테두리
+          막대로 비교합니다.
         </desc>
         <line
           className={styles["chart-axis"]}
@@ -105,6 +115,7 @@ export function MonthlyCashFlowChart({
             <g key={point.periodMonth}>
               <rect
                 className={styles["income-bar"]}
+                data-cash-flow-series="income"
                 x={centerX - barWidth}
                 y={incomeY}
                 width={barWidth}
@@ -112,22 +123,18 @@ export function MonthlyCashFlowChart({
               />
               <rect
                 className={styles["expense-bar"]}
+                data-cash-flow-series="expense"
                 x={centerX}
                 y={expenseY}
                 width={barWidth}
                 height={Math.max(0, baseline - expenseY)}
+                strokeDasharray="4 3"
               />
-              <text
-                className={styles["chart-month-label"]}
-                x={centerX}
-                y={MONTH_LABEL_Y}
-              >
-                {formatChartMonth(point.periodMonth)}
-              </text>
             </g>
           );
         })}
       </svg>
+      <ChartMonthLabels points={points} />
       <table className={styles["visually-hidden"]} aria-label="월별 수납 및 지출 수치">
         <thead>
           <tr>
@@ -170,12 +177,10 @@ export function LedgerBalanceChart({
     PLOT_TOP,
     PLOT_BOTTOM,
   );
+  const pointWidth = (PLOT_RIGHT - PLOT_LEFT) / points.length;
   const coordinates = points.map((point, index) => ({
     point,
-    x:
-      points.length === 1
-        ? (PLOT_LEFT + PLOT_RIGHT) / 2
-        : PLOT_LEFT + ((PLOT_RIGHT - PLOT_LEFT) * index) / (points.length - 1),
+    x: PLOT_LEFT + pointWidth * (index + 0.5),
     y: scale(point.closingLedgerBalance),
   }));
   const hasFinalPoint = points.some((point) => point.source === "final");
@@ -250,16 +255,10 @@ export function LedgerBalanceChart({
               r={5}
               fill={point.source === "current" ? "var(--canvas)" : undefined}
             />
-            <text
-              className={styles["chart-month-label"]}
-              x={x}
-              y={MONTH_LABEL_Y}
-            >
-              {formatChartMonth(point.periodMonth)}
-            </text>
           </g>
         ))}
       </svg>
+      <ChartMonthLabels points={points} />
       <table className={styles["visually-hidden"]} aria-label="월별 장부 잔액 수치">
         <thead>
           <tr>
@@ -299,6 +298,16 @@ function ChartFrame({
       </header>
       {children}
     </section>
+  );
+}
+
+function ChartMonthLabels({ points }: { points: DashboardTrendPoint[] }) {
+  return (
+    <ol className={styles["chart-month-labels"]} aria-label="표시 월">
+      {points.map((point) => (
+        <li key={point.periodMonth}>{formatChartMonth(point.periodMonth)}</li>
+      ))}
+    </ol>
   );
 }
 
