@@ -131,8 +131,9 @@ run's immutable index/checksum evidence. Never restore to production here.
 The initial hosted drill completed on 2026-08-02 against validation ref
 `orssnkppcukrqxikxdbf` using backup
 `20260802T030435497Z-af0948fe-295e-482f-aaff-d72ac743e6f8` from workflow run
-`30729954729`. The measured RTO was 546 seconds. Production and validation
-matched the same normalized digest
+`30729954729`. The conservative measured RTO was 885 seconds from the first
+destructive attempt, including two fail-closed permission adjustments.
+Production and validation matched the same normalized digest
 `bcd68767f3be73f9b2491e185b61806ebbf851227738ca8ee4e16ebe151ee758`, the same
 21-member checksum, zero Match tables, and zero Storage objects. Supabase denied
 writes to the four platform-owned tables `auth.schema_migrations`,
