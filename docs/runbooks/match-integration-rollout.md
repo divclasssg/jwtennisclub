@@ -302,7 +302,8 @@ postcondition; actual removal requires separate approval.
 Validation ref `orssnkppcukrqxikxdbf` passed the approved destructive hosted
 restore drill and the real `logical-offsite-v1` profile validates locally. The
 remaining blockers are immutable clone provenance, isolated Auth/client
-configuration, full inventory v2 composition, and the required Match/Edge/iOS
-gates. No DB apply, Edge replacement, load run, or release change may proceed
-until those prerequisites pass and their existing approvals are supplied.
-Production remains hard denied.
+configuration, a fresh pre-deploy backup/hosted restore run, manifest-bound
+inventory v3 composition and validation, and the required Match/Edge/iOS gates.
+No DB apply, Edge replacement, load run, main integration, or release change
+may proceed until those prerequisites pass and their existing approvals are
+supplied. Production remains hard denied.

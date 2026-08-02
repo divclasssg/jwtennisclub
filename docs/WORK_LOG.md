@@ -1,5 +1,24 @@
 # JW Tennis Club SaaS Work Log
 
+## 2026-08-02
+
+### Match migration inventory v3 완료
+- 실제 migration catalog를 `recorded`와 `unavailable`로 구분하는 DB inventory v2 payload와 strict 합성 inventory v3 계약을 구현했다. 원시 payload는 private `inventory-db-v2.json`으로 저장하고 manifest의 파일 바이트 해시와 canonical JSON digest를 모두 검증한다.
+- identity, migration, member baseline, Auth 집계, table, Storage bucket, database function의 DB 소유 필드를 원시 payload와 정확히 대조하고, 성공한 v3만 `inventory-validated`와 `recovery-validated` ledger stage에 결속하도록 전환했다.
+- 제품 snapshot `83e02eb5fcfb18313f13946dcdf7173920a0d320`을 approval/ledger 상수에 고정하고 v3 운영 절차를 runbook에 반영했다. helper self-pin 커밋은 별도 `bd094a535a104aed7c69e47d6f435ee5c1001501`로 유지했다.
+- 구현 브랜치를 `codex/shared-match-backend-refresh`에 fast-forward 병합하고 같은 HEAD를 원격 브랜치에 푸시했다. production DB, Edge 배포, release enable과 원격 validation 재수집은 실행하지 않았다.
+
+### 검증 근거
+- fresh local migration replay가 통과했고 pgTAP은 7개 파일, 212개 assertion이 모두 통과했다.
+- Task 8 Deno suite는 101개 테스트, 전체 웹 Vitest는 113개 파일·766개 테스트가 통과했다.
+- Deno format/check, TypeScript, Git diff 검사가 통과했다. ESLint는 오류 0건으로 통과했으며 미사용 변수 경고 2건을 보고했다.
+- manifest 결속 reader와 DB-owned projection 검증을 일시적으로 무력화하는 mutation check에서 새 회귀 테스트가 각각 실패하는 것을 확인한 뒤 구현을 복구하고 전체 suite를 다시 통과시켰다.
+
+### 백업·main 통합 경계
+- `logical-offsite-v1`의 초기 encrypted backup, private-key decrypt, local restore와 validation hosted restore drill은 완료 상태다. Match 앱 개발을 마친 뒤 실제 배포 직전에 최신 private backup workflow를 다시 실행하고 그 run의 immutable checksum/index로 hosted restore와 inventory v3 recovery evidence를 재수집한다.
+- production에 첫 Match 데이터가 생긴 뒤에는 현재의 pre-Match drill을 재사용하지 않고 새 백업·hosted restore drill을 수행한다. 이후 restore drill은 93일 이내 주기로 반복한다.
+- 최신 `origin/main`과 비교하면 `codex/shared-match-backend-refresh`는 main 전용 커밋 없이 45개 커밋 앞서 있어 기술적으로 fast-forward 병합 가능하다. 그러나 해당 범위에는 Match DB·Edge·rollout 전체가 포함되므로 남은 앱 작업과 pre-deploy gate가 완료되기 전에는 main에 병합하지 않는다.
+
 ## 2026-08-01
 
 ### 대시보드 라우트 상태 최종 검토 보정

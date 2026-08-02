@@ -69,12 +69,20 @@
 - [x] 피그마 기준 모바일 공통 셸과 계정 메뉴 구현
 - [x] 회원·회비·지출·정모·정산 테이블을 모바일 핵심 정보 리스트로 전환하고 가로 넘침 제거
 - [x] 모바일 반응형 UI를 PR #2로 `main`에 fast-forward 병합하고 원격 푸시
+- [x] Match 공유 백엔드·Edge 함수·iOS 연동 계약과 fail-closed rollout gate 구현
+- [x] `logical-offsite-v1` 암호화 백업의 로컬 복호화·복원과 validation hosted restore drill 검증
+- [x] manifest-bound 원시 DB 증거와 합성 `inventory-v3` 검증·ledger 결속 구현
+- [x] Match inventory v3 구현을 `codex/shared-match-backend-refresh`에 fast-forward 병합하고 원격 푸시
 - [x] 휴회원별 휴회 시작 월 저장·검증·`2026-08-01` 안전 백필 구현
 - [x] 휴회 시작 월 기준으로 7월 회비 대상 포함 및 8월 제외 처리 구현
 - [x] 휴회 시작 월 기준 회비 메모·CSV와 정모 명단 월 경계 회귀 적용
 - [x] 휴회 시작 월 변경의 루트 전체 테스트·lint·typecheck·프로덕션 빌드 검증
 
 ## Next Work
+- [ ] Match 앱의 남은 기능·UI 작업과 로컬 검증을 먼저 완료
+- [ ] 실제 배포 직전에 최신 private backup workflow를 실행하고 validation hosted restore와 `inventory-v3` recovery evidence를 재수집
+- [ ] clone provenance·격리 Auth/client·inventory/recovery·Match/Edge/iOS gate가 모두 통과한 뒤에만 `codex/shared-match-backend-refresh`를 `main`에 병합
+- [ ] production에 첫 Match 데이터가 생긴 뒤 새 백업·hosted restore drill을 수행하고 이후 93일 이내 주기로 반복
 - [x] 회원 가입일과 활동 시작 월 분리, 활동 예정 표시, 회비·정모 월 경계 적용
 - [x] 월별 결산 마감·재개·버전 스냅샷 및 스냅샷 전용 PDF 구현과 로컬 교차 기능 검증
 - [x] 월간 중간 결산과 최종 마감의 독립 버전, 최종 원본 잠금, 결산 재개 흐름 구현
