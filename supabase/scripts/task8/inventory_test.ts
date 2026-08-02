@@ -215,13 +215,26 @@ Deno.test("inventory rejects v1 evidence and ambiguous PITR booleans", async () 
     );
 });
 
-Deno.test("inventory requires exactly the seven approved edge functions", async () => {
+Deno.test("inventory rejects a partial approved edge deployment", async () => {
     const inventory = completeInventory();
     inventory.edgeFunctions.pop();
     await assertRejects(
         () => validateInventoryBundle(inventory, validationContext(), NOW),
         "seven approved edge functions",
     );
+});
+
+Deno.test("inventory accepts an empty edge set for an initial deployment", () => {
+    const inventory = completeInventory();
+    inventory.edgeFunctions = [];
+
+    const result = validateInventoryBundle(
+        inventory,
+        validationContext(),
+        NOW,
+    );
+
+    assert(result.edgeFunctions.length === 0);
 });
 
 Deno.test("inventory derives and rejects production-coupled auth/storage", async () => {

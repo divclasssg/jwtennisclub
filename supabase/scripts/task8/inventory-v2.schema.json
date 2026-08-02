@@ -36,8 +36,10 @@
         },
         "edgeFunctions": {
             "type": "array",
-            "minItems": 7,
-            "maxItems": 7,
+            "oneOf": [
+                { "maxItems": 0 },
+                { "minItems": 7, "maxItems": 7 }
+            ],
             "uniqueItems": true,
             "items": { "$ref": "#/$defs/edgeFunction" }
         },

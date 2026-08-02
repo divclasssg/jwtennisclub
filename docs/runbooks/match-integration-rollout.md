@@ -107,9 +107,10 @@ requires:
   and JWT expiry; Storage includes its project ref;
 - public/match table counts/hashes, Storage bucket config/object counts, and
   database function identity arguments/definition hashes;
-- exact deployed version/status for `admin-command`, `game-day-command`,
-  `game-day-snapshot`, `match-recommendation`, `member-link`, `member-read`, and
-  `operator-read`;
+- either no Edge functions for a first deployment, or the exact deployed
+  version/status for all seven approved functions: `admin-command`,
+  `game-day-command`, `game-day-snapshot`, `match-recommendation`,
+  `member-link`, `member-read`, and `operator-read`; partial sets fail closed;
 - exactly one explicit recovery profile and its canonical SHA-256 digest.
 
 `managed-pitr-v1` is the preferred paid path. It requires physical backups and
@@ -148,7 +149,9 @@ the helper queries and validates live DB identity itself through the exact bound
 direct or approved session-pooler target. Isolation is derived by comparing
 stored/live DB identity, production system identifier, Auth instance and network
 hosts, and Storage project refs. A supplied `isolated` boolean is not accepted.
-Every Edge status must equal `ACTIVE`.
+When Edge functions already exist, every status must equal `ACTIVE`. An empty
+set is accepted only as the explicit initial-deployment state; any partial or
+foreign set fails closed.
 
 Stop unless the chosen profile's honest RPO (`<=15m` managed or `<=1440m`
 logical), the admin connection can prepare and reset the database baseline, and

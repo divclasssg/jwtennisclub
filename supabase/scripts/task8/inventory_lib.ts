@@ -366,11 +366,14 @@ function validateFunctions(root: Record<string, unknown>): void {
         });
     const names = edgeFunctions.map(({ name }) => name).sort();
     if (
-        names.length !== EDGE_FUNCTIONS.length ||
-        names.some((name, index) => name !== [...EDGE_FUNCTIONS].sort()[index])
+        names.length !== 0 &&
+        (names.length !== EDGE_FUNCTIONS.length ||
+            names.some((name, index) =>
+                name !== [...EDGE_FUNCTIONS].sort()[index]
+            ))
     ) {
         throw new Error(
-            "inventory must contain exactly the seven approved edge functions",
+            "inventory must contain zero or exactly the seven approved edge functions",
         );
     }
     if (edgeFunctions.some(({ version }) => version < 1)) {
