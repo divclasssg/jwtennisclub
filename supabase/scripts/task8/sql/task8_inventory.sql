@@ -1,5 +1,8 @@
 \set ON_ERROR_STOP on
 \set QUIET on
+\pset format unaligned
+\pset tuples_only on
+\pset footer off
 
 begin;
 \ir task8_assert_identity.sql
@@ -53,7 +56,7 @@ $tables$;
 
 select pg_catalog.json_build_object(
   'schemaVersion',
-  1,
+  2,
   'identity',
   (
     select pg_catalog.json_build_object(
@@ -83,9 +86,26 @@ select pg_catalog.json_build_object(
         migration.version,
         'name',
         migration.name,
-        'sha256',
+        'statementsState',
+        case
+          when migration.statements is null then 'unavailable'
+          else 'recorded'
+        end,
+        'statementSha256',
+        case
+          when migration.statements is null then null
+          else pg_catalog.encode(extensions.digest(
+            array_to_string(migration.statements, E'\n'),
+            'sha256'
+          ), 'hex')
+        end,
+        'catalogSha256',
         pg_catalog.encode(extensions.digest(
-          array_to_string(migration.statements, E'\n'),
+          pg_catalog.jsonb_build_object(
+            'version', migration.version,
+            'name', migration.name,
+            'statements', migration.statements
+          )::text,
           'sha256'
         ), 'hex')
       )
