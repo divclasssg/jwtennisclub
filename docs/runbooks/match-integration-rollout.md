@@ -103,7 +103,7 @@ identity-bound `inventory-validated` and `recovery-validated` stages. It
 requires:
 
 - migration version/name/statement hash and member count/hash;
-- Auth user/identity/provider counts plus instance ID, site URL, redirect hosts,
+- Auth user/identity/provider counts plus project ref, site URL, redirect hosts,
   and JWT expiry; Storage includes its project ref;
 - public/match table counts/hashes, Storage bucket config/object counts, and
   database function identity arguments/definition hashes;
@@ -147,7 +147,7 @@ hosted drill before promotion.
 Validation requires `TASK8_IDENTITY_FILE` and `TASK8_PRODUCTION_INVENTORY_FILE`;
 the helper queries and validates live DB identity itself through the exact bound
 direct or approved session-pooler target. Isolation is derived by comparing
-stored/live DB identity, production system identifier, Auth instance and network
+stored/live DB identity, production system identifier, Auth project and network
 hosts, and Storage project refs. A supplied `isolated` boolean is not accepted.
 When Edge functions already exist, every status must equal `ACTIVE`. An empty
 set is accepted only as the explicit initial-deployment state; any partial or

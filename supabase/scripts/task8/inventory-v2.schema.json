@@ -104,7 +104,7 @@
                 "userCount",
                 "identityCount",
                 "providerCounts",
-                "instanceId",
+                "projectRef",
                 "siteUrl",
                 "redirectHosts",
                 "jwtExpirySeconds"
@@ -116,7 +116,7 @@
                     "type": "object",
                     "additionalProperties": { "type": "integer", "minimum": 0 }
                 },
-                "instanceId": { "type": "string", "minLength": 1 },
+                "projectRef": { "const": "orssnkppcukrqxikxdbf" },
                 "siteUrl": { "type": "string", "format": "uri" },
                 "redirectHosts": {
                     "type": "array",

@@ -92,7 +92,7 @@ function completeInventory(
             userCount: 25,
             identityCount: 25,
             providerCounts: { email: 25 },
-            instanceId: "validation-auth-instance",
+            projectRef: "orssnkppcukrqxikxdbf",
             siteUrl: "https://validation.invalid",
             redirectHosts: ["validation.invalid"],
             jwtExpirySeconds: 3600,
@@ -159,7 +159,7 @@ function validationContext() {
             projectRef: "ydiusirreirhbvlftegp",
             systemIdentifier: "1111111111111111111",
             auth: {
-                instanceId: "production-auth-instance",
+                projectRef: "ydiusirreirhbvlftegp",
                 siteUrl: "https://jwtennisclub.example",
                 redirectHosts: ["jwtennisclub.example"],
             },
@@ -175,7 +175,7 @@ Deno.test("inventory accepts exact v2 custody bundles for both recovery profiles
         NOW,
     );
     assert(result.edgeFunctions.length === 7);
-    assert(result.derivedIsolation.authInstanceDistinct);
+    assert(result.derivedIsolation.authProjectBound);
     assert(result.derivedIsolation.storageProjectBound);
     assert(result.derivedIsolation.networkHostsDistinct);
     assert(result.recoveryProfile.profile === "managed-pitr-v1");
@@ -239,10 +239,10 @@ Deno.test("inventory accepts an empty edge set for an initial deployment", () =>
 
 Deno.test("inventory derives and rejects production-coupled auth/storage", async () => {
     const auth = completeInventory();
-    auth.auth.instanceId = "production-auth-instance";
+    auth.auth.projectRef = "ydiusirreirhbvlftegp";
     await assertRejects(
         () => validateInventoryBundle(auth, validationContext(), NOW),
-        "auth instance",
+        "Auth project",
     );
 
     const storage = completeInventory();
@@ -258,6 +258,22 @@ Deno.test("inventory derives and rejects production-coupled auth/storage", async
         () => validateInventoryBundle(restore, validationContext(), NOW),
         "member checksum",
     );
+});
+
+Deno.test("inventory binds Auth isolation to observable project refs", () => {
+    const inventory = completeInventory();
+    const auth = inventory.auth as Record<string, unknown>;
+    auth.projectRef = "orssnkppcukrqxikxdbf";
+
+    const context = validationContext();
+    const productionAuth = context.productionInventory.auth as Record<
+        string,
+        unknown
+    >;
+    productionAuth.projectRef = "ydiusirreirhbvlftegp";
+
+    const result = validateInventoryBundle(inventory, context, NOW);
+    assert(result.derivedIsolation.authProjectBound);
 });
 
 Deno.test("inventory binds stored, live, and production identities", async () => {

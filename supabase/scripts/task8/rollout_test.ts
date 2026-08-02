@@ -109,7 +109,7 @@ Deno.test("rollout binds identical canonical recovery evidence into both validat
         schemaVersion: 2,
         recoveryProfile: profile,
         derivedIsolation: {
-            authInstanceDistinct: true,
+            authProjectBound: true,
             storageProjectBound: true,
             networkHostsDistinct: true,
         },

@@ -37,7 +37,7 @@ export interface InventoryBundleV2 {
         userCount: number;
         identityCount: number;
         providerCounts: Record<string, number>;
-        instanceId: string;
+        projectRef: string;
         siteUrl: string;
         redirectHosts: string[];
         jwtExpirySeconds: number;
@@ -56,7 +56,7 @@ export interface InventoryValidationContext {
         projectRef: string;
         systemIdentifier: string;
         auth: {
-            instanceId: string;
+            projectRef: string;
             siteUrl: string;
             redirectHosts: string[];
         };
@@ -66,7 +66,7 @@ export interface InventoryValidationContext {
 
 export interface ValidatedInventoryBundle extends InventoryBundleV2 {
     derivedIsolation: {
-        authInstanceDistinct: true;
+        authProjectBound: true;
         storageProjectBound: true;
         networkHostsDistinct: true;
     };
@@ -209,7 +209,7 @@ function validateAuthAndMember(
     root: Record<string, unknown>,
     context: InventoryValidationContext,
 ): {
-    authInstanceDistinct: true;
+    authProjectBound: true;
     networkHostsDistinct: true;
 } {
     const member = record(root.memberBaseline, "memberBaseline");
@@ -222,7 +222,7 @@ function validateAuthAndMember(
         "userCount",
         "identityCount",
         "providerCounts",
-        "instanceId",
+        "projectRef",
         "siteUrl",
         "redirectHosts",
         "jwtExpirySeconds",
@@ -237,7 +237,7 @@ function validateAuthAndMember(
     ) {
         throw new Error("auth.providerCounts is invalid");
     }
-    const instanceId = required(auth, "instanceId", isString, "auth");
+    const authProjectRef = required(auth, "projectRef", isString, "auth");
     const siteUrl = required(auth, "siteUrl", isString, "auth");
     const redirectHosts = required(auth, "redirectHosts", isArray, "auth");
     if (!redirectHosts.every(isString)) {
@@ -245,8 +245,13 @@ function validateAuthAndMember(
     }
     required(auth, "jwtExpirySeconds", isCount, "auth");
     const productionAuth = context.productionInventory.auth;
-    if (instanceId === productionAuth.instanceId) {
-        throw new Error("validation auth instance matches production");
+    if (
+        authProjectRef !== context.storedIdentity.validationRef ||
+        authProjectRef === productionAuth.projectRef ||
+        productionAuth.projectRef !== context.productionInventory.projectRef ||
+        !PROJECT_REF_PATTERN.test(authProjectRef)
+    ) {
+        throw new Error("Auth project is not bound to validation");
     }
     const validationHosts = [
         hostFromSiteUrl(siteUrl, "auth.siteUrl"),
@@ -267,7 +272,7 @@ function validateAuthAndMember(
         throw new Error("validation auth network host overlaps production");
     }
     return {
-        authInstanceDistinct: true,
+        authProjectBound: true,
         networkHostsDistinct: true,
     };
 }
