@@ -2,6 +2,8 @@
 
 import { validateInventoryBundle } from "./inventory_lib.ts";
 
+const NOW = new Date("2026-08-02T05:00:00.000Z");
+
 function assert(
     condition: unknown,
     message = "assertion failed",
@@ -20,11 +22,60 @@ async function assertRejects(action: () => unknown, message: string) {
     throw new Error(`expected rejection containing ${message}`);
 }
 
-function completeInventory() {
+function managedProfile() {
     return {
-        schemaVersion: 1,
+        profile: "managed-pitr-v1",
+        physicalBackupsEnabled: true,
+        pitrEnabled: true,
+        newestRecoveryPointAt: "2026-08-02T03:45:00.000Z",
+        restoreStartedAt: "2026-08-02T03:46:00.000Z",
+        restoreHealthyAt: "2026-08-02T03:55:00.000Z",
+        recoveryPointAt: "2026-08-02T03:45:00.000Z",
+        latestRestoredOperationAt: "2026-08-02T03:35:00.000Z",
+        beforeMemberChecksum: "e".repeat(64),
+        afterMemberChecksum: "e".repeat(64),
+        beforeMatchChecksum: "f".repeat(64),
+        afterMatchChecksum: "f".repeat(64),
+    };
+}
+
+function logicalProfile() {
+    return {
+        profile: "logical-offsite-v1",
+        repository: "divclasssg/jwtennisclub-backups",
+        backupId: "20260802T030435497Z-af0948fe-295e-482f-aaff-d72ac743e6f8",
+        workflowRunId: "30729954729",
+        encryptedArchiveSha256: "a".repeat(64),
+        sourceFingerprintSha256: "b".repeat(64),
+        archiveBytes: 82470,
+        backupStartedAt: "2026-08-02T03:04:35.497Z",
+        backupCompletedAt: "2026-08-02T03:07:05.402Z",
+        lastStateCheckAt: "2026-08-02T03:04:19.454Z",
+        maxStateCheckGapMinutes: 1440,
+        decryptTestedAt: "2026-08-02T03:13:56.000Z",
+        localRestoreTestedAt: "2026-08-02T03:08:31.949Z",
+        hostedRestoreStartedAt: "2026-08-02T03:14:00.000Z",
+        hostedRestoreHealthyAt: "2026-08-02T03:40:00.000Z",
+        hostedRestoreProjectRef: "orssnkppcukrqxikxdbf",
+        quarterlyDrillAt: "2026-08-02T03:40:00.000Z",
+        storageObjectCount: 0,
+        storageObjectsProtected: false,
+        beforeMemberChecksum: "e".repeat(64),
+        afterMemberChecksum: "e".repeat(64),
+        beforeMatchChecksum: "f".repeat(64),
+        afterMatchChecksum: "f".repeat(64),
+    };
+}
+
+function completeInventory(
+    recoveryProfile:
+        | ReturnType<typeof managedProfile>
+        | ReturnType<typeof logicalProfile> = managedProfile(),
+) {
+    return {
+        schemaVersion: 2,
         identity: {
-            validationRef: "abcdefghijklmnopqrst",
+            validationRef: "orssnkppcukrqxikxdbf",
             productionSystemIdentifier: "1111111111111111111",
             validationSystemIdentifier: "2222222222222222222",
             databaseOid: "5",
@@ -53,7 +104,7 @@ function completeInventory() {
             sha256: "c".repeat(64),
         }],
         storage: {
-            projectRef: "abcdefghijklmnopqrst",
+            projectRef: "orssnkppcukrqxikxdbf",
             buckets: [{
                 id: "avatars",
                 public: false,
@@ -81,28 +132,14 @@ function completeInventory() {
             version: index + 1,
             status: "ACTIVE",
         })),
-        backup: {
-            physicalBackupsEnabled: true,
-            pitrEnabled: true,
-            newestRecoveryPointAt: "2026-07-30T01:00:00.000Z",
-        },
-        recovery: {
-            restoreStartedAt: "2026-07-30T01:01:00.000Z",
-            restoreHealthyAt: "2026-07-30T01:31:00.000Z",
-            recoveryPointAt: "2026-07-30T01:00:00.000Z",
-            latestRestoredOperationAt: "2026-07-30T00:50:00.000Z",
-            beforeMemberChecksum: "e".repeat(64),
-            afterMemberChecksum: "e".repeat(64),
-            beforeMatchChecksum: "f".repeat(64),
-            afterMatchChecksum: "f".repeat(64),
-        },
+        recoveryProfile,
     };
 }
 
 function validationContext() {
     return {
         storedIdentity: {
-            validationRef: "abcdefghijklmnopqrst",
+            validationRef: "orssnkppcukrqxikxdbf",
             productionSystemIdentifier: "1111111111111111111",
             validationSystemIdentifier: "2222222222222222222",
             databaseOid: "5",
@@ -110,7 +147,7 @@ function validationContext() {
             provenanceId: "clone-ticket-42",
         },
         liveIdentity: {
-            projectRef: "abcdefghijklmnopqrst",
+            projectRef: "orssnkppcukrqxikxdbf",
             systemIdentifier: "2222222222222222222",
             databaseOid: "5",
             databaseName: "postgres",
@@ -131,32 +168,50 @@ function validationContext() {
     };
 }
 
-Deno.test("inventory accepts the exact versioned custody bundle", () => {
+Deno.test("inventory accepts exact v2 custody bundles for both recovery profiles", () => {
     const result = validateInventoryBundle(
         completeInventory(),
         validationContext(),
+        NOW,
     );
     assert(result.edgeFunctions.length === 7);
     assert(result.derivedIsolation.authInstanceDistinct);
     assert(result.derivedIsolation.storageProjectBound);
     assert(result.derivedIsolation.networkHostsDistinct);
+    assert(result.recoveryProfile.profile === "managed-pitr-v1");
+
+    const logical = validateInventoryBundle(
+        completeInventory(logicalProfile()),
+        validationContext(),
+        NOW,
+    );
+    assert(logical.recoveryProfile.profile === "logical-offsite-v1");
 });
 
-Deno.test("inventory fails closed when PITR or recovery evidence is missing", async () => {
-    const missingPitr = completeInventory();
-    delete (missingPitr.backup as Partial<typeof missingPitr.backup>)
-        .pitrEnabled;
+Deno.test("inventory rejects v1 evidence and ambiguous PITR booleans", async () => {
+    const legacy = completeInventory() as Record<string, unknown>;
+    legacy.schemaVersion = 1;
     await assertRejects(
-        () => validateInventoryBundle(missingPitr, validationContext()),
-        "backup.pitrEnabled",
+        () => validateInventoryBundle(legacy, validationContext(), NOW),
+        "schemaVersion must equal 2",
     );
 
-    const missingTiming = completeInventory();
-    delete (missingTiming.recovery as Partial<typeof missingTiming.recovery>)
-        .restoreHealthyAt;
+    const disabled = completeInventory();
+    (disabled.recoveryProfile as ReturnType<typeof managedProfile>)
+        .pitrEnabled = false;
     await assertRejects(
-        () => validateInventoryBundle(missingTiming, validationContext()),
-        "recovery.restoreHealthyAt",
+        () => validateInventoryBundle(disabled, validationContext(), NOW),
+        "pitrEnabled",
+    );
+
+    const disguised = completeInventory(logicalProfile()) as Record<
+        string,
+        unknown
+    >;
+    disguised.physicalBackupsEnabled = false;
+    await assertRejects(
+        () => validateInventoryBundle(disguised, validationContext(), NOW),
+        "unexpected field",
     );
 });
 
@@ -164,7 +219,7 @@ Deno.test("inventory requires exactly the seven approved edge functions", async 
     const inventory = completeInventory();
     inventory.edgeFunctions.pop();
     await assertRejects(
-        () => validateInventoryBundle(inventory, validationContext()),
+        () => validateInventoryBundle(inventory, validationContext(), NOW),
         "seven approved edge functions",
     );
 });
@@ -173,21 +228,21 @@ Deno.test("inventory derives and rejects production-coupled auth/storage", async
     const auth = completeInventory();
     auth.auth.instanceId = "production-auth-instance";
     await assertRejects(
-        () => validateInventoryBundle(auth, validationContext()),
+        () => validateInventoryBundle(auth, validationContext(), NOW),
         "auth instance",
     );
 
     const storage = completeInventory();
     storage.storage.projectRef = "ydiusirreirhbvlftegp";
     await assertRejects(
-        () => validateInventoryBundle(storage, validationContext()),
+        () => validateInventoryBundle(storage, validationContext(), NOW),
         "storage project",
     );
 
     const restore = completeInventory();
-    restore.recovery.afterMemberChecksum = "0".repeat(64);
+    restore.recoveryProfile.afterMemberChecksum = "0".repeat(64);
     await assertRejects(
-        () => validateInventoryBundle(restore, validationContext()),
+        () => validateInventoryBundle(restore, validationContext(), NOW),
         "member checksum",
     );
 });
@@ -196,14 +251,14 @@ Deno.test("inventory binds stored, live, and production identities", async () =>
     const storedMismatch = validationContext();
     storedMismatch.storedIdentity.markerDigest = "8".repeat(64);
     await assertRejects(
-        () => validateInventoryBundle(completeInventory(), storedMismatch),
+        () => validateInventoryBundle(completeInventory(), storedMismatch, NOW),
         "stored identity",
     );
 
     const liveMismatch = validationContext();
     liveMismatch.liveIdentity.systemIdentifier = "3333333333333333333";
     await assertRejects(
-        () => validateInventoryBundle(completeInventory(), liveMismatch),
+        () => validateInventoryBundle(completeInventory(), liveMismatch, NOW),
         "validation database fingerprint mismatch",
     );
 });
@@ -212,12 +267,12 @@ Deno.test("inventory requires exact ACTIVE edge deployment status", async () => 
     const inventory = completeInventory();
     inventory.edgeFunctions[0].status = "DEPLOYING";
     await assertRejects(
-        () => validateInventoryBundle(inventory, validationContext()),
+        () => validateInventoryBundle(inventory, validationContext(), NOW),
         "ACTIVE",
     );
 });
 
-Deno.test("inventory rejects malformed entries, extra fields, and recovery limits", async () => {
+Deno.test("inventory rejects malformed entries and extra fields", async () => {
     const extra = completeInventory() as
         & ReturnType<
             typeof completeInventory
@@ -225,28 +280,47 @@ Deno.test("inventory rejects malformed entries, extra fields, and recovery limit
         & { bearerToken?: string };
     extra.bearerToken = "must-not-be-accepted";
     await assertRejects(
-        () => validateInventoryBundle(extra, validationContext()),
+        () => validateInventoryBundle(extra, validationContext(), NOW),
         "unexpected field",
     );
 
     const malformed = completeInventory();
     malformed.migrations[0].sha256 = "not-a-hash";
     await assertRejects(
-        () => validateInventoryBundle(malformed, validationContext()),
+        () => validateInventoryBundle(malformed, validationContext(), NOW),
         "migrations[0].sha256",
     );
+});
 
-    const rto = completeInventory();
-    rto.recovery.restoreHealthyAt = "2026-07-30T02:02:00.000Z";
-    await assertRejects(
-        () => validateInventoryBundle(rto, validationContext()),
-        "RTO",
-    );
-
-    const rpo = completeInventory();
-    rpo.recovery.latestRestoredOperationAt = "2026-07-30T00:44:00.000Z";
-    await assertRejects(
-        () => validateInventoryBundle(rpo, validationContext()),
-        "RPO",
-    );
+Deno.test("inventory rejects foreign, stale, large, and incomplete logical evidence", async () => {
+    const cases: Array<[Record<string, unknown>, string]> = [
+        [{ pitrEnabled: true }, "unexpected field"],
+        [{ repository: "divclasssg/foreign" }, "repository"],
+        [{ workflowRunId: "foreign-run" }, "workflowRunId"],
+        [{ encryptedArchiveSha256: "not-a-hash" }, "encryptedArchiveSha256"],
+        [
+            { hostedRestoreProjectRef: "abcdefghijklmnopqrst" },
+            "hosted restore project",
+        ],
+        [{ lastStateCheckAt: "2026-07-31T16:59:59.000Z" }, "state check"],
+        [{ quarterlyDrillAt: "2026-05-01T04:59:59.000Z" }, "quarterly drill"],
+        [{ archiveBytes: 10_485_761 }, "archiveBytes"],
+        [{ storageObjectCount: 1 }, "Storage objects"],
+        [{ afterMemberChecksum: "0".repeat(64) }, "member checksum"],
+    ];
+    for (const [mutation, message] of cases) {
+        await assertRejects(
+            () =>
+                validateInventoryBundle(
+                    completeInventory(
+                        { ...logicalProfile(), ...mutation } as ReturnType<
+                            typeof logicalProfile
+                        >,
+                    ),
+                    validationContext(),
+                    NOW,
+                ),
+            message,
+        );
+    }
 });

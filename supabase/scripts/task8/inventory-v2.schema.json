@@ -1,0 +1,202 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://jwtennisclub.invalid/schemas/task8/inventory-v2.schema.json",
+    "title": "Task 8 rollout custody inventory v2",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schemaVersion",
+        "identity",
+        "migrations",
+        "memberBaseline",
+        "auth",
+        "tables",
+        "storage",
+        "databaseFunctions",
+        "edgeFunctions",
+        "recoveryProfile"
+    ],
+    "properties": {
+        "schemaVersion": { "const": 2 },
+        "identity": { "$ref": "#/$defs/identity" },
+        "migrations": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/migration" }
+        },
+        "memberBaseline": { "$ref": "#/$defs/memberBaseline" },
+        "auth": { "$ref": "#/$defs/auth" },
+        "tables": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/namedHash" }
+        },
+        "storage": { "$ref": "#/$defs/storage" },
+        "databaseFunctions": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/function" }
+        },
+        "edgeFunctions": {
+            "type": "array",
+            "minItems": 7,
+            "maxItems": 7,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/edgeFunction" }
+        },
+        "recoveryProfile": {
+            "$ref": "recovery-profile-v1.schema.json"
+        }
+    },
+    "$defs": {
+        "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+        },
+        "identity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "validationRef",
+                "productionSystemIdentifier",
+                "validationSystemIdentifier",
+                "databaseOid",
+                "markerDigest",
+                "provenanceId"
+            ],
+            "properties": {
+                "validationRef": { "const": "orssnkppcukrqxikxdbf" },
+                "productionSystemIdentifier": {
+                    "type": "string",
+                    "pattern": "^[0-9]{10,32}$"
+                },
+                "validationSystemIdentifier": {
+                    "type": "string",
+                    "pattern": "^[0-9]{10,32}$"
+                },
+                "databaseOid": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+                "markerDigest": { "$ref": "#/$defs/sha256" },
+                "provenanceId": { "type": "string", "minLength": 1 }
+            }
+        },
+        "migration": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["version", "name", "sha256"],
+            "properties": {
+                "version": { "type": "string", "pattern": "^[0-9]{12,14}$" },
+                "name": { "type": "string", "minLength": 1 },
+                "sha256": { "$ref": "#/$defs/sha256" }
+            }
+        },
+        "memberBaseline": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["count", "sha256"],
+            "properties": {
+                "count": { "type": "integer", "minimum": 0 },
+                "sha256": { "$ref": "#/$defs/sha256" }
+            }
+        },
+        "auth": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "userCount",
+                "identityCount",
+                "providerCounts",
+                "instanceId",
+                "siteUrl",
+                "redirectHosts",
+                "jwtExpirySeconds"
+            ],
+            "properties": {
+                "userCount": { "type": "integer", "minimum": 0 },
+                "identityCount": { "type": "integer", "minimum": 0 },
+                "providerCounts": {
+                    "type": "object",
+                    "additionalProperties": { "type": "integer", "minimum": 0 }
+                },
+                "instanceId": { "type": "string", "minLength": 1 },
+                "siteUrl": { "type": "string", "format": "uri" },
+                "redirectHosts": {
+                    "type": "array",
+                    "items": { "type": "string", "minLength": 1 }
+                },
+                "jwtExpirySeconds": { "type": "integer", "minimum": 1 }
+            }
+        },
+        "namedHash": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["schema", "name", "rowCount", "sha256"],
+            "properties": {
+                "schema": { "type": "string", "minLength": 1 },
+                "name": { "type": "string", "minLength": 1 },
+                "rowCount": { "type": "integer", "minimum": 0 },
+                "sha256": { "$ref": "#/$defs/sha256" }
+            }
+        },
+        "storage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["projectRef", "buckets"],
+            "properties": {
+                "projectRef": { "const": "orssnkppcukrqxikxdbf" },
+                "buckets": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/bucket" }
+                }
+            }
+        },
+        "bucket": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "id",
+                "public",
+                "fileSizeLimit",
+                "allowedMimeTypes",
+                "objectCount"
+            ],
+            "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "public": { "type": "boolean" },
+                "fileSizeLimit": { "type": ["integer", "null"], "minimum": 0 },
+                "allowedMimeTypes": {
+                    "type": ["array", "null"],
+                    "items": { "type": "string", "minLength": 1 }
+                },
+                "objectCount": { "type": "integer", "minimum": 0 }
+            }
+        },
+        "function": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["schema", "name", "identityArguments", "sha256"],
+            "properties": {
+                "schema": { "type": "string", "minLength": 1 },
+                "name": { "type": "string", "minLength": 1 },
+                "identityArguments": { "type": "string" },
+                "sha256": { "$ref": "#/$defs/sha256" }
+            }
+        },
+        "edgeFunction": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "version", "status"],
+            "properties": {
+                "name": {
+                    "enum": [
+                        "admin-command",
+                        "game-day-command",
+                        "game-day-snapshot",
+                        "match-recommendation",
+                        "member-link",
+                        "member-read",
+                        "operator-read"
+                    ]
+                },
+                "version": { "type": "integer", "minimum": 1 },
+                "status": { "const": "ACTIVE" }
+            }
+        }
+    }
+}

@@ -4,6 +4,10 @@ import {
     PRODUCTION_REF,
     validateDatabaseIdentity,
 } from "./identity_lib.ts";
+import {
+    type RecoveryProfile,
+    validateRecoveryProfile,
+} from "./recovery_profile_lib.ts";
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const PROJECT_REF_PATTERN = /^[a-z]{20}$/;
@@ -17,8 +21,8 @@ const EDGE_FUNCTIONS = [
     "operator-read",
 ] as const;
 
-export interface InventoryBundle {
-    schemaVersion: 1;
+export interface InventoryBundleV2 {
+    schemaVersion: 2;
     identity: {
         validationRef: string;
         productionSystemIdentifier: string;
@@ -42,21 +46,7 @@ export interface InventoryBundle {
     storage: { projectRef: string; buckets: unknown[] };
     databaseFunctions: unknown[];
     edgeFunctions: Array<{ name: string; version: number; status: string }>;
-    backup: {
-        physicalBackupsEnabled: true;
-        pitrEnabled: true;
-        newestRecoveryPointAt: string;
-    };
-    recovery: {
-        restoreStartedAt: string;
-        restoreHealthyAt: string;
-        recoveryPointAt: string;
-        latestRestoredOperationAt: string;
-        beforeMemberChecksum: string;
-        afterMemberChecksum: string;
-        beforeMatchChecksum: string;
-        afterMatchChecksum: string;
-    };
+    recoveryProfile: RecoveryProfile;
 }
 
 export interface InventoryValidationContext {
@@ -74,7 +64,7 @@ export interface InventoryValidationContext {
     };
 }
 
-export interface ValidatedInventoryBundle extends InventoryBundle {
+export interface ValidatedInventoryBundle extends InventoryBundleV2 {
     derivedIsolation: {
         authInstanceDistinct: true;
         storageProjectBound: true;
@@ -120,12 +110,6 @@ const isCount = (value: unknown): value is number =>
 const isString = (value: unknown): value is string =>
     typeof value === "string" && value.trim() !== "";
 const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
-
-function requireIso(value: string, path: string): void {
-    if (!Number.isFinite(Date.parse(value))) {
-        throw new Error(`${path} is invalid`);
-    }
-}
 
 function requireChecksum(value: unknown, path: string): string {
     if (typeof value !== "string" || !SHA256_PATTERN.test(value)) {
@@ -397,82 +381,10 @@ function validateFunctions(root: Record<string, unknown>): void {
     }
 }
 
-function validateRecovery(root: Record<string, unknown>): void {
-    const backup = record(root.backup, "backup");
-    exactKeys(backup, [
-        "physicalBackupsEnabled",
-        "pitrEnabled",
-        "newestRecoveryPointAt",
-    ], "backup");
-    required(backup, "physicalBackupsEnabled", isBoolean, "backup");
-    required(backup, "pitrEnabled", isBoolean, "backup");
-    if (backup.physicalBackupsEnabled !== true || backup.pitrEnabled !== true) {
-        throw new Error("backup and PITR capability must be enabled");
-    }
-    const newest = required(
-        backup,
-        "newestRecoveryPointAt",
-        isString,
-        "backup",
-    );
-    requireIso(newest, "backup.newestRecoveryPointAt");
-
-    const recovery = record(root.recovery, "recovery");
-    exactKeys(recovery, [
-        "restoreStartedAt",
-        "restoreHealthyAt",
-        "recoveryPointAt",
-        "latestRestoredOperationAt",
-        "beforeMemberChecksum",
-        "afterMemberChecksum",
-        "beforeMatchChecksum",
-        "afterMatchChecksum",
-    ], "recovery");
-    const times = Object.fromEntries([
-        "restoreStartedAt",
-        "restoreHealthyAt",
-        "recoveryPointAt",
-        "latestRestoredOperationAt",
-    ].map((key) => {
-        const timestamp = required(recovery, key, isString, "recovery");
-        requireIso(timestamp, `recovery.${key}`);
-        return [key, Date.parse(timestamp)];
-    }));
-    const beforeMember = requireChecksum(
-        recovery.beforeMemberChecksum,
-        "recovery.beforeMemberChecksum",
-    );
-    const afterMember = requireChecksum(
-        recovery.afterMemberChecksum,
-        "recovery.afterMemberChecksum",
-    );
-    const beforeMatch = requireChecksum(
-        recovery.beforeMatchChecksum,
-        "recovery.beforeMatchChecksum",
-    );
-    const afterMatch = requireChecksum(
-        recovery.afterMatchChecksum,
-        "recovery.afterMatchChecksum",
-    );
-    if (beforeMember !== afterMember) {
-        throw new Error("member checksum mismatch");
-    }
-    if (beforeMatch !== afterMatch) throw new Error("match checksum mismatch");
-    const rtoMinutes = (times.restoreHealthyAt - times.restoreStartedAt) /
-        60_000;
-    const rpoMinutes =
-        (times.recoveryPointAt - times.latestRestoredOperationAt) / 60_000;
-    if (rtoMinutes < 0 || rtoMinutes > 60) {
-        throw new Error("RTO exceeds 60 minutes");
-    }
-    if (rpoMinutes < 0 || rpoMinutes > 15) {
-        throw new Error("RPO exceeds 15 minutes");
-    }
-}
-
 export function validateInventoryBundle(
     value: unknown,
     context: InventoryValidationContext,
+    now = new Date(),
 ): ValidatedInventoryBundle {
     const root = record(value, "inventory");
     exactKeys(root, [
@@ -485,18 +397,18 @@ export function validateInventoryBundle(
         "storage",
         "databaseFunctions",
         "edgeFunctions",
-        "backup",
-        "recovery",
+        "recoveryProfile",
     ], "inventory");
-    if (root.schemaVersion !== 1) throw new Error("schemaVersion must equal 1");
+    if (root.schemaVersion !== 2) throw new Error("schemaVersion must equal 2");
     validateIdentity(root, context);
     validateMigrations(root);
     const authIsolation = validateAuthAndMember(root, context);
     const storageIsolation = validateTablesAndStorage(root, context);
     validateFunctions(root);
-    validateRecovery(root);
+    const recoveryProfile = validateRecoveryProfile(root.recoveryProfile, now);
     return {
-        ...(value as InventoryBundle),
+        ...(value as InventoryBundleV2),
+        recoveryProfile,
         derivedIsolation: {
             ...authIsolation,
             ...storageIsolation,
