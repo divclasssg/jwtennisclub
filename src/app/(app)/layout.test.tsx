@@ -27,8 +27,8 @@ describe("AppLayout", () => {
   it("renders shell identity from the shared operator context", async () => {
     render(await AppLayout({ children: <p>내용</p>, modal: null }));
 
-    expect(screen.getAllByText("박세익")).toHaveLength(2);
-    expect(screen.getByText("운영진 · 총무")).toBeInTheDocument();
+    expect(screen.getAllByText("박세익")).toHaveLength(3);
+    expect(screen.getAllByText("운영진 · 총무")).toHaveLength(2);
     expect(screen.getByText("내용")).toBeInTheDocument();
   });
 });

@@ -4,9 +4,22 @@ const mocks = vi.hoisted(() => {
   const deleteQuery = {
     eq: vi.fn(async () => ({ error: null })),
   };
+  const feePaymentReadQuery = {
+    eq: vi.fn(() => feePaymentReadQuery),
+    maybeSingle: vi.fn(async () => ({
+      data: {
+        id: "payment-1",
+        period_month: "2026-07-01",
+      } as { id: string; period_month: string } | null,
+      error: null,
+    })),
+  };
   const feePaymentsTable = {
     delete: vi.fn(() => deleteQuery),
-    insert: vi.fn(async () => ({ error: null })),
+    insert: vi.fn(
+      async (): Promise<{ error: unknown }> => ({ error: null }),
+    ),
+    select: vi.fn(() => feePaymentReadQuery),
   };
   const importMembersQuery = {
     eq: vi.fn(async () => ({
@@ -16,6 +29,7 @@ const mocks = vi.hoisted(() => {
           member_code: "M0001",
           status: "active",
           pause_start_month: null,
+          activity_start_month: "2026-07-01",
         },
       ],
       error: null,
@@ -28,6 +42,7 @@ const mocks = vi.hoisted(() => {
           member_code: "M0001",
           status: "active",
           pause_start_month: null,
+          activity_start_month: "2026-07-01",
         },
       ],
       error: null,
@@ -35,17 +50,32 @@ const mocks = vi.hoisted(() => {
   };
   const targetMemberQuery = {
     eq: vi.fn(() => targetMemberQuery),
+    in: vi.fn(() => importMembersQuery),
     neq: vi.fn(() => targetMemberQuery),
     lte: vi.fn(() => targetMemberQuery),
     or: vi.fn(() => targetMemberQuery),
     maybeSingle: vi.fn(async () => ({
-      data: { id: "member-1" } as { id: string } | null,
+      data: {
+        id: "member-1",
+        member_code: "M0001",
+        status: "active",
+        withdrawn_date: null,
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+      } as {
+        id: string;
+        member_code: string;
+        status: "active" | "paused" | "withdrawn";
+        withdrawn_date: string | null;
+        pause_start_month: string | null;
+        activity_start_month: string | null;
+      } | null,
       error: null,
     })),
   };
   const membersTable = {
     select: vi.fn((columns: string) =>
-      columns === "id" || columns.includes("joined_date")
+      columns === "id" || columns.includes("activity_start_month")
         ? targetMemberQuery
         : importMembersQuery,
     ),
@@ -96,6 +126,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     deleteQuery,
+    feePaymentReadQuery,
     feePaymentsTable,
     importMembersQuery,
     targetMemberQuery,
@@ -105,6 +136,23 @@ const mocks = vi.hoisted(() => {
     noteDeleteQuery,
     noteTable,
     currentOperatorHasPermission: vi.fn(async () => true),
+    getMonthlySourceLockStatus: vi.fn(
+      async (periodMonth: string) => {
+        void periodMonth;
+        return false;
+      },
+    ),
+    isMonthlySourceLockError: vi.fn(
+      (error: unknown) =>
+        Boolean(
+          error &&
+            typeof error === "object" &&
+            "code" in error &&
+            error.code === "55000" &&
+            "message" in error &&
+            String(error.message).includes("monthly closing source is locked"),
+        ),
+    ),
     revalidatePath: vi.fn(),
     redirect: vi.fn((path: string) => {
       throw new Error(`redirect:${path}`);
@@ -129,6 +177,11 @@ vi.mock("@/features/auth/operator-context", () => ({
   currentOperatorHasPermission: mocks.currentOperatorHasPermission,
 }));
 
+vi.mock("@/features/settlements/monthly-source-lock", () => ({
+  getMonthlySourceLockStatus: mocks.getMonthlySourceLockStatus,
+  isMonthlySourceLockError: mocks.isMonthlySourceLockError,
+}));
+
 import {
   cancelFeePayment,
   createFeePayment,
@@ -148,9 +201,19 @@ describe("fee payment actions", () => {
     mocks.supabase.from.mockClear();
     mocks.feePaymentsTable.delete.mockClear();
     mocks.feePaymentsTable.insert.mockClear();
+    mocks.feePaymentsTable.select.mockClear();
+    mocks.feePaymentReadQuery.eq.mockClear();
+    mocks.feePaymentReadQuery.maybeSingle.mockReset();
+    mocks.feePaymentReadQuery.maybeSingle.mockResolvedValue({
+      data: {
+        id: "payment-1",
+        period_month: "2026-07-01",
+      },
+      error: null,
+    });
     mocks.membersTable.select.mockClear();
     mocks.importMembersQuery.eq.mockClear();
-    mocks.importMembersQuery.in.mockClear();
+    mocks.targetMemberQuery.in.mockClear();
     mocks.importMembersQuery.then.mockClear();
     mocks.targetMemberQuery.eq.mockClear();
     mocks.targetMemberQuery.neq.mockClear();
@@ -158,7 +221,14 @@ describe("fee payment actions", () => {
     mocks.targetMemberQuery.or.mockClear();
     mocks.targetMemberQuery.maybeSingle.mockReset();
     mocks.targetMemberQuery.maybeSingle.mockResolvedValue({
-      data: { id: "member-1" },
+      data: {
+        id: "member-1",
+        member_code: "M0001",
+        status: "active",
+        withdrawn_date: null,
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+      },
       error: null,
     });
     mocks.existingNoteQuery.eq.mockClear();
@@ -175,9 +245,77 @@ describe("fee payment actions", () => {
     mocks.noteTable.insert.mockResolvedValue({ error: null });
     mocks.currentOperatorHasPermission.mockReset();
     mocks.currentOperatorHasPermission.mockResolvedValue(true);
+    mocks.getMonthlySourceLockStatus.mockReset();
+    mocks.getMonthlySourceLockStatus.mockResolvedValue(false);
+    mocks.isMonthlySourceLockError.mockClear();
     mocks.deleteQuery.eq.mockClear();
     mocks.deleteQuery.eq.mockResolvedValue({ error: null });
     mocks.feePaymentsTable.insert.mockResolvedValue({ error: null });
+  });
+
+  it("redirects a finalized inline payment month before reading or writing sources", async () => {
+    mocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({
+          memberId: "member-1",
+          periodMonth: "2026-07",
+        }),
+      ),
+    ).rejects.toThrow(
+      "redirect:/fees?error=closing-locked&month=2026-07",
+    );
+
+    expect(mocks.getMonthlySourceLockStatus).toHaveBeenCalledWith("2026-07-01");
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("members");
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("uses the stored month when a cancellation posts a mismatched month", async () => {
+    mocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+    const formData = new FormData();
+    formData.set("paymentId", "payment-1");
+    formData.set("periodMonth", "2026-08");
+
+    await expect(cancelFeePayment(formData)).rejects.toThrow(
+      "redirect:/fees?error=closing-locked&month=2026-07",
+    );
+
+    expect(mocks.feePaymentsTable.select).toHaveBeenCalledWith(
+      "id, period_month",
+    );
+    expect(mocks.feePaymentReadQuery.eq).toHaveBeenCalledWith(
+      "id",
+      "payment-1",
+    );
+    expect(mocks.getMonthlySourceLockStatus).toHaveBeenCalledWith(
+      "2026-07-01",
+    );
+    expect(mocks.feePaymentsTable.delete).not.toHaveBeenCalled();
+  });
+
+  it("maps a racing final-close trigger error during payment creation", async () => {
+    mocks.feePaymentsTable.insert.mockResolvedValueOnce({
+      error: {
+        code: "55000",
+        message: "monthly closing source is locked",
+      },
+    });
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({
+          memberId: "member-1",
+          periodMonth: "2026-07",
+        }),
+      ),
+    ).rejects.toThrow(
+      "redirect:/fees?error=closing-locked&month=2026-07",
+    );
+
+    expect(mocks.getMonthlySourceLockStatus).toHaveBeenCalledWith("2026-07-01");
+    expect(mocks.isMonthlySourceLockError).toHaveBeenCalled();
   });
 
   it("cancels a fee payment and returns to the selected month", async () => {
@@ -208,10 +346,12 @@ describe("fee payment actions", () => {
     expect(mocks.currentOperatorHasPermission).toHaveBeenCalledWith(
       "fees.payments.create",
     );
-    expect(mocks.membersTable.select).toHaveBeenCalledWith("id");
+    expect(mocks.membersTable.select).toHaveBeenCalledWith(
+      "id, member_code, status, withdrawn_date, pause_start_month, activity_start_month",
+    );
     expect(mocks.targetMemberQuery.eq).toHaveBeenCalledWith("id", "member-2");
     expect(mocks.targetMemberQuery.or).toHaveBeenCalledWith(
-      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-07-31)",
     );
     expect(mocks.targetMemberQuery.neq).toHaveBeenCalledWith(
       "member_code",
@@ -220,6 +360,10 @@ describe("fee payment actions", () => {
     expect(mocks.targetMemberQuery.lte).toHaveBeenCalledWith(
       "joined_date",
       "2026-07-31",
+    );
+    expect(mocks.targetMemberQuery.lte).toHaveBeenCalledWith(
+      "activity_start_month",
+      "2026-07-01",
     );
     expect(mocks.feePaymentsTable.insert).toHaveBeenCalledWith({
       member_id: "member-2",
@@ -249,8 +393,76 @@ describe("fee payment actions", () => {
     ).rejects.toThrow("redirect:/fees/new?error=invalid-member");
 
     expect(mocks.targetMemberQuery.or).toHaveBeenCalledWith(
-      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-08-01)",
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-08-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-08-31)",
     );
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects a direct payment when the returned member starts activity after the payment month", async () => {
+    mocks.targetMemberQuery.maybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "member-3",
+        member_code: "M0003",
+        status: "active",
+        withdrawn_date: null,
+        pause_start_month: null,
+        activity_start_month: "2026-08-01",
+      },
+      error: null,
+    });
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({ memberId: "member-3", periodMonth: "2026-07" }),
+      ),
+    ).rejects.toThrow("redirect:/fees/new?error=invalid-member");
+
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("creates a historical July payment for a member withdrawn on August 1", async () => {
+    mocks.targetMemberQuery.maybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "member-withdrawn",
+        member_code: "M0003",
+        status: "withdrawn",
+        withdrawn_date: "2026-08-01",
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+      },
+      error: null,
+    });
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({ memberId: "member-withdrawn", periodMonth: "2026-07" }),
+      ),
+    ).rejects.toThrow("redirect:/fees?status=created&month=2026-07");
+
+    expect(mocks.targetMemberQuery.or).toHaveBeenCalledWith(
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-07-31)",
+    );
+  });
+
+  it("rejects an August payment for a member withdrawn on August 1", async () => {
+    mocks.targetMemberQuery.maybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "member-withdrawn",
+        member_code: "M0003",
+        status: "withdrawn",
+        withdrawn_date: "2026-08-01",
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+      },
+      error: null,
+    });
+
+    await expect(
+      createFeePayment(
+        buildPaymentFormData({ memberId: "member-withdrawn", periodMonth: "2026-08" }),
+      ),
+    ).rejects.toThrow("redirect:/fees/new?error=invalid-member");
+
     expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
   });
 
@@ -334,9 +546,9 @@ describe("fee payment actions", () => {
 
     expect(mocks.supabase.from).toHaveBeenCalledWith("members");
     expect(mocks.membersTable.select).toHaveBeenCalledWith(
-      "id, member_code, status, pause_start_month",
+      "id, member_code, status, withdrawn_date, pause_start_month, activity_start_month",
     );
-    expect(mocks.importMembersQuery.in).toHaveBeenCalledWith("status", ["active", "paused"]);
+    expect(mocks.targetMemberQuery.in).toHaveBeenCalledWith("status", ["active", "paused", "withdrawn"]);
     expect(mocks.feePaymentsTable.insert).toHaveBeenCalledWith([
       {
         member_id: "member-1",
@@ -351,6 +563,39 @@ describe("fee payment actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
   });
 
+  it("preflights every distinct CSV month before the batch insert", async () => {
+    mocks.getMonthlySourceLockStatus.mockImplementation(
+      async (periodMonth: string) => periodMonth === "2026-08-01",
+    );
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(
+        [
+          [
+            "memberCode,periodMonth,amount,paidDate,memo",
+            "m0001,2026-07,30000,2026-07-03,7월 회비",
+            "m0001,2026-08,30000,2026-08-03,8월 회비",
+            "m0001,2026-07,30000,2026-07-04,추가 행",
+          ].join("\n"),
+        ],
+        "fees.csv",
+        { type: "text/csv" },
+      ),
+    );
+
+    await expect(importFeePaymentsCsv(formData)).rejects.toThrow(
+      "redirect:/fees/new?importError=closing-locked&month=2026-08",
+    );
+
+    expect(mocks.getMonthlySourceLockStatus.mock.calls).toEqual([
+      ["2026-07-01"],
+      ["2026-08-01"],
+    ]);
+    expect(mocks.supabase.from).not.toHaveBeenCalledWith("members");
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
   it("accepts an August-paused member's July CSV row but rejects its August row", async () => {
     mocks.importMembersQuery.then.mockImplementationOnce((resolve) => resolve({
       data: [
@@ -359,6 +604,8 @@ describe("fee payment actions", () => {
           member_code: "M0002",
           status: "paused",
           pause_start_month: "2026-08-01",
+          withdrawn_date: null,
+          activity_start_month: "2026-07-01",
         },
       ],
       error: null,
@@ -383,7 +630,120 @@ describe("fee payment actions", () => {
       "redirect:/fees/new?importError=member-not-found&line=3",
     );
 
-    expect(mocks.importMembersQuery.in).toHaveBeenCalledWith("status", ["active", "paused"]);
+    expect(mocks.targetMemberQuery.in).toHaveBeenCalledWith("status", ["active", "paused", "withdrawn"]);
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects a CSV payment before the member's activity start month", async () => {
+    mocks.importMembersQuery.then.mockImplementationOnce((resolve) => resolve({
+      data: [
+        {
+          id: "member-3",
+          member_code: "M0003",
+          status: "active",
+          withdrawn_date: null,
+          pause_start_month: null,
+          activity_start_month: "2026-08-01",
+        },
+      ],
+      error: null,
+    }));
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(
+        [
+          [
+            "memberCode,periodMonth,amount,paidDate,memo",
+            "m0003,2026-07,30000,2026-07-03,7월 회비",
+          ].join("\n"),
+        ],
+        "fees.csv",
+        { type: "text/csv" },
+      ),
+    );
+
+    await expect(importFeePaymentsCsv(formData)).rejects.toThrow(
+      "redirect:/fees/new?importError=member-not-found&line=2",
+    );
+
+    expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
+  });
+
+  it("imports a historical July CSV payment for a member withdrawn on August 1", async () => {
+    mocks.importMembersQuery.then.mockImplementationOnce((resolve) => resolve({
+      data: [
+        {
+          id: "member-withdrawn",
+          member_code: "M0003",
+          status: "withdrawn",
+          withdrawn_date: "2026-08-01",
+          pause_start_month: null,
+          activity_start_month: "2026-07-01",
+        },
+      ],
+      error: null,
+    }));
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(
+        [
+          [
+            "memberCode,periodMonth,amount,paidDate,memo",
+            "m0003,2026-07,30000,2026-07-03,7월 회비",
+          ].join("\n"),
+        ],
+        "fees.csv",
+        { type: "text/csv" },
+      ),
+    );
+
+    await expect(importFeePaymentsCsv(formData)).rejects.toThrow(
+      "redirect:/fees?status=imported&count=1&month=2026-07",
+    );
+
+    expect(mocks.targetMemberQuery.in).toHaveBeenCalledWith("status", [
+      "active",
+      "paused",
+      "withdrawn",
+    ]);
+  });
+
+  it("rejects a CSV payment in the withdrawal month after accepting the prior month", async () => {
+    mocks.importMembersQuery.then.mockImplementationOnce((resolve) => resolve({
+      data: [
+        {
+          id: "member-withdrawn",
+          member_code: "M0003",
+          status: "withdrawn",
+          withdrawn_date: "2026-08-01",
+          pause_start_month: null,
+          activity_start_month: "2026-07-01",
+        },
+      ],
+      error: null,
+    }));
+    const formData = new FormData();
+    formData.set(
+      "csvFile",
+      new File(
+        [
+          [
+            "memberCode,periodMonth,amount,paidDate,memo",
+            "m0003,2026-07,30000,2026-07-03,7월 회비",
+            "m0003,2026-08,30000,2026-08-03,8월 회비",
+          ].join("\n"),
+        ],
+        "fees.csv",
+        { type: "text/csv" },
+      ),
+    );
+
+    await expect(importFeePaymentsCsv(formData)).rejects.toThrow(
+      "redirect:/fees/new?importError=member-not-found&line=3",
+    );
+
     expect(mocks.feePaymentsTable.insert).not.toHaveBeenCalled();
   });
 
@@ -453,12 +813,38 @@ describe("fee payment actions", () => {
       updated_by: "operator-id",
     });
     expect(mocks.membersTable.select).toHaveBeenCalledWith(
-      "id, status, pause_start_month, joined_date, member_code",
+      "id, member_code, status, withdrawn_date, pause_start_month, activity_start_month",
     );
     expect(mocks.targetMemberQuery.or).toHaveBeenCalledWith(
-      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-07-31)",
+    );
+    expect(mocks.targetMemberQuery.lte).toHaveBeenCalledWith(
+      "activity_start_month",
+      "2026-07-01",
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/fees");
+  });
+
+  it("saves a historical July note for a member withdrawn on August 1", async () => {
+    mocks.targetMemberQuery.maybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "member-withdrawn",
+        member_code: "M0003",
+        status: "withdrawn",
+        withdrawn_date: "2026-08-01",
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+      },
+      error: null,
+    });
+
+    await expect(saveFeeMonthlyNote(buildNoteFormData("정산 메모"))).rejects.toThrow(
+      "status=note-saved",
+    );
+
+    expect(mocks.targetMemberQuery.or).toHaveBeenCalledWith(
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-07-31)",
+    );
   });
 
   it("updates a note without replacing its creator", async () => {

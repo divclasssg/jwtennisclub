@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   ActionLink,
   Button,
@@ -44,6 +44,9 @@ export function MemberForm({
   const candidate = actionState.status === "confirmation-required"
     ? actionState.candidate
     : null;
+  const [joinedDate, setJoinedDate] = useState(
+    candidate?.joinedDate ?? member?.joinedDate ?? "",
+  );
   const duplicateMessage = activeConfirmation === "phone-reuse"
     ? "같은 연락처가 다른 이름으로 등록되어 있습니다."
     : activeConfirmation === "name-without-phone"
@@ -102,11 +105,25 @@ export function MemberForm({
         </FormField>
         <FormField label="가입일" labelVisible>
           <DateInput
-            defaultValue={candidate?.joinedDate ?? member?.joinedDate}
             name="joinedDate"
+            onChange={(event) => setJoinedDate(event.currentTarget.value)}
             required
+            value={joinedDate}
           />
         </FormField>
+        <div>
+          <FormField label="활동 시작 월" labelVisible>
+            <TextInput
+              aria-describedby="activity-start-month-help"
+              defaultValue={(candidate?.activityStartMonth ?? member?.activityStartMonth ?? "").slice(0, 7)}
+              min={joinedDate.slice(0, 7)}
+              name="activityStartMonth"
+              required
+              type="month"
+            />
+          </FormField>
+          <small id="activity-start-month-help">가입 월 또는 그 이후의 월을 선택하세요.</small>
+        </div>
         <FormField label="상태" labelVisible>
           <SelectInput defaultValue={candidate?.status ?? member?.status ?? "active"} name="status">
             {MEMBER_STATUSES.map((status) => (

@@ -2,26 +2,32 @@
 
 .meeting-mobile-list {
   display: grid;
-  gap: var(--spacing-sm);
   margin: 0;
-  padding: var(--spacing-md);
+  padding: 0;
   list-style: none;
 }
 
 .meeting-mobile-item {
   display: grid;
   gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  border: var(--hairline-width) solid var(--divider-soft);
-  border-radius: var(--rounded-md);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--spacing-sm) var(--spacing-24);
+  border-bottom: var(--hairline-width) solid var(--hairline);
   background: var(--canvas);
+
+  &:last-child {
+    border-bottom: 0;
+  }
 }
 
 .meeting-mobile-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--spacing-sm);
+  min-width: 0;
 }
 
 .meeting-mobile-title {
@@ -44,6 +50,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-xs);
+  min-width: 0;
 }
 
 .meeting-mobile-number,
@@ -52,6 +59,7 @@
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   letter-spacing: var(--letter-spacing-caption);
+  overflow-wrap: anywhere;
 }
 
 .meeting-mobile-number {
@@ -82,7 +90,7 @@
 
 .meeting-mobile-roster-link,
 .meeting-mobile-roster-disabled {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-caption-strong);
@@ -108,6 +116,7 @@
 .meeting-mobile-count-list {
   display: grid;
   gap: var(--spacing-xs);
+  min-width: 0;
 }
 
 .meeting-mobile-detail,
@@ -118,6 +127,7 @@
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   letter-spacing: var(--letter-spacing-caption);
+  overflow-wrap: anywhere;
 }
 
 .meeting-mobile-count:first-child,
@@ -127,13 +137,14 @@
 }
 
 .meeting-mobile-actions {
+  min-width: 0;
+  max-width: 100%;
   padding-top: var(--spacing-sm);
   border-top: var(--hairline-width) solid var(--divider-soft);
 }
 
 @media (max-width: bp.$breakpoint-small-phone) {
-  .meeting-mobile-list,
   .meeting-mobile-item {
-    padding: var(--spacing-sm);
+    padding-inline: var(--spacing-sm);
   }
 }

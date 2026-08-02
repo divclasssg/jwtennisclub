@@ -20,6 +20,7 @@ const member = {
   joinedDate: "2026-07-01",
   withdrawnDate: null,
   pauseStartMonth: null,
+  activityStartMonth: "2026-07-01",
   memo: null,
 };
 
@@ -62,6 +63,7 @@ describe("MembersPage", () => {
       "상태",
       "휴회 시작",
       "가입일",
+      "활동 시작",
       "관리",
     ]);
     expect(within(table).getByRole("cell", { name: "운영진" })).toBeInTheDocument();
@@ -113,20 +115,21 @@ describe("MembersPage", () => {
     expect(within(table).getAllByRole("cell", { name: "-" })).toHaveLength(2);
     expect(within(table).getByRole("cell", { name: "일반회원" })).toBeInTheDocument();
     const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
-    expect(within(mobileList).getByText("구분 -")).toBeInTheDocument();
-    expect(within(mobileList).getByText("직책 일반회원")).toBeInTheDocument();
+    expect(within(mobileList).getByText("-")).toBeInTheDocument();
+    expect(within(mobileList).getByText("일반회원")).toBeInTheDocument();
   });
 
-  it("renders member code, group, and protected contact on mobile", async () => {
+  it("renders only essential directory information on mobile", async () => {
     render(await MembersPage({ searchParams: Promise.resolve({}) }));
 
     const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
-    expect(within(mobileList).getByText("회원번호 JW-000001")).toBeInTheDocument();
-    expect(within(mobileList).getByText("연락처 010-****-5678")).toBeInTheDocument();
-    expect(within(mobileList).getByText("그룹 A")).toBeInTheDocument();
-    expect(within(mobileList).getByText("구분 운영진")).toBeInTheDocument();
-    expect(within(mobileList).getByText("직책 총무")).toBeInTheDocument();
-    expect(within(mobileList).getByText("휴회 시작 -")).toBeInTheDocument();
+    expect(within(mobileList).getByText("JW-000001")).toBeInTheDocument();
+    expect(within(mobileList).getByText("총무")).toBeInTheDocument();
+    expect(within(mobileList).getByText("운영진")).toBeInTheDocument();
+    expect(within(mobileList).getByText("활동중")).toBeInTheDocument();
+    expect(within(mobileList).queryByText(/010-/)).not.toBeInTheDocument();
+    expect(within(mobileList).queryByText(/^그룹 /)).not.toBeInTheDocument();
+    expect(within(mobileList).queryByText(/^가입일 /)).not.toBeInTheDocument();
   });
 
   it("renders the pause start month for paused members on desktop and mobile", async () => {
@@ -142,6 +145,39 @@ describe("MembersPage", () => {
     expect(within(table).getByRole("cell", { name: "2026.08" })).toBeInTheDocument();
     const mobileList = screen.getByRole("list", { name: "모바일 회원 목록" });
     expect(within(mobileList).getByText("휴회 시작 2026.08")).toBeInTheDocument();
+  });
+
+  it("shows a presentation-only pending label for a future activity start", async () => {
+    loadMemberDirectoryPage.mockResolvedValue({
+      members: [{ ...member, activityStartMonth: "2099-08-01" }],
+      canCreate: true,
+      canUpdate: true,
+    });
+
+    render(await MembersPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getAllByText("활동 예정")).toHaveLength(2);
+    expect(screen.getByRole("table")).toHaveTextContent("2099.08");
+    expect(screen.getByRole("list", { name: "모바일 회원 목록" })).toHaveTextContent("활동 시작 2099.08");
+  });
+
+  it("shows an operator auto-member as awaiting activity-month confirmation on desktop and mobile", async () => {
+    loadMemberDirectoryPage.mockResolvedValue({
+      members: [{
+        ...member,
+        operatorProfileId: "new-operator-profile",
+        activityStartMonth: null,
+      }],
+      canCreate: true,
+      canUpdate: true,
+    });
+
+    render(await MembersPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getAllByText("활동 시작월 확인 필요")).toHaveLength(2);
+    expect(screen.getByRole("table")).not.toHaveTextContent("활동 예정");
+    expect(screen.getByRole("list", { name: "모바일 회원 목록" }))
+      .toHaveTextContent("활동 시작 -");
   });
 
   it("hides member management links without create and update permissions", async () => {

@@ -1,18 +1,23 @@
 import {
   formatCurrency,
   formatExpenseCategory,
-  type SettlementExpenseCategoryRow,
-} from "@/features/settlements/settlement-summary";
-import {
-  buildSettlementSummary,
   formatPeriodMonth,
+  formatSeoulProcessedDateTime,
 } from "@/features/settlements/settlement-summary";
 import {
   getCurrentPeriodMonth,
   normalizePeriodMonth,
 } from "@/features/fees/fee-model";
-import { type ExpenseCategory } from "@/features/expenses/expense-model";
 import { firstSearchParam } from "@/features/members/member-list";
+import type {
+  MonthlySettlementClosing,
+  MonthlySettlementClosingKind,
+  MonthlySettlementClosingStatus,
+  MonthlySettlementExpenseCategoryRow,
+} from "@/features/settlements/settlement-snapshot";
+import { z } from "zod";
+
+const reportSnapshotIdSchema = z.string().uuid();
 
 export type ReportSearchParams = {
   month?: string | string[];
@@ -20,18 +25,6 @@ export type ReportSearchParams = {
 
 export type ReportFilters = {
   periodMonth: string;
-};
-
-export type MonthlyReportFeePaymentInput = {
-  amount: number;
-};
-
-export type MonthlyReportExpenseInput = {
-  amount: number;
-  category: ExpenseCategory;
-  description: string;
-  expenseDate: string;
-  memo: string | null;
 };
 
 export type MonthlyReportExpenseRow = {
@@ -44,15 +37,30 @@ export type MonthlyReportExpenseRow = {
 export type MonthlyReportData = {
   title: string;
   periodLabel: string;
+  closingKind: MonthlySettlementClosingKind;
+  closingStatus: MonthlySettlementClosingStatus;
+  closingLabel: string;
+  closingVersion: number;
+  closedAtLabel: string;
+  closedBy: string;
   generatedAtLabel: string;
   generatedBy: string;
-  incomeTotal: number;
+  activityMemberCount: number;
+  feeTargetCount: number;
+  fullyPaidCount: number;
+  unpaidCount: number;
+  billedTotal: number;
+  actualFeeIncome: number;
+  recognizedPaidTotal: number;
+  adjustmentIncome: number;
+  unpaidTotal: number;
   expenseTotal: number;
-  balance: number;
-  feePaymentCount: number;
   expenseCount: number;
-  expenseCategoryRows: SettlementExpenseCategoryRow[];
-  majorExpenseRows: MonthlyReportExpenseRow[];
+  attributedNet: number;
+  openingLedgerBalance: number;
+  closingLedgerBalance: number;
+  expenseCategoryRows: MonthlySettlementExpenseCategoryRow[];
+  expenseRows: MonthlyReportExpenseRow[];
 };
 
 export function normalizeReportFilters(
@@ -65,30 +73,55 @@ export function normalizeReportFilters(
   };
 }
 
+export function normalizeReportSnapshotId(
+  value: string | string[] | undefined,
+) {
+  if (typeof value !== "string") return null;
+
+  const result = reportSnapshotIdSchema.safeParse(value);
+  return result.success ? result.data.toLowerCase() : null;
+}
+
 export function buildMonthlyReportData(input: {
-  periodMonth: string;
+  closing: MonthlySettlementClosing;
   generatedAt: Date;
   generatedBy: string;
-  feePayments: MonthlyReportFeePaymentInput[];
-  expenses: MonthlyReportExpenseInput[];
 }): MonthlyReportData {
-  const settlement = buildSettlementSummary({
-    feePayments: input.feePayments,
-    expenses: input.expenses,
-  });
+  const { closing } = input;
+  const snapshot = closing.snapshot;
+  const kindLabel =
+    closing.closingKind === "interim" ? "중간 결산" : "최종 마감";
+  const stateLabel =
+    closing.status === "reopened" ? " · 재개됨" : "";
+  const closingLabel = `${kindLabel} v${closing.version}${stateLabel}`;
 
   return {
-    title: formatReportTitle(input.periodMonth),
-    periodLabel: formatPeriodMonth(input.periodMonth),
-    generatedAtLabel: formatDateLabel(input.generatedAt),
+    title: formatReportTitle(snapshot.periodMonth),
+    periodLabel: formatPeriodMonth(snapshot.periodMonth),
+    closingKind: closing.closingKind,
+    closingStatus: closing.status,
+    closingLabel,
+    closingVersion: closing.version,
+    closedAtLabel: formatSeoulProcessedDateTime(closing.closedAt),
+    closedBy: closing.closedBy,
+    generatedAtLabel: formatSeoulProcessedDateTime(input.generatedAt),
     generatedBy: input.generatedBy,
-    incomeTotal: settlement.incomeTotal,
-    expenseTotal: settlement.expenseTotal,
-    balance: settlement.balance,
-    feePaymentCount: settlement.feePaymentCount,
-    expenseCount: settlement.expenseCount,
-    expenseCategoryRows: settlement.expenseCategoryRows,
-    majorExpenseRows: input.expenses.map((expense) => ({
+    activityMemberCount: snapshot.activityMemberCount,
+    feeTargetCount: snapshot.feeTargetCount,
+    fullyPaidCount: snapshot.fullyPaidCount,
+    unpaidCount: snapshot.unpaidCount,
+    billedTotal: snapshot.billedTotal,
+    actualFeeIncome: snapshot.actualFeeIncome,
+    recognizedPaidTotal: snapshot.recognizedPaidTotal,
+    adjustmentIncome: snapshot.adjustmentIncome,
+    unpaidTotal: snapshot.unpaidTotal,
+    expenseTotal: snapshot.expenseTotal,
+    expenseCount: snapshot.expenseCount,
+    attributedNet: snapshot.attributedNet,
+    openingLedgerBalance: snapshot.openingLedgerBalance,
+    closingLedgerBalance: snapshot.closingLedgerBalance,
+    expenseCategoryRows: snapshot.expenseCategoryRows.map((row) => ({ ...row })),
+    expenseRows: snapshot.expenseRows.map((expense) => ({
       expenseDate: expense.expenseDate.replaceAll("-", "."),
       categoryLabel: formatExpenseCategory(expense.category),
       description: expense.description,
@@ -100,19 +133,15 @@ export function buildMonthlyReportData(input: {
 function formatReportTitle(periodMonth: string) {
   const [year, month] = periodMonth.split("-").map(Number);
 
-  return `${year}년 ${month}월 테니스 클럽 월간 정산 보고서`;
+  return `${year}년 ${month}월 테니스 클럽 월간 결산 보고서`;
 }
 
-function formatDateLabel(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}.${month}.${day}`;
-}
-
-export function formatReportFileName(periodMonth: string) {
-  return `jw-tennis-club-${periodMonth.slice(0, 7)}-report.pdf`;
+export function formatReportFileName(
+  periodMonth: string,
+  kind: MonthlySettlementClosingKind,
+  version: number,
+) {
+  return `jw-tennis-club-${periodMonth.slice(0, 7)}-${kind}-v${version}.pdf`;
 }
 
 export { formatCurrency, formatPeriodMonth };

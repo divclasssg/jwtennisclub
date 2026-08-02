@@ -116,7 +116,11 @@ export function buildFeeListSummary(input: {
     (total, payment) => total + payment.amount,
     0,
   );
-  const paidCount = input.payments.length;
+  const monthlyFeeAmount =
+    input.monthlyFeeAmount ?? DEFAULT_MONTHLY_FEE_AMOUNT;
+  const paidCount = input.payments.filter(
+    (payment) => payment.amount >= monthlyFeeAmount,
+  ).length;
   const expectedCount = input.expectedCount;
 
   return {
@@ -124,7 +128,31 @@ export function buildFeeListSummary(input: {
     paidCount,
     unpaidCount: Math.max(expectedCount - paidCount, 0),
     paidTotal,
-    expectedTotal: expectedCount * (input.monthlyFeeAmount ?? DEFAULT_MONTHLY_FEE_AMOUNT),
+    expectedTotal: expectedCount * monthlyFeeAmount,
+  };
+}
+
+export function getFeePaymentStatus(
+  payment: Pick<FeePaymentRecord, "amount"> | null | undefined,
+  monthlyFeeAmount = DEFAULT_MONTHLY_FEE_AMOUNT,
+) {
+  if (!payment || payment.amount <= 0) {
+    return {
+      label: "미납" as const,
+      remainingAmount: monthlyFeeAmount,
+    };
+  }
+
+  if (payment.amount < monthlyFeeAmount) {
+    return {
+      label: "부분납부" as const,
+      remainingAmount: monthlyFeeAmount - payment.amount,
+    };
+  }
+
+  return {
+    label: "납부완료" as const,
+    remainingAmount: 0,
   };
 }
 

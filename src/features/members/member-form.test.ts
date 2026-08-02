@@ -15,6 +15,7 @@ describe("member form validation", () => {
       groupId: "group-a",
       status: "active",
       joinedDate: "2026-07-01",
+      activityStartMonth: "2026-07",
     });
 
     expect(validateMemberForm(member)).toEqual([]);
@@ -26,6 +27,7 @@ describe("member form validation", () => {
       joined_date: "2026-07-01",
       withdrawn_date: null,
       pause_start_month: null,
+      activity_start_month: "2026-07-01",
       memo: null,
     });
   });
@@ -51,6 +53,7 @@ describe("member form validation", () => {
       status: "paused",
       joinedDate: "2026-01-01",
       pauseStartMonth: "2026-08",
+      activityStartMonth: "2026-01",
     });
 
     expect(validateMemberForm(member)).toEqual([]);
@@ -66,8 +69,10 @@ describe("member form validation", () => {
     formData.set("status", "paused");
     formData.set("joinedDate", "2026-01-01");
     formData.set("pauseStartMonth", "2026-08");
+    formData.set("activityStartMonth", "2026-01");
 
     expect(parseMemberFormData(formData).pauseStartMonth).toBe("2026-08-01");
+    expect(parseMemberFormData(formData).activityStartMonth).toBe("2026-01-01");
   });
 
   it.each([
@@ -90,6 +95,7 @@ describe("member form validation", () => {
     const member = normalizeMemberInput({
       name: "엄다해",
       joinedDate: "2026-01-01",
+      activityStartMonth: "2026-01",
       ...overrides,
     });
 
@@ -112,6 +118,37 @@ describe("member form validation", () => {
       );
     },
   );
+
+  it.each([
+    [
+      "requires an activity start month",
+      {},
+      "활동 시작 월이 필요합니다.",
+    ],
+    [
+      "rejects a malformed activity start month",
+      { activityStartMonth: "2026/08" },
+      "활동 시작 월을 YYYY-MM 형식으로 입력하세요.",
+    ],
+    [
+      "rejects an activity start date that is not the first of its month",
+      { activityStartMonth: "2026-08-02" },
+      "활동 시작 월을 YYYY-MM 형식으로 입력하세요.",
+    ],
+    [
+      "rejects an activity start month before the joined month",
+      { activityStartMonth: "2026-06" },
+      "활동 시작 월은 가입 월보다 빠를 수 없습니다.",
+    ],
+  ])("%s", (_description, overrides, expectedError) => {
+    const member = normalizeMemberInput({
+      name: "엄다해",
+      joinedDate: "2026-07-20",
+      ...overrides,
+    });
+
+    expect(validateMemberForm(member)).toContain(expectedError);
+  });
 });
 
 describe("parseMemberSaveResult", () => {

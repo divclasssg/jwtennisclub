@@ -19,9 +19,14 @@ import {
   buildFeeEligibilityFilter,
   getCurrentPeriodMonth,
   getPeriodMonthEnd,
+  isMemberFeeTargetForPeriod,
   normalizePeriodMonth,
 } from "@/features/fees/fee-model";
-import { isMemberEligibleForPeriod, type MemberStatus } from "@/features/members/member-model";
+import type { MemberStatus } from "@/features/members/member-model";
+import {
+  getMonthlySourceLockStatus,
+  isMonthlySourceLockError,
+} from "@/features/settlements/monthly-source-lock";
 
 const feesPath = "/fees";
 const feeCreatePath = "/fees/new";
@@ -31,7 +36,9 @@ type FeeImportMemberRow = {
   id: string;
   member_code: string;
   status: MemberStatus;
+  withdrawn_date: string | null;
   pause_start_month: string | null;
+  activity_start_month: string | null;
 };
 
 function buildRedirect(path: string, params: Record<string, string | number>) {
@@ -98,16 +105,41 @@ export async function createFeePayment(formData: FormData) {
     redirect(buildRedirect(feeCreatePath, { error: "forbidden" }));
   }
 
+  if (await getMonthlySourceLockStatus(payment.periodMonth)) {
+    redirect(
+      buildRedirect(feesPath, {
+        error: "closing-locked",
+        month: payment.periodMonth.slice(0, 7),
+      }),
+    );
+  }
+
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("id")
+    .select(
+      "id, member_code, status, withdrawn_date, pause_start_month, activity_start_month",
+    )
     .eq("id", payment.memberId)
     .or(buildFeeEligibilityFilter(payment.periodMonth))
     .neq("member_code", FEE_EXEMPT_MEMBER_CODE)
     .lte("joined_date", getPeriodMonthEnd(payment.periodMonth))
+    .lte("activity_start_month", payment.periodMonth)
     .maybeSingle();
 
-  if (memberError || !member) {
+  if (
+    memberError ||
+    !member ||
+    !isMemberFeeTargetForPeriod(
+      {
+        memberCode: member.member_code,
+        status: member.status,
+        withdrawnDate: member.withdrawn_date,
+        pauseStartMonth: member.pause_start_month,
+        activityStartMonth: member.activity_start_month,
+      },
+      payment.periodMonth,
+    )
+  ) {
     redirect(buildRedirect(feeCreatePath, { error: "invalid-member" }));
   }
 
@@ -118,6 +150,15 @@ export async function createFeePayment(formData: FormData) {
   });
 
   if (error) {
+    if (isMonthlySourceLockError(error)) {
+      redirect(
+        buildRedirect(feesPath, {
+          error: "closing-locked",
+          month: payment.periodMonth.slice(0, 7),
+        }),
+      );
+    }
+
     redirect(buildRedirect(feeCreatePath, { error: "save-failed" }));
   }
 
@@ -132,22 +173,53 @@ export async function createFeePayment(formData: FormData) {
 
 export async function cancelFeePayment(formData: FormData) {
   const paymentId = String(formData.get("paymentId") ?? "");
-  const periodMonth =
+  const fallbackPeriodMonth =
     normalizePeriodMonth(String(formData.get("periodMonth") ?? "")) ||
     getCurrentPeriodMonth();
-  const month = periodMonth.slice(0, 7);
+  const fallbackMonth = fallbackPeriodMonth.slice(0, 7);
 
   if (!paymentId) {
-    redirect(buildRedirect(feesPath, { error: "missing-payment", month }));
+    redirect(
+      buildRedirect(feesPath, {
+        error: "missing-payment",
+        month: fallbackMonth,
+      }),
+    );
   }
 
   const { supabase } = await getAuthenticatedUserId();
+  const { data: payment, error: readError } = await supabase
+    .from("fee_payments")
+    .select("id, period_month")
+    .eq("id", paymentId)
+    .maybeSingle();
+
+  if (readError || !payment) {
+    redirect(
+      buildRedirect(feesPath, {
+        error: "cancel-failed",
+        month: fallbackMonth,
+      }),
+    );
+  }
+
+  const periodMonth = payment.period_month;
+  const month = periodMonth.slice(0, 7);
+
+  if (await getMonthlySourceLockStatus(periodMonth)) {
+    redirect(buildRedirect(feesPath, { error: "closing-locked", month }));
+  }
+
   const { error } = await supabase
     .from("fee_payments")
     .delete()
     .eq("id", paymentId);
 
   if (error) {
+    if (isMonthlySourceLockError(error)) {
+      redirect(buildRedirect(feesPath, { error: "closing-locked", month }));
+    }
+
     redirect(buildRedirect(feesPath, { error: "cancel-failed", month }));
   }
 
@@ -190,14 +262,30 @@ export async function saveFeeMonthlyNote(formData: FormData) {
   const { supabase, userId } = await getAuthenticatedUserId();
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("id, status, pause_start_month, joined_date, member_code")
+    .select(
+      "id, member_code, status, withdrawn_date, pause_start_month, activity_start_month",
+    )
     .eq("id", memberId)
     .or(buildFeeEligibilityFilter(periodMonth))
     .neq("member_code", FEE_EXEMPT_MEMBER_CODE)
     .lte("joined_date", getPeriodMonthEnd(periodMonth))
+    .lte("activity_start_month", periodMonth)
     .maybeSingle();
 
-  if (memberError || !member) {
+  if (
+    memberError ||
+    !member ||
+    !isMemberFeeTargetForPeriod(
+      {
+        memberCode: member.member_code,
+        status: member.status,
+        withdrawnDate: member.withdrawn_date,
+        pauseStartMonth: member.pause_start_month,
+        activityStartMonth: member.activity_start_month,
+      },
+      periodMonth,
+    )
+  ) {
     redirect(
       buildFeesHref(listState, {
         note: memberId,
@@ -283,10 +371,33 @@ export async function importFeePaymentsCsv(formData: FormData) {
   }
 
   const { supabase, userId } = await getAuthenticatedUserId();
+  const periodMonths = [
+    ...new Set(parsed.payments.map((payment) => payment.periodMonth)),
+  ];
+  const lockStatuses = await Promise.all(
+    periodMonths.map((periodMonth) =>
+      getMonthlySourceLockStatus(periodMonth),
+    ),
+  );
+  const lockedPeriodMonth = periodMonths.find(
+    (_, index) => lockStatuses[index],
+  );
+
+  if (lockedPeriodMonth) {
+    redirect(
+      buildRedirect(feeCreatePath, {
+        importError: "closing-locked",
+        month: lockedPeriodMonth.slice(0, 7),
+      }),
+    );
+  }
+
   const { data: members, error: membersError } = await supabase
     .from("members")
-    .select("id, member_code, status, pause_start_month")
-    .in("status", ["active", "paused"]);
+    .select(
+      "id, member_code, status, withdrawn_date, pause_start_month, activity_start_month",
+    )
+    .in("status", ["active", "paused", "withdrawn"]);
 
   if (membersError) {
     redirect(buildRedirect(feeCreatePath, { importError: "member-load-failed" }));
@@ -298,10 +409,13 @@ export async function importFeePaymentsCsv(formData: FormData) {
 
     if (
       !member ||
-      !isMemberEligibleForPeriod(
+      !isMemberFeeTargetForPeriod(
         {
+          memberCode: member.memberCode,
           status: member.status,
+          withdrawnDate: member.withdrawnDate,
           pauseStartMonth: member.pauseStartMonth,
+          activityStartMonth: member.activityStartMonth,
         },
         payment.periodMonth,
       )
@@ -328,6 +442,24 @@ export async function importFeePaymentsCsv(formData: FormData) {
   const { error } = await supabase.from("fee_payments").insert(payments);
 
   if (error) {
+    if (isMonthlySourceLockError(error)) {
+      const racingLockStatuses = await Promise.all(
+        periodMonths.map((periodMonth) =>
+          getMonthlySourceLockStatus(periodMonth),
+        ),
+      );
+      const racingLockedPeriodMonth =
+        periodMonths.find((_, index) => racingLockStatuses[index]) ??
+        periodMonths[0];
+
+      redirect(
+        buildRedirect(feeCreatePath, {
+          importError: "closing-locked",
+          month: racingLockedPeriodMonth.slice(0, 7),
+        }),
+      );
+    }
+
     redirect(buildRedirect(feeCreatePath, { importError: "save-failed" }));
   }
 
@@ -347,8 +479,11 @@ function buildMemberImportMap(members: FeeImportMemberRow[]) {
       member.member_code.trim().toUpperCase(),
       {
         id: member.id,
+        memberCode: member.member_code,
         status: member.status,
+        withdrawnDate: member.withdrawn_date,
         pauseStartMonth: member.pause_start_month,
+        activityStartMonth: member.activity_start_month,
       },
     ]),
   );

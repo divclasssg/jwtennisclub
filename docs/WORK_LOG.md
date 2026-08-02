@@ -1,5 +1,166 @@
 # JW Tennis Club SaaS Work Log
 
+## 2026-08-01
+
+### 대시보드 라우트 상태 최종 검토 보정
+- 시각적으로 숨긴 `홈` 1단계 제목과 `data-hide-shell-title-bar="true"` 신호를 비동기 `page.tsx`에서 `/dashboard` 구간 `layout.tsx`로 이동했다. 같은 구간에 로컬 `loading.tsx`를 추가해 부모 `(app)/loading.tsx`보다 안쪽에서 페이지 정지를 처리하므로 성공·로딩·오류 상태 모두 공용 셸 작업 공간 안에 제목 숨김 신호가 남는다.
+- 정상 화면 회귀 검사는 실제 `PageTitle` publisher가 `회원 관리`를 `.shell-title-bar`의 1단계 제목으로 발행하고 본문에는 별도 1단계 제목을 만들지 않는지 확인하도록 강화했다.
+- 대시보드 전진 마이그레이션 검사는 공백을 정규화한 초기·전진 SQL 전체를 비교한다. 전진 SQL에서 `active_count`의 단일 `members.member_code <> '#0000' and` 조건만 제거하면 트랜잭션, 함수 본문, `security definer`, 고정 `search_path`, 활성 운영자 검사, 원본 테이블 공유 잠금, 개인정보 비노출 JSON, revoke/grant와 PostgREST reload까지 초기 SQL과 정확히 같아야 한다.
+
+### 최종 검토 RED→GREEN 및 검증
+- 최초 RED: 대시보드 성공·대기·오류 구성을 새 구간 layout과 로컬 loading 경계로 검사한 집중 명령은 두 suite가 `./layout` 부재로 실패했고, 정상 경로 `PageTitle`와 마이그레이션 전체 동등성 검사는 통과했다. layout만 추가한 두 번째 RED에서는 성공 화면이 중복 `홈` 제목 2개로 실패하고 대기 화면 suite가 `./loading` 부재로 실패해 marker 소유권과 로컬 경계 누락을 각각 확인했다.
+- 최소 구현 뒤 `npm test -- 'src/app/(app)/dashboard/page.test.tsx' 'src/app/(app)/dashboard/layout.test.tsx' 'src/app/(app)/dashboard/error.test.tsx' src/features/shell/AppShell.test.tsx src/features/shell/AppShellStyles.test.ts src/features/dashboard/dashboard-migration.test.ts` — 6개 파일, 13개 테스트 통과.
+- 실제로 완료되지 않는 `loadDashboardPage()` Promise와 실제 reject를 사용하는 구간 상태 검사는 1개 파일, 3개 테스트 통과. 대시보드·셸 전체 집중 게이트는 `npm test -- src/features/dashboard 'src/app/(app)/dashboard' src/features/shell` — 11개 파일, 56개 테스트 통과.
+- 최종 `npm test` — 111개 파일, 764개 테스트 통과. `npm run lint`, `npx tsc --noEmit`, `git diff --check`도 모두 종료 코드 0으로 통과했다.
+- 루트의 무시된 `.env.local`을 값 출력 없이 로드한 최종 `npm run build` — Next.js 16.2.10 Turbopack 컴파일 3.2초, TypeScript 3.4초, 26/26개 정적 페이지 생성과 `/dashboard` 포함, 종료 코드 0. 제한 네트워크의 첫 실행은 최적화 단계에서 1분 이상 출력을 내지 않고 `.next/lock`을 유지해 해당 빌드 PID만 종료했으며 통과 근거로 사용하지 않았다.
+- 강제 로딩·오류 브라우저 검사는 런타임 데이터 소스를 임시 변경해야 해 수행하지 않았다. 이번 변경은 시각 스타일을 바꾸지 않으며, 실제 미해결·거부 loader를 사용해 실제 `AppShell` 안의 layout·loading·error 구성과 marker 위치를 결정적으로 검사하는 테스트가 해당 두 상태에 더 직접적인 근거다. 기존 성공 상태의 1440×900·375×812 인증 브라우저 QA 근거는 바로 아래 기록에 유지된다.
+- 전진 마이그레이션 적용, 배포와 푸시는 수행하지 않았다.
+
+### 대시보드 라인 레이아웃 및 회장 제외 표시 검증
+- `/dashboard`에서만 공용 셸의 56px 제목 표시줄과 빈 제목 행을 제거하고, 문서에는 시각적으로 숨긴 `홈` 1단계 제목을 유지했다. `/members` 등 다른 경로의 셸 제목 표시줄은 그대로 유지한다.
+- 활동 회원 요약에 `회장(#0000) 제외` 근거를 항상 보이게 추가하고, 대시보드 RPC의 `active_count`에만 `members.member_code <> '#0000'`를 적용하는 전진 마이그레이션 `202608010002_exclude_president_from_dashboard_activity.sql`을 추가했다.
+- 수납·지출 및 장부 잔액 차트의 정확한 월별 원화 값을 접근성 전용 숨김 표가 아니라 항상 보이는 표로 전환했다.
+- 요약, 이번 달 재무, 추이 차트, 최근 최종 마감과 오류·빈 상태를 흰색 캔버스와 1px 구분선 중심의 평면 레이아웃으로 통일하고, 카드형 외곽선·둥근 모서리·검은 잔액 배경을 제거했다.
+
+### 작업별 RED→GREEN 근거
+- Task 1 RED: `npm test -- 'src/app/(app)/dashboard/page.test.tsx' src/features/shell/AppShellStyles.test.ts` — 대시보드 마커와 셸 숨김 선택자가 없어 2개 파일, 2개 테스트 실패·2개 통과. GREEN: `npm test -- 'src/app/(app)/dashboard/page.test.tsx' src/features/shell/AppShell.test.tsx src/features/shell/AppShellStyles.test.ts` — 3개 파일, 6개 테스트 통과.
+- Task 2 RED: `npm test -- src/features/dashboard/dashboard-migration.test.ts src/features/dashboard/DashboardSections.test.tsx` — 전진 마이그레이션과 `회장(#0000) 제외` 문구가 없어 2개 파일, 2개 테스트 실패·9개 통과. GREEN: `npm test -- src/features/dashboard/dashboard-migration.test.ts src/features/dashboard/DashboardSections.test.tsx src/features/dashboard/dashboard-page.test.ts src/features/dashboard/dashboard-data.test.ts` — 4개 파일, 31개 테스트 통과.
+- Task 3 RED: `npm test -- src/features/dashboard/FinancialCharts.test.tsx` — Vitest DOM이 지원하지 않는 비대칭 `toHaveClass` 사용을 실제 클래스 문자열 검사로 교정한 뒤 숨김 표가 `chart-values-table`을 갖지 않아 의도대로 1개 테스트 실패. GREEN: `npm test -- src/features/dashboard/FinancialCharts.test.tsx src/features/dashboard/dashboard-page.test.ts` — 2개 파일, 28개 테스트 통과.
+- Task 4 RED: `npm test -- 'src/app/(app)/dashboard/page-styles.test.ts' 'src/app/(app)/dashboard/error.test.tsx' src/features/dashboard/FinancialCharts.test.tsx` — 기존 카드 외곽선·둥근 모서리·검은 잔액 배경 때문에 1개 파일·1개 테스트 실패, 2개 파일·15개 테스트 통과. GREEN: `npm test -- src/features/dashboard 'src/app/(app)/dashboard' src/features/shell` — 10개 파일, 53개 테스트 통과.
+
+### 최종 자동 검증
+- `npm test` — 110개 파일, 761개 테스트 전부 통과, 종료 코드 0, 13.58초.
+- `npm run lint`, `npx tsc --noEmit`, `git diff --check` — 모두 종료 코드 0.
+- 루트의 무시된 `.env.local`을 값 출력 없이 로드한 `zsh -c 'set -a; source ../../.env.local; set +a; npm run build'` — Next.js 16.2.10 Turbopack 컴파일 5.5초, TypeScript 3.1초, 26/26개 정적 페이지 생성, `/dashboard` 포함, 종료 코드 0.
+- 제한된 네트워크의 첫 동일 빌드는 최적화 단계에서 90초 이상 새 출력 없이 정체돼 해당 실행만 종료 코드 130으로 중지했고 통과로 처리하지 않았다. 정상 네트워크를 허용한 위 재실행 결과만 최종 빌드 근거로 사용한다.
+
+### 인증 브라우저 QA
+- 루트 환경 변수를 값 출력 없이 로드해 Next.js 16.2.10 개발 서버를 `http://localhost:3002`에서 시작하고, 기존 인증 쿠키가 있는 인앱 브라우저에서 검사했다. `127.0.0.1`은 별도 출처라 로그인으로 이동했으며 인증 QA 근거로 사용하지 않았다.
+- 1440×900: `/dashboard` 셸 제목 표시줄은 `display: none`, 0×0이고 콘텐츠는 셸 사용자 바 바로 아래에서 시작했다. `/members`에서는 `회원 관리` 제목 표시줄이 `display: flex`, 높이 56px로 유지됐다. 문서 `scrollWidth === clientWidth === 1440`이었다.
+- 1440×900: `회장(#0000) 제외`가 화면에 보이고, 수납·지출 표는 `7월 540,000원 / 506,500원`, `8월 540,000원 / 0원`, 잔액 표는 `7월 33,500원 확정`, `8월 573,500원 변동 가능`을 항상 보이는 표로 표시했다.
+- 1440×900: 요약 두 면, 이번 달 재무, 두 차트, 최근 최종 마감은 모두 계산된 배경색 `rgb(255, 255, 255)`, 반지름 0px이었다. 그룹 외곽은 위·아래 1px 선, 데스크톱의 두 요약·두 차트 사이는 오른쪽 1px 선으로 구분됐다.
+- 375×812: 셸 제목 표시줄은 `display: none`, 0×0이고 대시보드 콘텐츠는 64px 모바일 헤더와 56px 주 메뉴 직후 y=120에서 시작해 별도 56px 빈 제목 행이 없었다. `document.documentElement.scrollWidth === document.documentElement.clientWidth === 375`를 확인했다.
+- 375×812: 요약 카드는 375px 한 열로 쌓이며 사이에 아래쪽 1px 선 하나만 남았다. 차트 카드도 375px 한 열로 쌓이고 첫 차트의 아래쪽 1px 선 하나로 구분됐다. 두 값 표는 각각 x=16, 너비 343px이고 `scrollWidth === clientWidth === 343`으로 모든 열과 정확한 금액·상태가 잘림 없이 보였다. `회장(#0000) 제외` 근거도 유지됐다.
+- 인증된 `/dashboard` 데스크톱·모바일 요청과 `/members` 요청은 모두 HTTP 200이었다. 브라우저 콘솔의 오류·경고는 0건이었고 실패한 인증 QA 요청은 없었다. QA 중 보인 사용자 신원·회원 연락처가 포함된 화면은 파일로 저장하거나 커밋하지 않았고, 브라우저 뷰포트 override를 해제한 뒤 로컬 서버를 종료했다.
+
+### 배포 게이트
+- `202608010002_exclude_president_from_dashboard_activity.sql`은 이번 작업에서 로컬 또는 운영 DB에 적용하지 않았으며, **프로덕션에 아직 적용되지 않았다**. 따라서 현재 브라우저의 RPC 집계 값은 새 회장 제외 DB 동작의 프로덕션 검증 근거가 아니다.
+- 검토와 병합 승인 뒤 깨끗한 `main` 통합 작업트리에서 `supabase db push --linked --dry-run`을 실행하고, 출력에 `202608010002_exclude_president_from_dashboard_activity.sql` 하나만 있는 경우에만 앱 배포 전에 마이그레이션을 적용한다.
+- 적용 뒤 마이그레이션 이력, 함수 보안·실행 권한, 인증 RPC 출력에서 `#0000` 제외를 확인하고 1440×900·375×812 프로덕션 대시보드의 값·요청·콘솔을 다시 QA한다. 이번 구현 단계에서는 마이그레이션 적용, 배포, 푸시를 수행하지 않았다.
+
+### 재무 중심 대시보드 완료
+- 인증 운영자 전용 `get_dashboard_page()` 집계 계약, Zod 서버 경계, 서버 렌더링 재무 차트, 클럽 요약·이번 달 재무·재무 추이·최근 최종 마감 화면을 통합했다.
+- `/dashboard` 구간에 원문 예외를 노출하지 않는 `대시보드를 불러오지 못했습니다` 오류 경계와 `다시 시도` 복구 작업을 추가했다. 설치된 Next 16.2.10 문서에 따라 다시 시도는 콘텐츠를 재조회하는 `unstable_retry()`를 사용하고, 공용 `Button`의 기존 `onClick` 계약과 프로젝트 토큰을 유지한다.
+- 사용자의 최종 결정에 따라 대시보드에는 마감자·처리자 식별자를 타입·화면·fixture 어디에도 노출하지 않았다.
+- 최근 최종 마감의 5열 지표에 현재 재무용 `nth-child(4n)` 구분선 규칙이 섞이지 않도록 선택자를 각 그리드에 한정했다. 계산 차단 상태에서도 회원 요약, 최근 최종 마감, 현재 월·최종 월 결산 링크가 함께 남는 라우트 회귀 검사를 추가했다.
+- 디자인 QA에서 고정 높이 그리드가 `overflow: hidden`인 이번 달 재무 행을 2px로 축소해 지표를 시각적으로 자르는 문제를 발견했다. RED 회귀 뒤 암시적 행을 `max-content`로 고정해 데스크톱 203px, 모바일 최종 380px 높이로 복구했다.
+- 승인 목업의 모바일 2열 지표 밀도와 달리 1열로 늘어지던 차이를 두 번째 RED 회귀로 확인하고, 휴대폰에서도 현재 재무와 최근 최종 마감 지표를 2열로 유지하며 구분선을 보정했다.
+
+### 자동 검증
+- 오류 경계 최초 RED: `npm run test -- 'src/app/(app)/dashboard/error.test.tsx'`가 `./error` 모듈 부재로 실패했다. 최소 구현 뒤 오류 경계·라우트·스타일 집중 검사는 3개 파일, 5개 테스트 통과했다.
+- 검토 보정 RED: 오류 경계 테스트가 `unstable_retry` 호출을 요구하도록 바뀐 뒤 기존 `reset` 구현에서는 기대 1회 대비 0회 호출로 실패했다. 설치된 Next 16.2.10 문서를 확인하고 최소 구현을 변경한 뒤 집중 테스트가 통과했다.
+- 최종 대시보드 집중 검사: `npm run test -- src/features/dashboard 'src/app/(app)/dashboard'` — 8개 파일, 48개 테스트 통과.
+- 최종 전체 Vitest: `npm run test` — 109개 파일, 758개 테스트 통과.
+- `npm run lint`, `npx tsc --noEmit`, `git diff --check` — 모두 종료 코드 0.
+- 루트의 무시된 `.env.local`을 값 출력 없이 프로세스에 로드한 검토 보정 후 최종 `npm run build` — Next.js 16.2.10 Turbopack 컴파일 4.7초, TypeScript 3.3초, 26/26개 정적 페이지 생성, 종료 코드 0.
+- 첫 제한 환경 빌드는 `Creating an optimized production build ...` 뒤 90초 이상 출력 없이 정체되어 해당 빌드만 중지했으며 통과로 처리하지 않았다. 외부 폰트/네트워크가 허용된 동일 명령의 재실행과 최종 재실행은 모두 통과했다.
+
+### 브라우저 및 디자인 QA
+- 승인 소스와 구현을 같은 인앱 브라우저에서 1440×900 및 375×812, DPR 1로 비교해 개인정보 정리 전에 기능·디자인 통과를 확인했다. 검토 중 인증 셸 신원이 보이는 데스크톱·상태·오류·비교 보드 이미지는 픽셀 편집 없이 제거했다. 원본 해상도로 개별 확인한 신원 비노출 모바일 소스/구현 캡처만 유지하며, 신원 중립 데스크톱 재캡처는 구현 차단이 아닌 운영 증거 후속 작업으로 기록한다. 정확한 증거 범위는 루트 `design-qa.md`에 있다.
+- 1440×900 fixture 화면에서 섹션 순서, 재무 강조, 560×216 차트, 현재 월·최종 월·정확한 스냅샷 링크, 5열 최근 최종 마감, 마감자 비노출과 콘솔 오류 0건을 확인했다.
+- 375×812 fixture 화면에서 문서와 대시보드 `scrollWidth === clientWidth === 375`, 2열 재무 지표, 341×132 차트, 보이는 월 레이블과 콘솔 오류 0건을 확인했다.
+- 첫 장부 월·최근 최종 마감 없음 fixture에서 7월 현재 값 1개만 추이에 표시되고 올바른 7월 링크와 `아직 최종 마감된 결산이 없습니다`가 함께 나타남을 확인했다.
+- 계산 차단 fixture에서 회원 요약, `계산 대기`, 구체적인 직전 최종 마감 안내, 최근 최종 마감, 현재 월·최종 월·정확한 스냅샷 링크가 유지되고 콘솔 오류가 없음을 확인했다.
+- 브라우저 fixture는 `dashboard-data.ts`를 일시적으로만 대체했고 최종 검증 전 원본 RPC 로더로 완전히 복구했다. 최종 Git diff에 fixture 변경은 없다.
+- 승인 HTML 자체에 문자 인코딩 선언이 없어 소스 브라우저 캡처의 한글이 깨졌다. 원문 HTML의 한국어를 직접 확인했으며 구현 캡처의 한글은 정상이다.
+
+### DB 및 운영 검증 범위
+- `202608010001_add_dashboard_page.sql`은 이번 작업에서 로컬 또는 운영 DB에 적용하지 않았다. 프로덕션 DB 검증을 수행했다고 주장하지 않는다.
+- 인증된 실제 로컬 세션으로 `/dashboard`에 접근했을 때 운영 Supabase에 새 RPC가 없어 대시보드 요청이 실패했고, 새 제어 오류 경계가 정상 표시됐다. 이 관찰은 배포 게이트로 기록하되, 인증 셸 신원이 보이던 화면 캡처는 개인정보 검토에서 제거했다.
+- 따라서 집계 응답과 기존 결산 미리보기의 실제 값 일치, 최종 마감 전용 과거 추이, 개인정보·상세 행 비노출, 비활성·비인증 호출 거부, 실패 요청 없는 프로덕션 화면은 마이그레이션 적용 뒤 별도 확인해야 한다.
+
+## 2026-07-31
+
+### 월간 결산 PDF 장부형 미리보기 검증
+- 장부형 PDF 집중 Vitest: `src/features/reports/MonthlyReportPdf.test.tsx` 1개 파일, 6개 테스트 통과. 45개 지출 상세 행을 넣는 장기 페이지네이션 회귀 검사와 공백 없는 한글 지출 내용의 UI 허용 경계 120자·스냅샷 허용 경계 500자 검사를 포함한다. 120자·500자 모두 마지막 고유 표식과 전체 반복 글자 수가 보존되고, 공백·레이아웃을 정규화한 bbox 텍스트가 원본 내용과 정확히 같으며 원본에 없던 `-`가 없다. 지출 내용의 모든 bbox가 424.0pt 열 경계 안에 있고 500자 행의 시작·끝은 같은 페이지에 남는다.
+- 관련 집중 Vitest: `MonthlyReportPdf.test.tsx`, `monthly-report.test.ts`, `settlement-snapshot.test.ts` 3개 파일, 44개 테스트 통과. 스냅샷 파서는 지출 내용 500자를 허용하고 501자를 거부한다. 전체 Vitest: `npm run test -- --exclude '.worktrees/**'` 102개 파일, 711개 테스트 통과.
+- `npx eslint . --ignore-pattern '.worktrees/**'`, `npx tsc --noEmit`, `git diff --check`는 모두 종료 코드 0으로 통과했다.
+- `output/pdf/monthly-report-ledger-style-preview.pdf`를 다시 생성해 `pdfinfo`, `pdftotext -layout`, `pdffonts`와 150dpi PNG 렌더로 검사했다. A4(595.28×841.89pt) 1페이지이며 `IBMPlexSansKR-Regular` subset이 내장됐고, 장부 제목·소계·기말 장부 잔액이 추출됐다. 1241×1754 원본 PNG 육안검사에서 잘림·겹침·두부 문자·카드형 배경·개인정보 노출이 없었다. 당시 별도 120자·500자 공백 없는 한글 시각 재현은 2페이지 A4였고 각 행의 금액 전체와 마지막 고유 표식이 보였으며 마지막 표식의 xMax는 413.07pt, 금액의 xMin은 480.40pt였다. 다만 해당 첫 시각 재현은 강제 줄바꿈마다 원본에 없는 하이픈이 보인다는 후속 검토를 받아 최신 결과로 취급하지 않는다.
+- 후속 수정은 React PDF의 하이픈 penalty 대신 글자소 사이에 폭이 0이고 trim 시 비는 구분자를 넣어 glue 줄바꿈을 사용한다. 자동 PDF 렌더·추출 검사에서 120자와 500자 원문이 공백 정규화 뒤 정확히 일치하고 추가 하이픈이 0개임을 확인했다. 플랫폼 사용량 제한으로 로컬 `tsx` 렌더 권한 승인이 거부되어 대표 PDF와 2페이지 PNG는 이 후속 수정 뒤 다시 생성·육안검사하지 못했으며, 기존 파일은 이전 구현 산출물로 남겨 두었다.
+- 제한된 샌드박스에서 루트 `.env.local`을 값 출력 없이 로드한 첫 `npm run build`는 `Creating an optimized production build ...` 뒤 2분 이상 진행 출력 없이 `.next/lock`을 유지해 완료하지 못했다. 해당 작업트리에서 시작한 빌드 PID만 중지했다. 이후 컨트롤러가 제한 없는 환경에서 같은 환경 변수 로딩 빌드를 재실행해 Next.js 16.2.10 컴파일 2.7초, TypeScript 3.0초, 26개 정적 페이지 생성까지 총 6.9345초·종료 코드 0으로 통과를 확인했다.
+- 공백 없는 한글 줄바꿈 수정 뒤 같은 환경 변수 로딩 빌드를 제한된 샌드박스에서 다시 실행했으나 최적화 빌드 단계에서 3분 이상 새 출력과 파일 변경 없이 정체됐다. `.next/lock`의 유일한 보유자가 이 작업에서 시작한 Node PID 87910임을 확인한 뒤 해당 실행만 종료 코드 130으로 중지했고 잠금 파일이 제거됨을 확인했다. 이 재실행은 빌드 통과로 처리하지 않았다.
+- 원본에 없는 하이픈을 제거하는 후속 미세 수정 뒤에는 제한된 샌드박스에서 프로덕션 빌드를 다시 시도하지 않았다. 따라서 이 후속 커밋의 프로덕션 빌드는 새로 검증되지 않았다.
+- 프로덕션 배포와 실제 운영 결산 PDF 다운로드는 수행하지 않았다. 로컬 미리보기의 시각 승인 전에는 배포하지 않는다.
+
+### 완료
+- 월별 중간 결산과 최종 마감이 유형별 독립 버전을 사용하도록 구현했다. 중간 결산은 원본을 잠그지 않고, 최종 마감만 해당 월 회비·지출 원본을 데이터베이스 트리거에서 잠근다.
+- 최종 마감본은 결산 재개 전까지 원본 변경을 차단하며, 재개 후 다시 최종 마감하면 이전 불변 이력을 유지한 채 다음 최종 버전을 생성한다.
+- 중간 결산과 최종 마감 PDF를 생성 당일부터 정확한 스냅샷 ID로 다운로드하도록 변경했다. PDF에는 결산 유형·버전·처리자·처리일시를 표시하고 원본 테이블을 다시 조회하지 않는다.
+- 메뉴, 화면, 작업, 안내, 오류와 PDF의 사용자용 `정산` 표현을 `결산`으로 변경했다. 내부 `settlement` 식별자는 배포 호환성을 위해 유지했다.
+- DB 우선 혼합 버전 배포를 위해 기존 `get_monthly_settlement_page(date)`와 3인자 PDF 감사 RPC를 유지하고, 새 앱 전용 `get_monthly_settlement_page_v2(date)`와 1인자 PDF 감사 RPC를 분리했다. 전환 RPC는 모두 `authenticated`만 실행할 수 있다.
+- 결산 처리일시와 PDF 생성일시를 서울 시간의 초 단위까지 표시해 같은 날 생성한 여러 기록을 구분할 수 있게 했다. 결산 Action은 `category|count|amount`와 `asc|desc`의 유효한 정렬 쌍만 리다이렉트에 보존한다.
+
+### 검증 근거
+- 최종 수정 RED에서 호환 RPC 분리, 서울 초 단위 표시, 정렬 FormData 화이트리스트가 없어 집중 테스트 11건이 의도한 이유로 실패했고, 생성 mutation의 v2 반환 계약 2건도 별도 RED로 확인했다.
+- 최종 수정 집중 Vitest — 6개 파일, 64개 테스트 통과.
+- 전체 Vitest: `npm run test -- --exclude '.worktrees/**'` — 99개 파일, 698개 테스트 통과.
+- `npx eslint . --ignore-pattern '.worktrees/**'`, `npx tsc --noEmit`, `git diff --check` — 종료 코드 0으로 통과.
+- 대표 최종 마감 PDF를 `tmp/pdfs`에 생성해 `pdfinfo`, `pdftotext -layout`, `pdffonts`, `pdftoppm -png -r 150`으로 검사했다. 1페이지 A4, 서로 다른 결산·생성 초 단위 시각, 내장된 IBM Plex Sans KR subset을 확인했고 1241×1754 PNG 원본 해상도 육안검사에서 잘림·겹침·두부 문자·개인정보 노출이 없었다. 검사 뒤 PDF·텍스트·PNG와 임시 생성 테스트를 삭제했다.
+- 환경 변수 없이 실행한 `npm run build`는 컴파일과 TypeScript 검사까지 성공한 뒤 `/(.)expenses/new` 사전 렌더에서 `Missing or invalid Supabase environment variables`로 실패했다. 빌드 통과로 처리하지 않았다.
+- 루트 작업 공간의 무시된 `.env.local`을 값 출력이나 복사 없이 실행 환경으로 로드한 빌드는 두 번 모두 오류 출력 없이 `Creating an optimized production build ...`에서 2분 이상 정체돼 해당 빌드 프로세스만 중단했다. 빌드 통과로 처리하지 않았다.
+- 기존 `202607300002_add_monthly_settlement_closings.sql`이 구현 기준 커밋에서 변경되지 않았고, 새 순서가 `202607310001_add_interim_monthly_closings.sql` 다음 `202607310002_lock_finalized_month_sources.sql`임을 확인했다.
+- 소스 계약과 변경 검토에서 기존 행의 `final` 기본 백필, 직전 활성 최종 마감만 사용하는 기초 잔액, 정확한 스냅샷 PDF RPC, API 역할의 트리거 헬퍼 실행 차단, 활성 운영자·권한 검사, 스냅샷에서 제외된 회비 메모의 편집 허용, 영수증 업로드와 최종 잠금 경합 시 신규 객체 정리를 확인했다.
+- Task 1~6의 집중 검토와 최종 수정 라운드를 확인했다. 보류했던 결산 Action의 `sort`·`direction` FormData 화이트리스트도 회귀 테스트와 함께 반영했다.
+
+### 배포 차단
+- 읽기 전용 `supabase migration list --linked --output-format json` 결과 `202607290001`, `202607300001`, `202607300002`는 로컬·원격이 일치했고 `202607310001`, `202607310002`는 로컬에만 있는 대기 상태였다.
+- 원격에만 있는 것으로 보였던 `202607270001`, `202607270002`는 메인 작업 공간에 미추적 상태로 남아 있던 실제 운영 마이그레이션이었다. 두 파일을 기능 브랜치에 원본 SHA-256 그대로 복구한 뒤 마이그레이션 목록의 로컬·원격 버전 일치를 확인했다.
+- 운영 스키마 덤프에서 `save_member_with_contact.member_id` 한정 참조가 후속 함수 정의에도 유지됨을 확인했다. 읽기 전용 운영 조회로 `#0020` 회원 1건, `#0021`~`#0024` 0건, 할당기 다음 번호 21, 정모 명단·출석 회원번호 스냅샷 불일치 0건을 확인했다.
+- 읽기 전용 운영 조회에서 전체 회원과 운영자 자동 회원의 `activity_start_month` 누락이 모두 0건임을 확인했고, 운영 스키마에 월 첫날 및 가입 월 이후 제약이 유지됨을 확인했다.
+- 유효한 Supabase 환경과 외부 폰트 네트워크를 제공해 Webpack 및 기본 Turbopack 프로덕션 빌드를 각각 실행했고, 두 빌드 모두 TypeScript와 26개 정적 페이지 생성을 포함해 통과했다. 제한된 네트워크에서 보였던 Turbopack 정체는 동일 조건의 Webpack 빌드가 Google Fonts DNS 실패를 명시하면서 원인이 확인됐다.
+- DB 적용 전에는 인증 운영자 프로덕션 브라우저 QA와 2026년 7월 운영 결산 생성·최종 마감을 수행하지 않았다. 실제 회비·지출·회원 데이터를 QA 목적으로 만들거나 수정하지 않았다.
+- 구 앱 트래픽이 사라진 뒤에만 레거시 페이지·PDF RPC를 제거하는 별도 정리 마이그레이션을 새로 작성하며, 이번 작업에서는 해당 정리 마이그레이션을 만들거나 적용하지 않았다.
+
+### 운영 DB 적용
+- 비밀번호를 출력하지 않고 현재 transaction/session pooler 연결을 검증했다. transaction pooler `6543`은 인증됐지만 prepared statement 제약이 있어 dry-run 전용으로 사용했고, 실제 마이그레이션은 prepared statement를 지원하는 session pooler `5432`로 실행했다.
+- 전체 dry-run에서 `202607310001`, `202607310002` 두 파일만 대기 중임을 확인했다. 두 번째 파일을 제외한 별도 작업 디렉터리의 dry-run에서 `202607310001` 한 개만 확인한 뒤 먼저 적용했다.
+- 첫 번째 적용 후 로컬·원격 이력 일치와 운영 스키마 덤프를 확인했다. 결산 유형 enum·컬럼, 유형별 버전 유일 제약, 최종 마감 전용 활성 인덱스, 중간 결산 생성 함수, 신형 페이지 RPC와 인증 사용자 권한이 존재했다.
+- 전체 작업 디렉터리의 다음 dry-run에서 `202607310002` 한 개만 남은 것을 확인한 뒤 적용했다. 운영 스키마에서 회비·지출 INSERT/UPDATE/DELETE 잠금 트리거, 최종 마감 전용 잠금 조건, 트리거 함수의 직접 실행 권한 회수를 확인했다.
+- 최종 마이그레이션 목록은 `202607310002`까지 로컬·원격이 모두 일치했다. PostgREST 읽기 전용 조회에서 새 결산 컬럼 계약은 200이었고, 활성 최종 마감과 중간 결산은 모두 0건이라 적용만으로 운영 결산 데이터나 원본 잠금이 생성되지 않았다.
+- `origin/main`을 기능 브랜치에 병합하면서 최종 잠금·중간/최종 마감 기능과 모바일 회원·회비·지출·결산 UI를 함께 보존했다. 충돌 해소 후 관련 테스트 74개, 전체 101개 파일 705개 테스트, ESLint, TypeScript, diff 검사와 실제 환경변수를 사용한 Next.js 26개 경로 프로덕션 빌드가 모두 통과했다.
+- 검증된 병합 커밋 `62087d9`를 원격 `main`에 반영했고 Vercel Production 배포가 성공했다. 배포 URL의 비인증 HTTP 확인은 Vercel SSO 보호 화면으로 정상 리다이렉트됐으며, 인증 운영자 브라우저 QA와 운영 결산 생성은 수행하지 않았다.
+
+## 2026-07-30
+
+### Completed
+- 가입일과 별도로 활동 시작 월을 저장·검증하고, 미래 시작 회원을 회원 명단에서 `활동 예정`으로 표시했다. 활동 시작 월은 회비 대상, 정모 preparing/최초 locked 명단, 월말 활동 회원 수의 공통 시작 경계가 된다.
+- 회원별 회비 인정액·미납액 계산, 실제/인정/조정 수납액 조정식, 2026년 7월 기초 장부 잔액 0원과 월별 기말 잔액 승계, 마감·재개·버전 이력을 가진 정산 스냅샷을 구현했다.
+- 정산 화면은 마감 전 원본 데이터 기반 미리보기를, 마감 후에는 활성 마감 스냅샷을 표시하도록 변경했다. 회원 공유용 PDF는 항상 활성 마감 스냅샷만 사용하며, 개인별 납부 정보·회원 식별자·영수증·내부 메모를 제외하고 활동 회원 수·회비 현황·장부 잔액·전체 공개 지출 내역을 표시한다. PDF 생성은 감사 RPC를 통해 감사 로그를 남긴다.
+- 운영자 계정으로 자동 생성되는 회원은 활동 시작 월을 추정하지 않고 명시적인 미확정 상태로 둔다. 회원 명단은 `활동 시작월 확인 필요`를 표시하며, 기존 회원 수정 폼에서 운영자가 실제 월을 확인해 저장한다.
+- 준비·최초 잠금·임시 추가 정모 후보에 활동 시작 월, 휴회 시작 월과 탈퇴 월말 경계를 동일하게 적용했다. 회비 화면은 부분납부를 미납으로 집계하고 잔여 금액을 표시하며, 마감일은 서울 시간대 달력 날짜로 표시한다.
+
+### Verification Evidence
+- 최종 통합 수정 RED 게이트에서 자동 운영자 미확정, 정모 후보 월 경계, 부분납부, 활동 시작 월 오류 UX, 서울 마감일 테스트가 예상 원인으로 17건 실패하는 것을 확인했다.
+- 최종 수정 집중 Vitest — 10개 파일, 90개 테스트 통과.
+- 교차 기능 Vitest: `npm run test -- src/features/members src/features/fees src/features/meetings src/features/settlements src/features/reports 'src/app/(app)/members' 'src/app/(app)/fees' 'src/app/(app)/meetings' 'src/app/(app)/settlements' 'src/app/(app)/reports'` — 51개 파일, 435개 테스트 통과.
+- 최종 전체 `npm run test` — 95개 파일, 630개 테스트 통과.
+- 최종 `npm run lint`, `npx tsc --noEmit`, `git diff --check` — 모두 종료 코드 0으로 통과.
+- `next.config`와 PDF 경로는 변경하지 않아 프로덕션 컴파일·trace 검사는 다시 실행하지 않았다. 세 마이그레이션은 모두 이번 작업에서 적용하지 않았다.
+- 교차 기능 Vitest: `npm run test -- src/features/members src/features/fees src/features/meetings src/features/settlements src/features/reports 'src/app/(app)/members' 'src/app/(app)/fees' 'src/app/(app)/meetings' 'src/app/(app)/settlements' 'src/app/(app)/reports'` — 51개 파일, 416개 테스트 통과.
+- 전체 `npm run test` — 95개 파일, 611개 테스트 통과.
+- `npm run lint`, `npx tsc --noEmit`, `git diff --check` — 모두 종료 코드 0으로 통과.
+- 표준 `npm run build`(Next.js 16.2.10 Turbopack)은 컴파일과 TypeScript 검사까지 성공했으나, 이 격리 작업트리에 Supabase 환경 변수가 없어 `/(.)expenses/new` 정적 사전 렌더에서 `Missing or invalid Supabase environment variables`로 종료 코드 1을 반환했다. 빌드 통과로 처리하지 않았다.
+- `npx next build --webpack`도 컴파일과 TypeScript 검사까지 성공했으나 같은 환경 변수 부재로 `/(.)expenses/new`와 `/fees/new` 사전 렌더에서 종료 코드 1을 반환했다. 월간 PDF 라우트 NFT에는 `../../../../../../src/features/reports/fonts/IBMPlexSansKR-Regular.ttf` 항목이 정확히 한 번 포함된 것을 확인했다.
+- DB에 적용하지 않고 마이그레이션을 검토했다. `202607300001`은 nullable `activity_start_month`와 월 첫날/가입 월 제약을 먼저 추가하며, `202607300002`는 정산 마감 스키마·RPC·RLS를 추가한다. 최종 `NOT NULL` 마이그레이션은 존재하지 않는다. 마감 계산은 활동 시작 월 null을 거부하고, 스냅샷 JSON은 회원·납부·영수증·메모 식별자를 포함하지 않는다. 활성 운영자 읽기 RLS, 직접 인증 사용자 쓰기 차단, 고정 `search_path`, 명시적 grant/revoke, 권한 재검증, advisory lock과 원본 테이블 공유 잠금, 버전·원장·감사 규칙 및 PDF 감사 RPC의 원자적 closing-row 잠금을 확인했다.
+
+### Deployment Gate
+- `202607290001`, `202607300001`, `202607300002`는 이번 작업에서 운영 DB에 적용하지 않았다. 배포는 반드시 `202607290001_add_member_pause_start_month.sql` → `202607300001_add_member_activity_start_month.sql` → 운영자 확인 활동 시작 월 백필 → `202607300002_add_monthly_settlement_closings.sql` 순서로 진행한다.
+- 마이그레이션 실행기가 대기 중인 버전을 번호 순서로 자동 적용하더라도, `202607300001` 뒤에서 백필을 완료하고 검증한 다음 `202607300002`를 계속하는 운영 중단점이 보장되기 전에는 실행하지 않는다.
+- 기존 회원과 자동 생성 운영자 회원의 활동 시작 월은 가입일·계정 생성 월로 추정하지 않는다. 운영자가 확인한 값으로 입력하고 완전성·월 첫날·가입 월 경계를 검증한다.
+- 최종 `NOT NULL` 마이그레이션 전에는 운영자 계정 생성과 확인된 활동 시작 월을 한 작업으로 원자적으로 받도록 자동 회원 생성 흐름을 재설계해야 한다. 이 재설계와 전체 백필 검증 전에는 최종 제약을 만들거나 적용하지 않는다.
+- 첫 마감은 2026년 7월이며 기초 장부 잔액은 0원이다. 8월 이후는 직전 활성 마감의 기말 잔액을 승계하므로 월 순서를 건너뛰어 마감하지 않는다.
+- 롤백 가능한 DB 환경에서 마이그레이션과 백필을 적용한 뒤, 인증된 운영자 브라우저로 회원·회비·정모·정산 마감/재개·PDF·권한 경계를 QA해야 한다. Supabase 환경 변수를 제공한 프로덕션 빌드도 그 전에 다시 확인해야 한다.
+
 ## 2026-07-29
 
 ### Completed
@@ -23,6 +184,26 @@
 ### Deployment Gate
 - DB 마이그레이션을 먼저 적용하고 앱을 배포한다. 전환 중에는 구버전 UI의 신규 `active`→`paused` 전환을 금지하거나 짧게 회원 쓰기를 중단한다. 구버전 요청은 기존 휴회원 수정과 재활성화는 호환되지만, 시작 월 키 없는 신규 휴회 전환은 DB 제약으로 거부된다.
 - 배포 전 롤백 가능한 DB에서 백필·제약, `save_member_with_contact`, 회원 디렉터리, 7월 포함·8월 제외 회비/정모 명단 smoke를 완료해야 한다. 로컬 DB 부재 상태에서 운영 DB에 임의 적용하지 않는다.
+
+## 2026-07-27
+
+### 회원 등록 RPC 장애 진단
+- 관리자 Auth 사용자가 이메일 확인·비차단 상태이고, 연결된 프로필이 활성 `admin`이며 `members.create`와 `members.contacts.manage` 권한을 모두 보유한 것을 운영 Supabase에서 확인했다.
+- 관리자 일회성 인증으로 반드시 롤백되는 회원 저장 요청을 재현해 PostgreSQL `42702` 오류(`member_id` 매개변수와 컬럼 참조가 모호함)를 확인했다.
+- `save_member_with_contact`의 공개 함수 시그니처를 유지하면서 모든 매개변수 참조를 함수명으로 한정하고 연락처 upsert 충돌 대상을 기본키 제약 이름으로 변경하는 전진 마이그레이션을 추가했다.
+- 회귀 테스트를 RED→GREEN으로 실행해 새 마이그레이션이 모호한 `member_id` 참조를 다시 도입하지 않도록 했다.
+
+### 적용 상태
+- 로컬 수정과 집중 테스트는 완료했다.
+- 운영 DB에 Supabase SQL Editor로 적용했다.
+- 적용 후 존재하지 않는 그룹 ID를 사용한 롤백 진단에서 기존 `42702` 모호성 오류가 사라지고 예상한 `23503` 외래 키 오류까지 도달해 수정된 함수가 실제 호출되는 것을 확인했다. 진단 데이터는 트랜잭션 롤백으로 저장되지 않았다.
+
+### 첫 신규 회원번호 교정 준비
+- 운영 DB에서 첫 신규 회원의 실제 번호가 `#0024`, 기존 번호가 `#0000`~`#0019`, 할당기의 다음 번호가 `#0025`인 것을 확인했다.
+- 기대 상태 `#0020`과 다음 번호 `#0021`을 검사하는 읽기 전용 회귀 검사를 실행해 현재 상태에서 의도대로 실패(RED)하는 것을 확인했다.
+- `#0020`~`#0023`의 공백, 정확히 하나인 `#0024` 대상, 할당기 `#/25`를 선행 검증하고 회원번호·정모 명단/출석 스냅샷·할당기를 한 트랜잭션에서 각각 `#0020`·`#0021` 상태로 교정하는 전진 마이그레이션을 추가했다.
+- 운영 DB에 마이그레이션을 적용한 뒤 동일한 읽기 전용 검사를 다시 실행해 첫 신규 회원 `#0020`, 할당기 `#/21`, 예약 구간의 유일한 행 `#0020`, 정모 명단 스냅샷 `#0020`, 출석 스냅샷 0건을 확인했다.
+- SQL Editor 직접 실행에 따른 `supabase_migrations` 이력은 PostgREST가 해당 스키마를 노출하지 않아 API로 확인하지 못했다.
 
 ## 2026-07-15
 
@@ -776,3 +957,49 @@
 ### 운영 적용 보류
 - 로컬 환경에는 `supabase`, `psql`, `docker`가 없고 `.env.local`에는 DDL 실행 경로가 없어 `202607130002_add_club_meetings.sql`을 실제 Supabase 프로젝트에 적용하지 않았다.
 - 실제 admin/operator 및 분리 권한 계정의 RPC 권한 행렬, 두 연결 동시성, KST 월·시간 경계, 1440px/375px 인증 화면과 네트워크 검증은 마이그레이션 적용 뒤 수행해야 한다.
+
+## 2026-07-27
+
+### 피그마 기준 모바일 공통 UI 구현
+- 피그마의 402px 모바일 프레임을 기준으로 64px 브랜드 헤더, 가로 이동 가능한 주요 메뉴 필, 페이지 제목과 콘텐츠 흐름을 공통 앱 셸에 적용했다.
+- 햄버거 메뉴에는 사용자 정보, 비밀번호 변경, 로그아웃만 배치하고 주요 화면 이동 메뉴는 항상 노출되도록 유지했다.
+- 회원·회비·정모 목록은 모바일에서 핵심 정보만 남긴 평면 리스트로 정리했다.
+- 지출과 정산의 데스크톱 테이블에 대응하는 전용 모바일 리스트를 추가했다.
+- 모바일 검색·필터와 패널 헤더를 한 열 또는 줄바꿈 구조로 바꾸고 콘텐츠 최소 폭을 제한해 페이지 가로 스크롤을 방지했다.
+- 데스크톱에서는 기존 사이드 내비게이션, 사용자 바, 테이블 레이아웃이 유지되도록 반응형 전환 범위를 휴대폰 구간으로 한정했다.
+
+### 검증 근거
+- 관련 회귀 게이트: 10개 파일, 47개 테스트 통과.
+- 전체 `npm test`: 91개 파일, 503개 테스트 통과.
+- `npm run lint`, `npx tsc --noEmit`, `git diff --check`: 통과.
+- `npm run build`: Next.js 16.2.10 프로덕션 빌드, TypeScript 검사, 26개 정적 페이지 생성까지 통과.
+- 인증된 브라우저에서 `/members`, `/fees`, `/expenses`, `/settlements`, `/meetings`를 375px과 402px로 검사했다. 모든 화면에서 문서 폭과 뷰포트 폭이 일치했고 보이는 테이블, 잘린 버튼·입력 요소, 페이지 가로 넘침이 없었다.
+- 375px에서 계정 메뉴가 뷰포트 안에 열리고 회원·지출·정산의 핵심 정보 리스트가 표시되는 것을 확인했다.
+- 1440px에서 회원·지출·정산의 모바일 헤더는 숨겨지고 기존 테이블이 표시되며 페이지 가로 넘침이 없음을 확인했다.
+- 브라우저 콘솔의 오류와 경고가 없음을 확인했다.
+
+### 병합 및 원격 반영
+- 구현 브랜치 `codex/mobile-responsive-ui-implementation`의 8개 커밋을 로컬 `main`에 별도 merge commit 없이 fast-forward 병합했다.
+- 병합 결과에서 전체 91개 파일·503개 테스트, ESLint, TypeScript, `git diff --check`를 통과했다.
+- 격리된 병합 워크트리에 기존 `.env.local`을 값 출력 없이 복사한 뒤 Next.js 16.2.10 프로덕션 빌드와 26/26개 정적 페이지 생성을 통과했다.
+- `main`을 `2abd798`까지 `origin/main`에 푸시했고 GitHub PR #2가 `MERGED` 상태와 동일한 커밋을 가리키는 것을 확인했다.
+- 임시 병합·구현 워크트리와 병합 완료된 로컬 구현 브랜치를 정리했으며, 원래 작업공간의 미커밋 변경은 수정하지 않았다.
+
+### 회원 등록 RPC 장애 진단
+- `parkseik@gmail.com` Auth 사용자가 이메일 확인·비차단 상태이고, 연결된 프로필이 활성 `admin`이며 `members.create`와 `members.contacts.manage` 권한을 모두 보유한 것을 운영 Supabase에서 확인했다.
+- 관리자 일회성 인증으로 반드시 롤백되는 회원 저장 요청을 재현해 PostgreSQL `42702` 오류(`member_id` 매개변수와 컬럼 참조가 모호함)를 확인했다.
+- `save_member_with_contact`의 공개 함수 시그니처를 유지하면서 모든 매개변수 참조를 함수명으로 한정하고 연락처 upsert 충돌 대상을 기본키 제약 이름으로 변경하는 전진 마이그레이션을 추가했다.
+- 회귀 테스트를 RED→GREEN으로 실행해 새 마이그레이션이 모호한 `member_id` 참조를 다시 도입하지 않도록 했다.
+
+### 적용 상태
+- 로컬 수정과 집중 테스트는 완료했다.
+- 운영 DB에 Supabase SQL Editor로 적용했다.
+- 적용 후 존재하지 않는 그룹 ID를 사용한 롤백 진단에서 기존 `42702` 모호성 오류가 사라지고 예상한 `23503` 외래 키 오류까지 도달해 수정된 함수가 실제 호출되는 것을 확인했다. 진단 데이터는 트랜잭션 롤백으로 저장되지 않았다.
+
+### 첫 신규 회원번호 교정
+- 운영 DB에서 첫 신규 회원의 실제 번호가 `#0024`, 기존 번호가 `#0000`~`#0019`, 할당기의 다음 번호가 `#0025`인 것을 확인했다.
+- 기대 상태 `#0020`과 다음 번호 `#0021`을 검사하는 읽기 전용 회귀 검사를 실행해 현재 상태에서 의도대로 실패(RED)하는 것을 확인했다.
+- `#0020`~`#0023`의 공백, 정확히 하나인 `#0024` 대상, 할당기 `#/25`를 선행 검증하고 회원번호·정모 명단/출석 스냅샷·할당기를 한 트랜잭션에서 각각 `#0020`·`#0021` 상태로 교정하는 전진 마이그레이션을 추가했다.
+- 운영 DB 직접 적용 후 마이그레이션 이력이 재생되는 경우에는 정확한 교정 완료 상태를 성공으로 처리하고, 다른 환경에서는 사고 당시 상태가 정확히 일치할 때만 데이터를 변경하도록 재실행 안전성을 확보했다.
+- 운영 DB에 마이그레이션을 적용한 뒤 동일한 읽기 전용 검사를 다시 실행해 첫 신규 회원 `#0020`, 할당기 `#/21`, 예약 구간의 유일한 행 `#0020`, 정모 명단 스냅샷 `#0020`, 출석 스냅샷 0건을 확인했다.
+- SQL Editor 직접 실행에 따른 `supabase_migrations` 이력은 PostgREST가 해당 스키마를 노출하지 않아 API로 확인하지 못했다.

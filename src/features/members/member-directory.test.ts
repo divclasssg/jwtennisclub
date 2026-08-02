@@ -33,6 +33,7 @@ const memberRow: MemberRecord = {
   joinedDate: "2026-07-01",
   withdrawnDate: null,
   pauseStartMonth: null,
+  activityStartMonth: "2026-07-01",
   memo: "첫 등록",
   createdBy: null,
   updatedBy: null,
@@ -51,6 +52,7 @@ const databaseMemberRow = {
   joined_date: "2026-07-01",
   withdrawn_date: null,
   pause_start_month: null,
+  activity_start_month: "2026-07-01",
   memo: "첫 등록",
 };
 
@@ -125,6 +127,7 @@ describe("member directory DTO", () => {
 
     expect(row.phoneDisplay).toBe("010-****-5678");
     expect(row.pauseStartMonth).toBeNull();
+    expect(row.activityStartMonth).toBe("2026-07-01");
     expect(row).not.toHaveProperty("phoneNumber");
     expect(JSON.stringify(row)).not.toContain("01012345678");
   });
@@ -148,6 +151,7 @@ describe("member directory page RPC", () => {
           ...databaseMemberRow,
           status: "paused",
           pause_start_month: "2026-08-01",
+          activity_start_month: "2026-07-01",
           club_position_label: "총무",
           phone_display: "010-****-5678",
           group_code: "A",
@@ -170,6 +174,7 @@ describe("member directory page RPC", () => {
       name: "김민수",
       phoneDisplay: "010-****-5678",
       pauseStartMonth: "2026-08-01",
+      activityStartMonth: "2026-07-01",
     });
   });
 });
@@ -266,6 +271,7 @@ describe("member directory contact query scope", () => {
       member_ids: ["member-id"],
     });
     expect(member?.pauseStartMonth).toBeNull();
+    expect(member?.activityStartMonth).toBe("2026-07-01");
   });
 
   it("단일 편집 조회는 휴회 시작 월을 보존한다", async () => {

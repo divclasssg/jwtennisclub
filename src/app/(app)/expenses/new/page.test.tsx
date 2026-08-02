@@ -2,11 +2,53 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import NewExpensePage from "./page";
 
+const lockMocks = vi.hoisted(() => ({
+  getMonthlySourceLockStatus: vi.fn(async () => false),
+}));
+
 vi.mock("../actions", () => ({
   createExpense: vi.fn(),
 }));
 
+vi.mock("@/features/settlements/monthly-source-lock", () => ({
+  getMonthlySourceLockStatus: lockMocks.getMonthlySourceLockStatus,
+}));
+
 describe("NewExpensePage", () => {
+  it("explains why direct creation is unavailable for a finalized month", async () => {
+    lockMocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+
+    render(
+      await NewExpensePage({
+        searchParams: Promise.resolve({ month: "2026-07" }),
+      }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+    expect(screen.queryByRole("button", { name: "지출 등록" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("renders a racing closing-locked redirect with its attempted month", async () => {
+    render(
+      await NewExpensePage({
+        searchParams: Promise.resolve({
+          error: "closing-locked",
+          month: "2026-07",
+        }),
+      }),
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+    expect(lockMocks.getMonthlySourceLockStatus).toHaveBeenCalledWith(
+      "2026-07-01",
+    );
+  });
+
   it("renders the expense creation form", async () => {
     render(
       await NewExpensePage({

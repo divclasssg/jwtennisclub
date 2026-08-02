@@ -2,6 +2,10 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import EditExpensePage from "./page";
 
+const lockMocks = vi.hoisted(() => ({
+  getMonthlySourceLockStatus: vi.fn(async () => false),
+}));
+
 const expensesQuery = {
   eq: vi.fn(() => expensesQuery),
   maybeSingle: vi.fn(async () => ({
@@ -37,11 +41,36 @@ vi.mock("../../actions", () => ({
   updateExpense: vi.fn(),
 }));
 
+vi.mock("@/features/settlements/monthly-source-lock", () => ({
+  getMonthlySourceLockStatus: lockMocks.getMonthlySourceLockStatus,
+}));
+
 describe("EditExpensePage", () => {
   beforeEach(() => {
     expensesQuery.eq.mockClear();
     expensesQuery.maybeSingle.mockClear();
     expensesQuery.select.mockClear();
+    lockMocks.getMonthlySourceLockStatus.mockReset();
+    lockMocks.getMonthlySourceLockStatus.mockResolvedValue(false);
+  });
+
+  it("explains why direct editing is unavailable for a finalized month", async () => {
+    lockMocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+
+    render(
+      await EditExpensePage({
+        params: Promise.resolve({ id: "expense-1" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+    expect(screen.queryByRole("button", { name: "변경 저장" }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "영수증 삭제" }))
+      .not.toBeInTheDocument();
   });
 
   it("renders the expense edit form with existing values", async () => {
@@ -63,5 +92,20 @@ describe("EditExpensePage", () => {
       "intent",
     );
     expect(screen.getByRole("button", { name: "변경 저장" })).toBeInTheDocument();
+  });
+
+  it("renders a racing closing-locked redirect after the month is reopened", async () => {
+    render(
+      await EditExpensePage({
+        params: Promise.resolve({ id: "expense-1" }),
+        searchParams: Promise.resolve({ error: "closing-locked" }),
+      }),
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+    expect(screen.getByRole("button", { name: "변경 저장" }))
+      .toBeInTheDocument();
   });
 });

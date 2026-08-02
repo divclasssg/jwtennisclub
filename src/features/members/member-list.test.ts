@@ -3,6 +3,8 @@ import {
   buildMemberSearchFilter,
   formatDate,
   formatPauseStartMonth,
+  isMemberActivityPending,
+  isMemberActivityStartUnconfirmed,
   formatMemberKind,
   formatMemberStatus,
   formatMemberStatusTab,
@@ -64,6 +66,7 @@ describe("member list formatting", () => {
         joined_date: "2026-07-01",
         withdrawn_date: null,
         pause_start_month: "2026-08-01",
+        activity_start_month: "2026-07-01",
         memo: "첫 등록",
       }),
     ).toEqual({
@@ -77,6 +80,7 @@ describe("member list formatting", () => {
       joinedDate: "2026-07-01",
       withdrawnDate: null,
       pauseStartMonth: "2026-08-01",
+      activityStartMonth: "2026-07-01",
       memo: "첫 등록",
     });
   });
@@ -97,6 +101,20 @@ describe("member list formatting", () => {
   it("formats member kind by operator profile linkage", () => {
     expect(formatMemberKind({ operatorProfileId: "profile-id" })).toBe("운영진");
     expect(formatMemberKind({ operatorProfileId: null })).toBe("일반회원");
+  });
+
+  it("marks a member with a future activity start month as pending", () => {
+    expect(isMemberActivityPending({ activityStartMonth: "2026-08-01" }, "2026-07-01")).toBe(true);
+    expect(isMemberActivityPending({ activityStartMonth: "2026-07-01" }, "2026-07-01")).toBe(false);
+  });
+
+  it("marks only a missing activity start month as awaiting operator confirmation", () => {
+    expect(isMemberActivityStartUnconfirmed({ activityStartMonth: null })).toBe(true);
+    expect(
+      isMemberActivityStartUnconfirmed({
+        activityStartMonth: "2026-08-01",
+      }),
+    ).toBe(false);
   });
 
   it("sorts operators above general members by club position order", () => {

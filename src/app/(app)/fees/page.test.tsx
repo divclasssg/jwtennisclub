@@ -5,7 +5,21 @@ import FeesPage from "./page";
 
 const permissionMocks = vi.hoisted(() => ({
   currentOperatorHasPermission: vi.fn(async () => true),
+  getMonthlySourceLockStatus: vi.fn(async () => false),
 }));
+
+type FeeMemberFixture = {
+  id: string;
+  member_code: string;
+  name: string;
+  operator_profile_id: string | null;
+  status: "active" | "paused" | "withdrawn";
+  joined_date: string;
+  withdrawn_date: string | null;
+  pause_start_month: string | null;
+  activity_start_month: string | null;
+  memo: string | null;
+};
 
 const payments = [
   {
@@ -26,7 +40,7 @@ const payments = [
   },
 ];
 
-const members = [
+const members: FeeMemberFixture[] = [
   {
     id: "member-1",
     member_code: "M0001",
@@ -36,6 +50,7 @@ const members = [
     joined_date: "2026-07-01",
     withdrawn_date: null,
     pause_start_month: null,
+    activity_start_month: "2026-07-01",
     memo: null,
   },
   {
@@ -47,6 +62,7 @@ const members = [
     joined_date: "2026-07-01",
     withdrawn_date: null,
     pause_start_month: "2026-08-01",
+    activity_start_month: "2026-07-01",
     memo: null,
   },
 ];
@@ -137,6 +153,10 @@ vi.mock("@/features/auth/operator-context", () => ({
   currentOperatorHasPermission: permissionMocks.currentOperatorHasPermission,
 }));
 
+vi.mock("@/features/settlements/monthly-source-lock", () => ({
+  getMonthlySourceLockStatus: permissionMocks.getMonthlySourceLockStatus,
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ back: vi.fn(), replace: vi.fn() }),
 }));
@@ -205,6 +225,31 @@ describe("FeesPage", () => {
     );
     permissionMocks.currentOperatorHasPermission.mockReset();
     permissionMocks.currentOperatorHasPermission.mockResolvedValue(true);
+    permissionMocks.getMonthlySourceLockStatus.mockReset();
+    permissionMocks.getMonthlySourceLockStatus.mockResolvedValue(false);
+  });
+
+  it("hides fee source actions but preserves note editing for a finalized month", async () => {
+    permissionMocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+
+    render(
+      await FeesPage({
+        searchParams: Promise.resolve({ month: "2026-07" }),
+      }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+    expect(screen.queryByRole("link", { name: "CSV 등록" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "납부 처리" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "납부 취소" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /메모 (입력|수정)/ }).length)
+      .toBeGreaterThan(0);
+    expect(permissionMocks.getMonthlySourceLockStatus).toHaveBeenCalledTimes(1);
+    expect(permissionMocks.getMonthlySourceLockStatus).toHaveBeenCalledWith(
+      "2026-07-01",
+    );
   });
 
   it("renders monthly fee board rows with filters and summary", async () => {
@@ -249,12 +294,43 @@ describe("FeesPage", () => {
     expect(within(table).getByRole("cell", { name: "30,000원" })).toBeInTheDocument();
     expect(within(table).getByRole("button", { name: "납부 취소" })).toBeInTheDocument();
     expect(membersQuery.select).toHaveBeenCalledWith(
-      "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, pause_start_month, memo",
+      "id, member_code, name, operator_profile_id, status, joined_date, withdrawn_date, pause_start_month, activity_start_month, memo",
     );
     expect(membersQuery.or).toHaveBeenCalledWith(
-      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-07-31)",
     );
     expect(membersQuery.neq).toHaveBeenCalledWith("member_code", "#0000");
+    expect(membersQuery.lte).toHaveBeenCalledWith(
+      "activity_start_month",
+      "2026-07-01",
+    );
+  });
+
+  it("includes a member withdrawn after July in the July fee board", async () => {
+    queryState.payments = [];
+    queryState.members = [
+      {
+        id: "member-withdrawn",
+        member_code: "M0003",
+        name: "박지수",
+        operator_profile_id: null,
+        status: "withdrawn",
+        joined_date: "2026-07-01",
+        withdrawn_date: "2026-08-01",
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+        memo: null,
+      },
+    ];
+
+    render(
+      await FeesPage({ searchParams: Promise.resolve({ month: "2026-07" }) }),
+    );
+
+    expect(screen.getByRole("cell", { name: "M0003" })).toBeInTheDocument();
+    expect(membersQuery.or).toHaveBeenCalledWith(
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-07-31)",
+    );
   });
 
   it("renders unpaid rows with an inline payment action", async () => {
@@ -297,6 +373,115 @@ describe("FeesPage", () => {
     expect(within(mobileList).getAllByRole("heading").map((heading) => heading.textContent)).toEqual(["이영희", "김민수"]);
   });
 
+  it("shows and sorts partial, exact, and overpayments by their real status", async () => {
+    queryState.members = [
+      {
+        id: "member-partial",
+        member_code: "M0001",
+        name: "부분 회원",
+        operator_profile_id: null,
+        status: "active",
+        joined_date: "2026-07-01",
+        withdrawn_date: null,
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+        memo: null,
+      },
+      {
+        id: "member-exact",
+        member_code: "M0002",
+        name: "정액 회원",
+        operator_profile_id: null,
+        status: "active",
+        joined_date: "2026-07-01",
+        withdrawn_date: null,
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+        memo: null,
+      },
+      {
+        id: "member-over",
+        member_code: "M0003",
+        name: "초과 회원",
+        operator_profile_id: null,
+        status: "active",
+        joined_date: "2026-07-01",
+        withdrawn_date: null,
+        pause_start_month: null,
+        activity_start_month: "2026-07-01",
+        memo: null,
+      },
+    ];
+    queryState.payments = [
+      {
+        ...payments[0],
+        id: "payment-partial",
+        member_id: "member-partial",
+        amount: 10000,
+        members: { name: "부분 회원", member_code: "M0001" },
+      },
+      {
+        ...payments[0],
+        id: "payment-exact",
+        member_id: "member-exact",
+        amount: 30000,
+        members: { name: "정액 회원", member_code: "M0002" },
+      },
+      {
+        ...payments[0],
+        id: "payment-over",
+        member_id: "member-over",
+        amount: 40000,
+        members: { name: "초과 회원", member_code: "M0003" },
+      },
+    ];
+    queryState.notes = [];
+
+    render(await FeesPage({
+      searchParams: Promise.resolve({
+        month: "2026-07",
+        sort: "status",
+        direction: "asc",
+      }),
+    }));
+
+    const table = screen.getByRole("table");
+    expect(
+      within(table).getAllByRole("rowheader").map((cell) => cell.textContent),
+    ).toEqual(["정액 회원", "초과 회원", "부분 회원"]);
+
+    const partialRow = screen.getByRole("rowheader", {
+      name: "부분 회원",
+    }).closest("tr")!;
+    expect(within(partialRow).getByText("부분납부")).toBeInTheDocument();
+    expect(within(partialRow).getByText("잔여 20,000원")).toBeInTheDocument();
+    expect(within(partialRow).getByRole("cell", { name: "10,000원" }))
+      .toBeInTheDocument();
+
+    for (const name of ["정액 회원", "초과 회원"]) {
+      const row = screen.getByRole("rowheader", { name }).closest("tr")!;
+      expect(within(row).getByText("납부완료")).toBeInTheDocument();
+    }
+    expect(within(table).getByRole("cell", { name: "40,000원" }))
+      .toBeInTheDocument();
+
+    const mobileList = screen.getByRole("list", {
+      name: "모바일 회비 목록",
+    });
+    const partialItem = within(mobileList)
+      .getByRole("heading", { name: "부분 회원" })
+      .closest("li")!;
+    expect(within(partialItem).getByText("부분납부")).toBeInTheDocument();
+    expect(within(partialItem).getByText("잔여 20,000원"))
+      .toBeInTheDocument();
+    expect(within(partialItem).getByText("기준 금액 10,000원"))
+      .toBeInTheDocument();
+
+    const summary = screen.getByRole("region", { name: "회비 요약" });
+    expect(within(summary).getByText("2명")).toBeInTheDocument();
+    expect(within(summary).getByText("1명")).toBeInTheDocument();
+  });
+
   it("renders a mobile fee list with the same payment details", async () => {
     render(
       await FeesPage({
@@ -320,6 +505,7 @@ describe("FeesPage", () => {
     expect(within(items[1]).getByText("회원번호 M0002")).toBeInTheDocument();
     expect(within(items[1]).getByText("미납")).toBeInTheDocument();
     expect(within(items[0]).getByText("기준 금액 30,000원")).toBeInTheDocument();
+    expect(within(mobileList).queryByText("운영진")).not.toBeInTheDocument();
     expect(within(items[1]).getByRole("button", { name: "납부 처리" })).toBeInTheDocument();
     expect(
       within(items[1]).getByRole("link", { name: "이영희 메모 입력" }),

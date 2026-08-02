@@ -1,14 +1,18 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildFeeEligibilityFilter,
   formatCurrency,
   formatPeriodMonth,
+  getCurrentPeriodMonth,
   getPeriodMonthEnd,
+  isMemberActiveForPeriod,
+  isMemberFeeTargetForPeriod,
   normalizePeriodMonth,
 } from "./fee-model";
 import { isMemberEligibleForPeriod } from "@/features/members/member-model";
+import { isMemberActivityPending } from "@/features/members/member-list";
 
 const migrationSql = readFileSync(
   join(process.cwd(), "supabase/migrations/202607030003_add_fee_payments.sql"),
@@ -31,6 +35,31 @@ describe("fee model", () => {
     expect(getPeriodMonthEnd("2026-02-01")).toBe("2026-02-28");
   });
 
+  it("uses Asia/Seoul when calculating the current payment month", () => {
+    vi.stubEnv("TZ", "UTC");
+    const currentPeriodMonth = getCurrentPeriodMonth(new Date("2026-07-31T15:00:00.000Z"));
+    vi.unstubAllEnvs();
+
+    expect(currentPeriodMonth).toBe("2026-08-01");
+    expect(
+      isMemberActivityPending(
+        { activityStartMonth: "2026-08-01" },
+        currentPeriodMonth,
+      ),
+    ).toBe(false);
+    expect(
+      isMemberActiveForPeriod(
+        {
+          status: "active",
+          withdrawnDate: null,
+          pauseStartMonth: null,
+          activityStartMonth: "2026-08-01",
+        },
+        currentPeriodMonth,
+      ),
+    ).toBe(true);
+  });
+
   it("keeps a member paused in August eligible for July fees only", () => {
     const pausedInAugust = {
       status: "paused" as const,
@@ -38,10 +67,82 @@ describe("fee model", () => {
     };
 
     expect(buildFeeEligibilityFilter("2026-07-01")).toBe(
-      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01)",
+      "status.eq.active,and(status.eq.paused,pause_start_month.gt.2026-07-01),and(status.eq.withdrawn,withdrawn_date.gt.2026-07-31)",
     );
     expect(isMemberEligibleForPeriod(pausedInAugust, "2026-07-01")).toBe(true);
     expect(isMemberEligibleForPeriod(pausedInAugust, "2026-08-01")).toBe(false);
+  });
+
+  it("uses the activity start month for activity and fee eligibility", () => {
+    const startsInAugust = {
+      status: "active" as const,
+      joinedDate: "2026-07-20",
+      withdrawnDate: null,
+      pauseStartMonth: null,
+      activityStartMonth: "2026-08-01",
+    };
+
+    expect(isMemberActiveForPeriod(startsInAugust, "2026-07-01")).toBe(false);
+    expect(isMemberActiveForPeriod(startsInAugust, "2026-08-01")).toBe(true);
+    expect(
+      isMemberFeeTargetForPeriod(
+        { ...startsInAugust, memberCode: "#0020" },
+        "2026-08-01",
+      ),
+    ).toBe(true);
+    expect(
+      isMemberFeeTargetForPeriod(
+        { ...startsInAugust, memberCode: "#0000" },
+        "2026-08-01",
+      ),
+    ).toBe(false);
+  });
+
+  it("applies pause and withdrawal boundaries to monthly activity", () => {
+    expect(
+      isMemberActiveForPeriod(
+        {
+          status: "paused",
+          withdrawnDate: null,
+          pauseStartMonth: "2026-08-01",
+          activityStartMonth: "2026-07-01",
+        },
+        "2026-07-01",
+      ),
+    ).toBe(true);
+    expect(
+      isMemberActiveForPeriod(
+        {
+          status: "paused",
+          withdrawnDate: null,
+          pauseStartMonth: "2026-08-01",
+          activityStartMonth: "2026-07-01",
+        },
+        "2026-08-01",
+      ),
+    ).toBe(false);
+    expect(
+      isMemberActiveForPeriod(
+        {
+          status: "withdrawn",
+          withdrawnDate: "2026-07-31",
+          pauseStartMonth: null,
+          activityStartMonth: "2026-07-01",
+        },
+        "2026-07-01",
+      ),
+    ).toBe(false);
+    expect(
+      isMemberActiveForPeriod(
+        {
+          status: "withdrawn",
+          withdrawnDate: "2026-08-01",
+          pauseStartMonth: null,
+          activityStartMonth: "2026-07-01",
+        },
+        "2026-07-01",
+      ),
+    ).toBe(true);
   });
 });
 

@@ -1,11 +1,12 @@
 import type { ComponentProps } from "react";
 import { ActionLink, Badge, Button } from "@/components/atoms";
-import { formatDate, formatMemberKind } from "@/features/members/member-list";
+import { formatDate } from "@/features/members/member-list";
 import {
   DEFAULT_MONTHLY_FEE_AMOUNT,
 } from "./fee-model";
 import {
   formatCurrency,
+  getFeePaymentStatus,
   type FeeBoardMemberRow,
 } from "./fee-list";
 import styles from "./FeeMobileList.module.scss";
@@ -17,20 +18,18 @@ type FeeMobileListProps = {
   canManageNotes: boolean;
   cancelPaymentAction: FormAction;
   createPaymentAction: FormAction;
+  isLocked: boolean;
   periodMonth: string;
   rows: FeeBoardMemberRow[];
   today: string;
   listState: FeeListState;
 };
 
-function formatPaymentStatus(row: FeeBoardMemberRow) {
-  return row.payment ? "납부완료" : "미납";
-}
-
 export function FeeMobileList({
   canManageNotes,
   cancelPaymentAction,
   createPaymentAction,
+  isLocked,
   periodMonth,
   rows,
   today,
@@ -40,6 +39,7 @@ export function FeeMobileList({
     <ul aria-label="모바일 회비 목록" className={styles["fee-mobile-list"]}>
       {rows.map((row) => {
         const amount = row.payment?.amount ?? DEFAULT_MONTHLY_FEE_AMOUNT;
+        const paymentStatus = getFeePaymentStatus(row.payment);
 
         return (
           <li className={styles["fee-mobile-item"]} key={row.memberId}>
@@ -47,15 +47,15 @@ export function FeeMobileList({
               <div className={styles["fee-mobile-title"]}>
                 <h3 className={styles["fee-mobile-name"]}>{row.memberName}</h3>
                 <div className={styles["fee-mobile-badges"]}>
-                  <Badge tone={row.operatorProfileId ? "info" : "muted"}>
-                    {formatMemberKind(row)}
+                  <Badge tone={paymentStatus.label === "납부완료" ? "success" : "danger"}>
+                    {paymentStatus.label}
                   </Badge>
-                  <Badge tone={row.payment ? "success" : "danger"}>
-                    {formatPaymentStatus(row)}
-                  </Badge>
+                  {paymentStatus.label === "부분납부" ? (
+                    <span>잔여 {formatCurrency(paymentStatus.remainingAmount)}원</span>
+                  ) : null}
                 </div>
               </div>
-              {row.payment ? (
+              {isLocked ? null : row.payment ? (
                 <form action={cancelPaymentAction} className={styles["fee-mobile-action"]}>
                   <input name="paymentId" type="hidden" value={row.payment.id} />
                   <input name="periodMonth" type="hidden" value={periodMonth} />

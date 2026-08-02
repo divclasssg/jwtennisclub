@@ -31,6 +31,7 @@ function memberFormData(confirmation?: "phone-reuse" | "name-without-phone") {
   formData.set("groupId", "group-a");
   formData.set("status", "active");
   formData.set("joinedDate", "2026-07-01");
+  formData.set("activityStartMonth", "2026-07-01");
   if (confirmation) formData.set("duplicateConfirmation", confirmation);
   return formData;
 }
@@ -72,6 +73,7 @@ describe("member actions", () => {
         name: "홍길동",
         phone_number: "01012345678",
         group_id: "group-a",
+        activity_start_month: "2026-07-01",
       }),
       duplicate_confirmation: null,
     });
@@ -122,6 +124,28 @@ describe("member actions", () => {
       duplicate_confirmation: null,
     });
   });
+
+  it.each([
+    ["create", createMember, "/members/new?error=invalid-activity-start-month"],
+    [
+      "edit",
+      updateMember,
+      "/members/member-id/edit?error=invalid-activity-start-month",
+    ],
+  ] as const)(
+    "routes an invalid activity start month to the stable %s error",
+    async (_mode, action, redirectPath) => {
+      const formData = memberFormData();
+      formData.set("activityStartMonth", "2026-06");
+      if (action === updateMember) formData.set("id", "member-id");
+
+      await expect(action(initialState, formData)).rejects.toThrow(
+        `redirect:${redirectPath}`,
+      );
+
+      expect(mocks.rpc).not.toHaveBeenCalled();
+    },
+  );
 
   it("disables general member CSV imports without calling the database", async () => {
     const formData = new FormData();

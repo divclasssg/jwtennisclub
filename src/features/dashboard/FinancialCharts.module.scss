@@ -1,0 +1,215 @@
+@use "../../app/breakpoints" as bp;
+
+.chart-card {
+  display: grid;
+  min-width: 0;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--rounded-none);
+  background: var(--canvas);
+}
+
+.chart-card:first-child {
+  border-right: var(--hairline-width) solid var(--hairline);
+}
+
+.chart-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+  gap: var(--spacing-sm);
+
+  h3 {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--text-title-size);
+    font-weight: var(--text-title-weight);
+    line-height: var(--text-title-line-height);
+  }
+
+  span {
+    flex: 0 0 auto;
+    color: var(--ink-muted-48);
+    font-size: var(--text-caption-size);
+    font-weight: var(--text-caption-weight);
+    line-height: var(--text-caption-line-height);
+  }
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-md);
+  padding: 0;
+  margin: 0;
+  color: var(--ink-muted-80);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-line-height);
+  list-style: none;
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xxs);
+  }
+}
+
+.income-legend-key,
+.expense-legend-key,
+.final-legend-key,
+.provisional-legend-key {
+  display: inline-block;
+  width: var(--spacing-sm);
+  height: var(--spacing-sm);
+  flex: 0 0 auto;
+}
+
+.income-legend-key {
+  background: var(--action-blue);
+}
+
+.expense-legend-key {
+  background: var(--dashboard-expense-series);
+  border: var(--selected-ring-width) dashed var(--ink);
+}
+
+.final-legend-key {
+  background: var(--ink);
+  border-radius: var(--rounded-full);
+}
+
+.provisional-legend-key {
+  background: var(--canvas);
+  border: var(--selected-ring-width) solid var(--dashboard-provisional-series);
+  border-radius: var(--rounded-full);
+}
+
+.chart-status {
+  color: var(--dashboard-provisional-series);
+  font-weight: var(--font-weight-semibold);
+}
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  overflow: visible;
+}
+
+.chart-axis {
+  stroke: var(--hairline);
+  stroke-width: var(--hairline-width);
+}
+
+.income-bar {
+  fill: var(--action-blue);
+}
+
+.expense-bar {
+  fill: var(--dashboard-expense-series);
+  stroke: var(--ink);
+  stroke-width: var(--selected-ring-width);
+}
+
+.final-balance-segment,
+.provisional-balance-segment {
+  fill: none;
+  stroke-width: var(--selected-ring-width);
+}
+
+.final-balance-segment {
+  stroke: var(--ink);
+}
+
+.provisional-balance-segment {
+  stroke: var(--dashboard-provisional-series);
+}
+
+.final-balance-marker,
+.provisional-balance-marker {
+  stroke-width: var(--selected-ring-width);
+}
+
+.final-balance-marker {
+  fill: var(--ink);
+  stroke: var(--ink);
+}
+
+.provisional-balance-marker {
+  stroke: var(--dashboard-provisional-series);
+}
+
+.chart-month-labels {
+  display: flex;
+  padding: 0;
+  margin: 0;
+  color: var(--ink-muted-48);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-line-height);
+  list-style: none;
+
+  li {
+    min-width: 0;
+    flex: 1 1 0;
+    text-align: center;
+  }
+}
+
+.chart-empty-state {
+  margin: 0;
+  color: var(--ink-muted-48);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-line-height);
+}
+
+.chart-values-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--ink-muted-80);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-line-height);
+
+  tr {
+    border-top: var(--hairline-width) solid var(--hairline);
+  }
+
+  th,
+  td {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  th {
+    text-align: right;
+  }
+
+  th:first-child,
+  tbody th {
+    text-align: left;
+  }
+
+  td {
+    text-align: right;
+  }
+
+  @media (max-width: bp.$breakpoint-phone) {
+    th,
+    td {
+      padding: var(--spacing-xxs) var(--spacing-xs);
+    }
+  }
+}
+
+@media (max-width: bp.$breakpoint-tablet-landscape) {
+  .chart-card:first-child {
+    border-right: 0;
+    border-bottom: var(--hairline-width) solid var(--hairline);
+  }
+}

@@ -36,6 +36,10 @@ function firstValidationCode(errors: string[]) {
     return "invalid-phone";
   }
 
+  if (errors.some((error) => error.includes("활동 시작 월"))) {
+    return "invalid-activity-start-month";
+  }
+
   if (errors.some((error) => error.includes("가입일"))) {
     return "invalid-joined-date";
   }

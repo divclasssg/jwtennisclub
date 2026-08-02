@@ -19,6 +19,7 @@ export type MemberRecord = {
   joinedDate: string;
   withdrawnDate: string | null;
   pauseStartMonth: string | null;
+  activityStartMonth: string | null;
   memo: string | null;
   createdBy: string | null;
   updatedBy: string | null;
@@ -28,7 +29,11 @@ export type MemberRecord = {
 
 export type MemberLifecycleInput = Pick<
   MemberRecord,
-  "status" | "joinedDate" | "withdrawnDate" | "pauseStartMonth"
+  | "status"
+  | "joinedDate"
+  | "withdrawnDate"
+  | "pauseStartMonth"
+  | "activityStartMonth"
 >;
 
 export function isFeeChargeTarget(status: MemberStatus): boolean {
@@ -66,6 +71,17 @@ export function validateMemberLifecycle(
 
   if (member.status !== "paused" && member.pauseStartMonth !== null) {
     errors.push("활동중 또는 탈퇴 회원은 휴회 시작 월을 비워야 합니다.");
+  }
+
+  if (!member.activityStartMonth) {
+    errors.push("활동 시작 월이 필요합니다.");
+  }
+
+  if (
+    member.activityStartMonth &&
+    member.activityStartMonth.slice(0, 7) < member.joinedDate.slice(0, 7)
+  ) {
+    errors.push("활동 시작 월은 가입 월보다 빠를 수 없습니다.");
   }
 
   if (

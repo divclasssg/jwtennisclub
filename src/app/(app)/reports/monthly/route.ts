@@ -1,89 +1,47 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getNextPeriodMonth, isExpenseCategory } from "@/features/expenses/expense-model";
+import { parseMonthlySettlementClosing } from "@/features/settlements/settlement-snapshot";
 import {
   buildMonthlyReportData,
   formatReportFileName,
-  normalizeReportFilters,
-  type MonthlyReportExpenseInput,
-  type MonthlyReportFeePaymentInput,
+  normalizeReportSnapshotId,
 } from "@/features/reports/monthly-report";
 import { renderMonthlyReportPdf } from "@/features/reports/MonthlyReportPdf";
-
-type FeePaymentDatabaseRow = {
-  amount: number;
-};
-
-type ExpenseDatabaseRow = {
-  amount: number;
-  category: string;
-  description: string;
-  expense_date: string;
-  memo: string | null;
-};
 
 type ProfileDatabaseRow = {
   display_name: string | null;
 };
 
-async function getReportFeePayments(
-  periodMonth: string,
-): Promise<MonthlyReportFeePaymentInput[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("fee_payments")
-    .select("id, amount")
-    .eq("period_month", periodMonth)
-    .order("amount", { ascending: false });
-
-  if (error) {
-    throw new Error("보고서 회비 수입을 불러오지 못했습니다.");
-  }
-
-  return ((data ?? []) as FeePaymentDatabaseRow[]).map((payment) => ({
-    amount: payment.amount,
-  }));
-}
-
-async function getReportExpenses(
-  periodMonth: string,
-): Promise<MonthlyReportExpenseInput[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("expenses")
-    .select("id, category, description, amount, expense_date, memo")
-    .gte("expense_date", periodMonth)
-    .lt("expense_date", getNextPeriodMonth(periodMonth))
-    .order("amount", { ascending: false });
-
-  if (error) {
-    throw new Error("보고서 지출을 불러오지 못했습니다.");
-  }
-
-  return ((data ?? []) as ExpenseDatabaseRow[]).map((expense) => ({
-    amount: expense.amount,
-    category: isExpenseCategory(expense.category) ? expense.category : "other",
-    description: expense.description,
-    expenseDate: expense.expense_date,
-    memo: expense.memo,
-  }));
-}
-
 async function getGeneratedBy(user: { id: string; email?: string | null }) {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("display_name")
     .eq("id", user.id)
     .maybeSingle();
-  const profile = data as ProfileDatabaseRow | null;
 
+  if (error) {
+    throw new Error("report generator lookup failed");
+  }
+
+  const profile = data as ProfileDatabaseRow | null;
   return profile?.display_name ?? user.email ?? "JW Tennis Club";
 }
 
-export async function GET(request: Request) {
-  const params = Object.fromEntries(new URL(request.url).searchParams);
-  const filters = normalizeReportFilters(params);
+function controlledResponse(message: string, status: number) {
+  return new Response(message, { status });
+}
+
+export async function GET(request: NextRequest) {
+  const snapshotValues = request.nextUrl.searchParams.getAll("snapshot");
+  const snapshotId = normalizeReportSnapshotId(
+    snapshotValues.length === 1 ? snapshotValues[0] : snapshotValues,
+  );
+
+  if (!snapshotId) {
+    return controlledResponse("결산 스냅샷 식별자가 올바르지 않습니다.", 400);
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -94,24 +52,61 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  const [feePayments, expenses, generatedBy] = await Promise.all([
-    getReportFeePayments(filters.periodMonth),
-    getReportExpenses(filters.periodMonth),
-    getGeneratedBy(user),
-  ]);
-  const report = buildMonthlyReportData({
-    periodMonth: filters.periodMonth,
-    generatedAt: new Date(),
-    generatedBy,
-    feePayments,
-    expenses,
-  });
-  const pdf = await renderMonthlyReportPdf(report);
+  let auditedClosingData: unknown;
+  try {
+    const { data, error } = await supabase.rpc(
+      "record_monthly_report_generation",
+      { requested_closing_id: snapshotId },
+    );
 
-  return new Response(new Uint8Array(pdf), {
-    headers: {
-      "Content-Disposition": `attachment; filename="${formatReportFileName(filters.periodMonth)}"`,
-      "Content-Type": "application/pdf",
-    },
-  });
+    if (error) {
+      if (error.code === "P0002") {
+        return controlledResponse("결산 스냅샷을 찾을 수 없습니다.", 404);
+      }
+
+      return controlledResponse("PDF 생성 기록을 저장하지 못했습니다.", 500);
+    }
+
+    auditedClosingData = data;
+  } catch {
+    return controlledResponse("PDF 생성 기록을 저장하지 못했습니다.", 500);
+  }
+
+  if (!auditedClosingData) {
+    return controlledResponse("결산 스냅샷을 찾을 수 없습니다.", 404);
+  }
+
+  let closing;
+  try {
+    closing = parseMonthlySettlementClosing(auditedClosingData);
+  } catch {
+    return controlledResponse("마감 결산 데이터를 확인하지 못했습니다.", 500);
+  }
+
+  if (closing.id !== snapshotId) {
+    return controlledResponse("마감 결산 데이터를 확인하지 못했습니다.", 500);
+  }
+
+  try {
+    const generatedBy = await getGeneratedBy(user);
+    const report = buildMonthlyReportData({
+      closing,
+      generatedAt: new Date(),
+      generatedBy,
+    });
+    const pdf = await renderMonthlyReportPdf(report);
+
+    return new Response(new Uint8Array(pdf), {
+      headers: {
+        "Content-Disposition": `attachment; filename="${formatReportFileName(
+          closing.periodMonth,
+          closing.closingKind,
+          closing.version,
+        )}"`,
+        "Content-Type": "application/pdf",
+      },
+    });
+  } catch {
+    return controlledResponse("PDF 보고서를 생성하지 못했습니다.", 500);
+  }
 }

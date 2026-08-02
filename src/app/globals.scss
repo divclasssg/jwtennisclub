@@ -175,14 +175,10 @@
   --floating-sticky-bar-padding: 12px 32px;
   --footer-padding: 64px;
   --login-panel-width: 420px;
-  --section-gap: var(--spacing-xl);
   --motion-duration-fast: 160ms;
   --dashboard-card-min-height: 164px;
-  --dashboard-side-column-min: 280px;
-  --dashboard-utility-title-max-width: 260px;
-  --dashboard-utility-title-line-height: 1.16;
-  --dashboard-utility-title-letter-spacing: 0;
-  --dashboard-queue-size: 15px;
+  --dashboard-expense-series: var(--ink-muted-48);
+  --dashboard-provisional-series: var(--ink-muted-80);
   --members-status-filter-width: 180px;
   --members-table-min-width: 1151px;
   --fees-note-summary-max-width: 320px;

@@ -50,6 +50,22 @@ describe("NewMemberPage", () => {
     );
   });
 
+  it("renders the stable activity-start validation message", async () => {
+    render(
+      await NewMemberPage({
+        searchParams: Promise.resolve({
+          error: "invalid-activity-start-month",
+        }),
+      }),
+    );
+
+    expect(
+      screen.getByText(
+        "활동 시작 월은 필수이며 가입 월 또는 그 이후여야 합니다.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("uses notFound without member create permission", async () => {
     currentOperatorHasPermission.mockResolvedValue(false);
 

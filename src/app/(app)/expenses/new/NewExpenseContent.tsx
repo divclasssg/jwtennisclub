@@ -6,6 +6,7 @@ import { firstSearchParam } from "@/features/members/member-list";
 
 export type NewExpenseSearchParams = {
   error?: string | string[];
+  month?: string | string[];
 };
 
 function getErrorMessage(error: string | undefined) {
@@ -39,6 +40,10 @@ function getErrorMessage(error: string | undefined) {
 
   if (error === "receipt-upload-failed") {
     return "영수증 파일을 업로드하지 못했습니다. 잠시 후 다시 시도하세요.";
+  }
+
+  if (error === "closing-locked") {
+    return "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.";
   }
 
   return null;

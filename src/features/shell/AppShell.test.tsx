@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
+import { PageTitle } from "./PageTitleContext";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -34,7 +35,7 @@ const requiredNavigationItems = [
   { href: "/fees", label: "회비" },
   { href: "/expenses", label: "지출" },
   { href: "/schedule", label: "일정" },
-  { href: "/settlements", label: "정산" },
+  { href: "/settlements", label: "결산" },
 ];
 
 describe("AppShell", () => {
@@ -46,18 +47,32 @@ describe("AppShell", () => {
         userPositionLabel="부총무"
         userRoleLabel="관리자"
       >
-        <h1>업무 화면</h1>
+        <PageTitle title="회원 관리" />
+        <p>업무 화면</p>
       </AppShell>,
     );
 
     expect(screen.getAllByText("박세익").length).toBeGreaterThan(0);
-    expect(screen.getByText("관리자 · 부총무")).toBeInTheDocument();
+    expect(screen.getAllByText("관리자 · 부총무")).toHaveLength(2);
+    const mobileHeader = screen.getByRole("banner", {
+      name: "모바일 앱 헤더",
+    });
+    const accountMenu = within(mobileHeader).getByRole("button", {
+      name: "계정 메뉴",
+    });
+    expect(accountMenu.querySelector("img")).toHaveAttribute(
+      "src",
+      expect.stringContaining("menu.png"),
+    );
+    expect(screen.getAllByRole("link", { name: "비밀번호 변경" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "로그아웃" })).toHaveLength(2);
     const nav = screen.getByLabelText("주요 메뉴");
 
-    expect(screen.getByRole("link", { name: "JW TENNIS CLUB" })).toHaveAttribute(
-      "href",
-      "/dashboard",
-    );
+    for (const brandLink of screen.getAllByRole("link", {
+      name: "JW TENNIS CLUB",
+    })) {
+      expect(brandLink).toHaveAttribute("href", "/dashboard");
+    }
 
     for (const item of requiredNavigationItems) {
       expect(within(nav).getByRole("link", { name: item.label })).toHaveAttribute(
@@ -76,12 +91,23 @@ describe("AppShell", () => {
     expect(
       within(nav).queryByRole("link", { name: "PDF" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "비밀번호 변경" })).toHaveAttribute(
-      "href",
-      "/settings/password",
-    );
-    expect(screen.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "업무 화면" })).toBeInTheDocument();
+    for (const passwordLink of screen.getAllByRole("link", {
+      name: "비밀번호 변경",
+    })) {
+      expect(passwordLink).toHaveAttribute("href", "/settings/password");
+    }
+    const shellContent = screen.getByRole("main");
+    const shellTitleBar = shellContent.previousElementSibling;
+
+    expect(shellTitleBar).not.toBeNull();
+    expect(
+      within(shellTitleBar as HTMLElement).getByRole("heading", {
+        name: "회원 관리",
+        level: 1,
+      }),
+    ).toBeInTheDocument();
+    expect(within(shellContent).queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(within(shellContent).getByText("업무 화면")).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "등록 모달" })).toHaveTextContent(
       "모달 내용",
     );

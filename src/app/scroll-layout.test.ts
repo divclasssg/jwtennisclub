@@ -11,6 +11,7 @@ const templateStyles = readSource("src/components/templates/Templates.module.scs
 const moleculeStyles = readSource("src/components/molecules/Molecules.module.scss");
 const organismStyles = readSource("src/components/organisms/Organisms.module.scss");
 const schedulePageStyles = readSource("src/app/(app)/schedule/page.module.scss");
+const settlementPageStyles = readSource("src/app/(app)/settlements/page.module.scss");
 const scheduleStyles = readSource("src/features/events/ScheduleCalendar.module.scss");
 
 function cssRuleBody(source: string, selector: string) {
@@ -40,6 +41,12 @@ describe("scroll layout", () => {
     expect(templateStyles).toMatch(/\.management-list\s*{[\s\S]*?overflow:\s*hidden;/);
     expect(moleculeStyles).toMatch(/\.table-scroll-area\s*{[\s\S]*?overflow:\s*auto;/);
     expect(organismStyles).toMatch(/\.data-panel\s*{[\s\S]*?min-height:\s*0;/);
+  });
+
+  it("keeps all settlement history reachable inside the fixed app frame", () => {
+    expect(settlementPageStyles).toMatch(
+      /\.settlements-list\s*{[\s\S]*?height:\s*100%;[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/,
+    );
   });
 
   it("keeps schedule toolbars fixed while calendar content scrolls internally", () => {

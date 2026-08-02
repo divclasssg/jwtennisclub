@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "10mb",
     },
   },
+  outputFileTracingIncludes: {
+    "/reports/monthly": [
+      "src/features/reports/fonts/IBMPlexSansKR-Regular.ttf",
+    ],
+  },
   turbopack: {
     root: projectRoot,
   },

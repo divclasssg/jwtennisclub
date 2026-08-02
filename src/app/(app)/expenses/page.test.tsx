@@ -2,6 +2,10 @@ import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ExpensesPage from "./page";
 
+const lockMocks = vi.hoisted(() => ({
+  getMonthlySourceLockStatus: vi.fn(async () => false),
+}));
+
 vi.mock("./actions", () => ({
   deleteExpense: vi.fn(),
 }));
@@ -58,6 +62,10 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
+vi.mock("@/features/settlements/monthly-source-lock", () => ({
+  getMonthlySourceLockStatus: lockMocks.getMonthlySourceLockStatus,
+}));
+
 describe("ExpensesPage", () => {
   beforeEach(() => {
     expensesQuery.select.mockClear();
@@ -65,6 +73,27 @@ describe("ExpensesPage", () => {
     expensesQuery.lt.mockClear();
     expensesQuery.eq.mockClear();
     expensesQuery.order.mockClear();
+    lockMocks.getMonthlySourceLockStatus.mockReset();
+    lockMocks.getMonthlySourceLockStatus.mockResolvedValue(false);
+  });
+
+  it("hides expense mutations but preserves receipts for a finalized month", async () => {
+    lockMocks.getMonthlySourceLockStatus.mockResolvedValueOnce(true);
+
+    render(
+      await ExpensesPage({
+        searchParams: Promise.resolve({ month: "2026-07" }),
+      }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "최종 마감된 월입니다. 회비와 지출을 수정하려면 먼저 결산을 재개하세요.",
+    );
+    expect(screen.queryByRole("link", { name: "지출 등록" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "수정" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "삭제" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "영수증 보기" })).toHaveLength(2);
+    expect(lockMocks.getMonthlySourceLockStatus).toHaveBeenCalledTimes(1);
   });
 
   it("renders monthly expenses with filters and summary", async () => {
@@ -77,7 +106,7 @@ describe("ExpensesPage", () => {
     expect(screen.getByRole("heading", { name: "지출 관리" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "지출 등록" })).toHaveAttribute(
       "href",
-      "/expenses/new",
+      "/expenses/new?month=2026-07",
     );
     expect(screen.getByLabelText("사용 월")).toHaveValue("2026-07");
     expect(screen.getByLabelText("카테고리")).toHaveValue("court");
@@ -85,18 +114,33 @@ describe("ExpensesPage", () => {
     expect(screen.getAllByText("120,000원").length).toBeGreaterThan(0);
 
     const list = screen.getByRole("region", { name: "월별 지출 목록" });
+    const table = within(list).getByRole("table");
     expect(within(list).getByText("2026.07 · 총 1건")).toBeInTheDocument();
-    expect(within(list).getByRole("cell", { name: "코트" })).toBeInTheDocument();
-    expect(within(list).getByRole("cell", { name: "코트 대관" })).toBeInTheDocument();
-    expect(within(list).getByRole("link", { name: "영수증 보기" })).toHaveAttribute(
+    expect(within(table).getByRole("cell", { name: "코트" })).toBeInTheDocument();
+    expect(within(table).getByRole("cell", { name: "코트 대관" })).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "영수증 보기" })).toHaveAttribute(
       "href",
       "/expenses/receipts?key=expenses%2Foperator-id%2F2026%2F07%2Freceipt.jpg",
     );
-    expect(within(list).getByRole("link", { name: "수정" })).toHaveAttribute(
+    expect(within(table).getByRole("link", { name: "수정" })).toHaveAttribute(
       "href",
       "/expenses/expense-1/edit",
     );
-    expect(within(list).getByRole("button", { name: "삭제" })).toBeInTheDocument();
+    expect(within(table).getByRole("button", { name: "삭제" })).toBeInTheDocument();
+
+    const mobileList = within(list).getByRole("list", {
+      name: "모바일 지출 목록",
+    });
+    expect(
+      within(mobileList).getByRole("heading", { name: "코트 대관" }),
+    ).toBeInTheDocument();
+    expect(within(mobileList).getByText("120,000원")).toBeInTheDocument();
+    expect(
+      within(mobileList).getByRole("link", { name: "영수증 보기" }),
+    ).toHaveAttribute(
+      "href",
+      "/expenses/receipts?key=expenses%2Foperator-id%2F2026%2F07%2Freceipt.jpg",
+    );
   });
 
   it("sorts expense rows and preserves month and category in sort links", async () => {

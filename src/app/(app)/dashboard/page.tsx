@@ -1,91 +1,42 @@
-﻿import styles from "./page.module.scss";
+import {
+  LedgerBalanceChart,
+  MonthlyCashFlowChart,
+} from "@/features/dashboard/FinancialCharts";
+import {
+  CurrentMonthFinance,
+  DashboardOverview,
+  LatestFinalClosing,
+} from "@/features/dashboard/DashboardSections";
+import { loadDashboardPage } from "@/features/dashboard/dashboard-data";
 
-import Link from "next/link";
+import styles from "./page.module.scss";
 
-const metrics = [
-  { label: "회비 수입", value: "0원", note: "이번 달 입금 합계" },
-  { label: "운영비 지출", value: "0원", note: "코트비, 공, 기타 비용" },
-  { label: "미납 회원", value: "0명", note: "확인 대기" },
-  { label: "정산 상태", value: "진행 중", note: "월말 확정 전" },
-];
+export default async function DashboardPage() {
+  const dashboard = await loadDashboardPage();
 
-const utilityItems = [
-  {
-    label: "회원",
-    title: "연락처와 출석 흐름을 한 화면에서 확인",
-    href: "/members",
-  },
-  {
-    label: "정산",
-    title: "월말 회비, 운영비, 잔액을 빠르게 대조",
-    href: "/settlements",
-  },
-  {
-    label: "PDF",
-    title: "공유용 월간 리포트를 준비",
-    href: "/reports",
-  },
-];
-
-export default function DashboardPage() {
   return (
     <section className={styles["dashboard-page"]}>
-      <header className={styles["dashboard-header"]}>
-        <div>
-          <p className={styles["dashboard-kicker"]}>운영 대시보드</p>
-          <h1>이번 달 클럽 운영 상태</h1>
-        </div>
-        <p>
-          회원, 회비, 지출, 정산 흐름을 한 화면에서 확인할 수 있도록
-          foundation 화면을 준비했습니다.
-        </p>
-      </header>
-
-      <section aria-label="월간 운영 지표">
-        <dl className={styles["dashboard-metrics"]}>
-          {metrics.map((metric) => (
-            <div className={styles["dashboard-metric-card"]} key={metric.label}>
-              <dt className={styles["dashboard-metric-label"]}>
-                {metric.label}
-              </dt>
-              <dd className={styles["dashboard-metric-value"]}>
-                {metric.value}
-              </dd>
-              <dd className={styles["dashboard-metric-note"]}>
-                {metric.note}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      <section className={styles["dashboard-utility-grid"]}>
-        {utilityItems.map((item) => (
-          <Link
-            className={styles["dashboard-utility-card"]}
-            href={item.href}
-            key={item.href}
-          >
-            <span>{item.label}</span>
-            <strong>{item.title}</strong>
-          </Link>
-        ))}
-      </section>
-
+      <DashboardOverview data={dashboard} />
+      <CurrentMonthFinance
+        finance={dashboard.currentFinance}
+        periodMonth={dashboard.periodMonth}
+      />
       <section
-        className={styles["dashboard-panel"]}
-        aria-labelledby="work-queue-title"
+        className={styles["dashboard-section"]}
+        aria-labelledby="finance-trends-title"
       >
-        <div>
-          <p className={styles["dashboard-panel-label"]}>작업 대기</p>
-          <h2 id="work-queue-title">오늘 확인할 항목</h2>
+        <h2
+          className={styles["dashboard-section-title"]}
+          id="finance-trends-title"
+        >
+          재무 추이
+        </h2>
+        <div className={styles["dashboard-trends-grid"]}>
+          <MonthlyCashFlowChart points={dashboard.trends} />
+          <LedgerBalanceChart points={dashboard.trends} />
         </div>
-        <ul className={styles["dashboard-queue"]}>
-          <li>신규 회원 등록 및 연락처 확인</li>
-          <li>7월 회비 입금 내역 대조</li>
-          <li>운영비 영수증 입력 준비</li>
-        </ul>
       </section>
+      <LatestFinalClosing closing={dashboard.latestFinal} />
     </section>
   );
 }

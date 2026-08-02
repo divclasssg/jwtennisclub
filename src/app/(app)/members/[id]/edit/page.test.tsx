@@ -35,6 +35,7 @@ const member = {
   joinedDate: "2026-07-01",
   withdrawnDate: null,
   pauseStartMonth: "2026-08-01",
+  activityStartMonth: "2026-07-01",
   memo: "초기 등록",
 };
 
@@ -74,6 +75,21 @@ describe("EditMemberPage", () => {
 
     expect(screen.queryByLabelText("연락처")).not.toBeInTheDocument();
     expect(screen.getByText("010-****-5678")).toBeInTheDocument();
+  });
+
+  it("renders the stable activity-start validation message", async () => {
+    render(await EditMemberPage({
+      params: Promise.resolve({ id: "member-1" }),
+      searchParams: Promise.resolve({
+        error: "invalid-activity-start-month",
+      }),
+    }));
+
+    expect(
+      screen.getByText(
+        "활동 시작 월은 필수이며 가입 월 또는 그 이후여야 합니다.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("uses notFound for missing members", async () => {

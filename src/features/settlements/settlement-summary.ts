@@ -39,7 +39,7 @@ export type SettlementExpenseCategoryRow = {
 export type SettlementSummary = {
   incomeTotal: number;
   expenseTotal: number;
-  balance: number;
+  attributedNet: number;
   feePaymentCount: number;
   expenseCount: number;
   expenseCategoryRows: SettlementExpenseCategoryRow[];
@@ -71,7 +71,7 @@ export function buildSettlementSummary(input: {
   return {
     incomeTotal,
     expenseTotal,
-    balance: incomeTotal - expenseTotal,
+    attributedNet: incomeTotal - expenseTotal,
     feePaymentCount: input.feePayments.length,
     expenseCount: input.expenses.length,
     expenseCategoryRows: buildExpenseCategoryRows(input.expenses),
@@ -107,6 +107,26 @@ export function formatSettlementBalance(value: number) {
   }
 
   return "0원";
+}
+
+export function formatSeoulProcessedDateTime(value: string | Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  })
+    .formatToParts(value instanceof Date ? value : new Date(value))
+    .reduce<Record<string, string>>((result, part) => {
+      if (part.type !== "literal") result[part.type] = part.value;
+      return result;
+    }, {});
+
+  return `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
 export { formatCurrency, formatExpenseCategory, formatPeriodMonth };
