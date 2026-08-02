@@ -187,7 +187,9 @@ function completeInventory(
         | ReturnType<typeof logicalProfile> = managedProfile(),
 ) {
     return {
-        schemaVersion: 2,
+        schemaVersion: 3,
+        sourceDatabaseInventorySha256:
+            "633ed186e36397fbc27a4babf1e8cc3c1fe7086be36f09a22872f8e68ebe5d77",
         identity: {
             validationRef: "orssnkppcukrqxikxdbf",
             productionSystemIdentifier: "1111111111111111111",
@@ -196,12 +198,24 @@ function completeInventory(
             markerDigest: "9".repeat(64),
             provenanceId: "clone-ticket-42",
         },
-        migrations: [{
-            version: "20260730000000",
-            name: "match",
-            sha256: "a".repeat(64),
-        }],
-        memberBaseline: { count: 25, sha256: "b".repeat(64) },
+        migrations: [
+            {
+                version: "202607130001",
+                name: "optimize_navigation_queries",
+                statementsState: "unavailable",
+                statementSha256: null,
+                catalogSha256:
+                    "6f3f0d96f52eb42858814f6d5748bc6c3e9cd0ecde50bbf5cf56f98c97f6f421",
+            },
+            {
+                version: "202608020001",
+                name: "match_foundation",
+                statementsState: "recorded",
+                statementSha256: "a".repeat(64),
+                catalogSha256: "b".repeat(64),
+            },
+        ],
+        memberBaseline: { count: 25, sha256: "c".repeat(64) },
         auth: {
             userCount: 25,
             identityCount: 25,
@@ -215,7 +229,7 @@ function completeInventory(
             schema: "match",
             name: "events",
             rowCount: 0,
-            sha256: "c".repeat(64),
+            sha256: "d".repeat(64),
         }],
         storage: {
             projectRef: "orssnkppcukrqxikxdbf",
@@ -231,7 +245,7 @@ function completeInventory(
             schema: "public",
             name: "match_state",
             identityArguments: "uuid",
-            sha256: "d".repeat(64),
+            sha256: "e".repeat(64),
         }],
         edgeFunctions: [
             "admin-command",
@@ -248,6 +262,12 @@ function completeInventory(
         })),
         recoveryProfile,
     };
+}
+
+function databaseInventory() {
+    return fixtureJson<typeof inventoryDatabaseFixture>(
+        "inventory-db-v2.json",
+    );
 }
 
 function validationContext() {
@@ -282,9 +302,10 @@ function validationContext() {
     };
 }
 
-Deno.test("inventory accepts exact v2 custody bundles for both recovery profiles", () => {
-    const result = validateInventoryBundle(
+Deno.test("inventory accepts exact v3 custody bundles for both recovery profiles", async () => {
+    const result = await validateInventoryBundle(
         completeInventory(),
+        databaseInventory(),
         validationContext(),
         NOW,
     );
@@ -294,27 +315,42 @@ Deno.test("inventory accepts exact v2 custody bundles for both recovery profiles
     assert(result.derivedIsolation.networkHostsDistinct);
     assert(result.recoveryProfile.profile === "managed-pitr-v1");
 
-    const logical = validateInventoryBundle(
+    const logical = await validateInventoryBundle(
         completeInventory(logicalProfile()),
+        databaseInventory(),
         validationContext(),
         NOW,
     );
     assert(logical.recoveryProfile.profile === "logical-offsite-v1");
 });
 
-Deno.test("inventory rejects v1 evidence and ambiguous PITR booleans", async () => {
-    const legacy = completeInventory() as Record<string, unknown>;
-    legacy.schemaVersion = 1;
-    await assertRejects(
-        () => validateInventoryBundle(legacy, validationContext(), NOW),
-        "schemaVersion must equal 2",
-    );
+Deno.test("inventory rejects legacy evidence and ambiguous PITR booleans", async () => {
+    for (const schemaVersion of [1, 2]) {
+        const legacy = completeInventory() as Record<string, unknown>;
+        legacy.schemaVersion = schemaVersion;
+        await assertRejects(
+            () =>
+                validateInventoryBundle(
+                    legacy,
+                    databaseInventory(),
+                    validationContext(),
+                    NOW,
+                ),
+            "schemaVersion must equal 3",
+        );
+    }
 
     const disabled = completeInventory();
     (disabled.recoveryProfile as ReturnType<typeof managedProfile>)
         .pitrEnabled = false;
     await assertRejects(
-        () => validateInventoryBundle(disabled, validationContext(), NOW),
+        () =>
+            validateInventoryBundle(
+                disabled,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
         "pitrEnabled",
     );
 
@@ -324,7 +360,13 @@ Deno.test("inventory rejects v1 evidence and ambiguous PITR booleans", async () 
     >;
     disguised.physicalBackupsEnabled = false;
     await assertRejects(
-        () => validateInventoryBundle(disguised, validationContext(), NOW),
+        () =>
+            validateInventoryBundle(
+                disguised,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
         "unexpected field",
     );
 });
@@ -333,17 +375,24 @@ Deno.test("inventory rejects a partial approved edge deployment", async () => {
     const inventory = completeInventory();
     inventory.edgeFunctions.pop();
     await assertRejects(
-        () => validateInventoryBundle(inventory, validationContext(), NOW),
+        () =>
+            validateInventoryBundle(
+                inventory,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
         "seven approved edge functions",
     );
 });
 
-Deno.test("inventory accepts an empty edge set for an initial deployment", () => {
+Deno.test("inventory accepts an empty edge set for an initial deployment", async () => {
     const inventory = completeInventory();
     inventory.edgeFunctions = [];
 
-    const result = validateInventoryBundle(
+    const result = await validateInventoryBundle(
         inventory,
+        databaseInventory(),
         validationContext(),
         NOW,
     );
@@ -355,26 +404,44 @@ Deno.test("inventory derives and rejects production-coupled auth/storage", async
     const auth = completeInventory();
     auth.auth.projectRef = "ydiusirreirhbvlftegp";
     await assertRejects(
-        () => validateInventoryBundle(auth, validationContext(), NOW),
+        () =>
+            validateInventoryBundle(
+                auth,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
         "Auth project",
     );
 
     const storage = completeInventory();
     storage.storage.projectRef = "ydiusirreirhbvlftegp";
     await assertRejects(
-        () => validateInventoryBundle(storage, validationContext(), NOW),
+        () =>
+            validateInventoryBundle(
+                storage,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
         "storage project",
     );
 
     const restore = completeInventory();
     restore.recoveryProfile.afterMemberChecksum = "0".repeat(64);
     await assertRejects(
-        () => validateInventoryBundle(restore, validationContext(), NOW),
+        () =>
+            validateInventoryBundle(
+                restore,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
         "member checksum",
     );
 });
 
-Deno.test("inventory binds Auth isolation to observable project refs", () => {
+Deno.test("inventory binds Auth isolation to observable project refs", async () => {
     const inventory = completeInventory();
     const auth = inventory.auth as Record<string, unknown>;
     auth.projectRef = "orssnkppcukrqxikxdbf";
@@ -386,7 +453,12 @@ Deno.test("inventory binds Auth isolation to observable project refs", () => {
     >;
     productionAuth.projectRef = "ydiusirreirhbvlftegp";
 
-    const result = validateInventoryBundle(inventory, context, NOW);
+    const result = await validateInventoryBundle(
+        inventory,
+        databaseInventory(),
+        context,
+        NOW,
+    );
     assert(result.derivedIsolation.authProjectBound);
 });
 
@@ -394,14 +466,26 @@ Deno.test("inventory binds stored, live, and production identities", async () =>
     const storedMismatch = validationContext();
     storedMismatch.storedIdentity.markerDigest = "8".repeat(64);
     await assertRejects(
-        () => validateInventoryBundle(completeInventory(), storedMismatch, NOW),
+        () =>
+            validateInventoryBundle(
+                completeInventory(),
+                databaseInventory(),
+                storedMismatch,
+                NOW,
+            ),
         "stored identity",
     );
 
     const liveMismatch = validationContext();
     liveMismatch.liveIdentity.systemIdentifier = "3333333333333333333";
     await assertRejects(
-        () => validateInventoryBundle(completeInventory(), liveMismatch, NOW),
+        () =>
+            validateInventoryBundle(
+                completeInventory(),
+                databaseInventory(),
+                liveMismatch,
+                NOW,
+            ),
         "validation database fingerprint mismatch",
     );
 });
@@ -410,7 +494,13 @@ Deno.test("inventory requires exact ACTIVE edge deployment status", async () => 
     const inventory = completeInventory();
     inventory.edgeFunctions[0].status = "DEPLOYING";
     await assertRejects(
-        () => validateInventoryBundle(inventory, validationContext(), NOW),
+        () =>
+            validateInventoryBundle(
+                inventory,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
         "ACTIVE",
     );
 });
@@ -423,14 +513,26 @@ Deno.test("inventory rejects malformed entries and extra fields", async () => {
         & { bearerToken?: string };
     extra.bearerToken = "must-not-be-accepted";
     await assertRejects(
-        () => validateInventoryBundle(extra, validationContext(), NOW),
+        () =>
+            validateInventoryBundle(
+                extra,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
         "unexpected field",
     );
 
     const malformed = completeInventory();
-    malformed.migrations[0].sha256 = "not-a-hash";
+    (malformed.migrations[0] as Record<string, unknown>).sha256 = "not-a-hash";
     await assertRejects(
-        () => validateInventoryBundle(malformed, validationContext(), NOW),
+        () =>
+            validateInventoryBundle(
+                malformed,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
         "migrations[0].sha256",
     );
 });
@@ -460,6 +562,94 @@ Deno.test("inventory rejects foreign, stale, large, and incomplete logical evide
                             typeof logicalProfile
                         >,
                     ),
+                    databaseInventory(),
+                    validationContext(),
+                    NOW,
+                ),
+            message,
+        );
+    }
+});
+
+Deno.test("inventory recomputes the canonical source digest", async () => {
+    const inventory = completeInventory();
+    inventory.sourceDatabaseInventorySha256 = "0".repeat(64);
+    await assertRejects(
+        () =>
+            validateInventoryBundle(
+                inventory,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
+        "sourceDatabaseInventorySha256 does not match raw database payload",
+    );
+});
+
+Deno.test("inventory rejects omitted and mutated database migration rows", async () => {
+    const omitted = completeInventory();
+    omitted.migrations.shift();
+    await assertRejects(
+        () =>
+            validateInventoryBundle(
+                omitted,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
+        "migrations do not match raw database payload",
+    );
+
+    const mutated = completeInventory();
+    mutated.migrations[0].catalogSha256 = "0".repeat(64);
+    await assertRejects(
+        () =>
+            validateInventoryBundle(
+                mutated,
+                databaseInventory(),
+                validationContext(),
+                NOW,
+            ),
+        "migrations do not match raw database payload",
+    );
+});
+
+Deno.test("inventory rejects every mutated database-owned projection", async () => {
+    const cases: Array<[
+        string,
+        (inventory: ReturnType<typeof completeInventory>) => void,
+    ]> = [
+        ["identity does not match raw database payload", (inventory) => {
+            inventory.identity.databaseOid = "6";
+        }],
+        ["memberBaseline does not match raw database payload", (inventory) => {
+            inventory.memberBaseline.count += 1;
+        }],
+        [
+            "auth database counts do not match raw database payload",
+            (inventory) => {
+                inventory.auth.userCount += 1;
+            },
+        ],
+        ["tables do not match raw database payload", (inventory) => {
+            inventory.tables[0].rowCount += 1;
+        }],
+        ["storage buckets do not match raw database payload", (inventory) => {
+            inventory.storage.buckets[0].objectCount += 1;
+        }],
+        ["databaseFunctions do not match raw database payload", (inventory) => {
+            inventory.databaseFunctions[0].sha256 = "0".repeat(64);
+        }],
+    ];
+
+    for (const [message, mutate] of cases) {
+        const inventory = completeInventory();
+        mutate(inventory);
+        await assertRejects(
+            () =>
+                validateInventoryBundle(
+                    inventory,
+                    databaseInventory(),
                     validationContext(),
                     NOW,
                 ),

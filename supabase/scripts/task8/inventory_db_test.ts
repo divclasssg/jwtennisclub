@@ -2,12 +2,16 @@ import {
     canonicalJson,
     extractSingleJsonPayload,
     sha256CanonicalJson,
+    validateDatabaseInventoryV2,
 } from "./inventory_db_lib.ts";
 import {
     readManifestBoundPrivateJson,
     writeEvidence,
     writeEvidenceManifest,
 } from "./evidence_lib.ts";
+import inventoryDatabaseFixture from "./fixtures/inventory-db-v2.json" with {
+    type: "json",
+};
 
 function assert(
     condition: unknown,
@@ -99,6 +103,64 @@ Deno.test("hashes the canonical UTF-8 bytes against a hand-derived checksum", as
     assertEquals(
         digest,
         "7c44f426a3d71894241b18be995a8fd81135f54ebb1567f6b691af08a9efb1f1",
+    );
+});
+
+Deno.test("accepts the exact database inventory v2 fixture", () => {
+    const result = validateDatabaseInventoryV2(
+        structuredClone(inventoryDatabaseFixture),
+    );
+    assertEquals(result.schemaVersion, 2);
+    assertEquals(result.migrations[0].statementsState, "unavailable");
+    assertEquals(result.migrations[1].statementsState, "recorded");
+});
+
+Deno.test("rejects legacy, future, and unexpected raw database inventory fields", async () => {
+    for (const schemaVersion of [1, 3]) {
+        const value = structuredClone(inventoryDatabaseFixture) as
+            & Record<string, unknown>
+            & { schemaVersion: number };
+        value.schemaVersion = schemaVersion;
+        await assertRejects(
+            () => validateDatabaseInventoryV2(value),
+            "database inventory schemaVersion must equal 2",
+        );
+    }
+
+    const extra = structuredClone(inventoryDatabaseFixture) as Record<
+        string,
+        unknown
+    >;
+    extra.unexpected = true;
+    await assertRejects(
+        () => validateDatabaseInventoryV2(extra),
+        "databaseInventory.unexpected is an unexpected field",
+    );
+});
+
+Deno.test("rejects duplicate and unsorted raw migration custody", async () => {
+    type Fixture = typeof inventoryDatabaseFixture;
+    const duplicateVersion = structuredClone(
+        inventoryDatabaseFixture,
+    ) as Fixture;
+    duplicateVersion.migrations[1].version = "202607130001";
+    await assertRejects(
+        () => validateDatabaseInventoryV2(duplicateVersion),
+        "duplicate migration version",
+    );
+
+    const duplicateName = structuredClone(inventoryDatabaseFixture) as Fixture;
+    duplicateName.migrations[1].name = "optimize_navigation_queries";
+    await assertRejects(
+        () => validateDatabaseInventoryV2(duplicateName),
+        "duplicate migration name",
+    );
+
+    const unsorted = structuredClone(inventoryDatabaseFixture) as Fixture;
+    unsorted.migrations.reverse();
+    await assertRejects(
+        () => validateDatabaseInventoryV2(unsorted),
+        "migrations must be sorted by ascending version",
     );
 });
 

@@ -8,6 +8,11 @@ import {
     type RecoveryProfile,
     validateRecoveryProfile,
 } from "./recovery_profile_lib.ts";
+import {
+    canonicalJson,
+    sha256CanonicalJson,
+    validateDatabaseInventoryV2,
+} from "./inventory_db_lib.ts";
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const PROJECT_REF_PATTERN = /^[a-z]{20}$/;
@@ -94,12 +99,76 @@ export interface InventoryValidationContext {
     };
 }
 
-export interface ValidatedInventoryBundle extends InventoryBundleV2 {
+export interface ValidatedInventoryBundle extends InventoryBundleV3 {
     derivedIsolation: {
         authProjectBound: true;
         storageProjectBound: true;
         networkHostsDistinct: true;
     };
+}
+
+function assertProjection(
+    actual: unknown,
+    expected: unknown,
+    message: string,
+): void {
+    if (canonicalJson(actual) !== canonicalJson(expected)) {
+        throw new Error(message);
+    }
+}
+
+function validateDatabaseOwnedProjection(
+    inventory: InventoryBundleV3,
+    source: ReturnType<typeof validateDatabaseInventoryV2>,
+): void {
+    assertProjection(inventory.identity, {
+        validationRef: source.identity.projectRef,
+        productionSystemIdentifier: source.identity.sourceSystemIdentifier,
+        validationSystemIdentifier: source.identity.systemIdentifier,
+        databaseOid: source.identity.databaseOid,
+        markerDigest: source.identity.markerDigest,
+        provenanceId: source.identity.provenanceId,
+    }, "identity does not match raw database payload");
+    assertProjection(
+        inventory.migrations,
+        source.migrations,
+        "migrations do not match raw database payload",
+    );
+    assertProjection(
+        inventory.memberBaseline,
+        source.memberBaseline,
+        "memberBaseline does not match raw database payload",
+    );
+    assertProjection({
+        userCount: inventory.auth.userCount,
+        identityCount: inventory.auth.identityCount,
+        providerCounts: inventory.auth.providerCounts,
+    }, {
+        userCount: source.authDatabaseInventory.userCount,
+        identityCount: source.authDatabaseInventory.identityCount,
+        providerCounts: source.authDatabaseInventory.providers,
+    }, "auth database counts do not match raw database payload");
+    assertProjection(
+        inventory.tables,
+        source.tables,
+        "tables do not match raw database payload",
+    );
+    assertProjection(
+        inventory.storage.buckets,
+        source.storage.buckets.map((bucket) => ({
+            id: bucket.id,
+            public: bucket.public,
+            fileSizeLimit: bucket.fileSizeLimit,
+            allowedMimeTypes: bucket.allowedMimeTypes,
+            objectCount: bucket.objectCount,
+        })),
+        "storage buckets do not match raw database payload",
+    );
+    assertProjection(
+        inventory.databaseFunctions,
+        source.databaseFunctions,
+        "databaseFunctions do not match raw database payload",
+    );
 }
 
 function record(value: unknown, path: string): Record<string, unknown> {
@@ -203,21 +272,6 @@ function validateIdentity(
     ) {
         throw new Error("production inventory identity mismatch");
     }
-}
-
-function validateMigrations(root: Record<string, unknown>): void {
-    const migrations = required(root, "migrations", isArray, "inventory");
-    migrations.forEach((entry, index) => {
-        const path = `migrations[${index}]`;
-        const item = record(entry, path);
-        exactKeys(item, ["version", "name", "sha256"], path);
-        const version = required(item, "version", isString, path);
-        if (!/^[0-9]{12,14}$/.test(version)) {
-            throw new Error(`${path}.version is invalid`);
-        }
-        required(item, "name", isString, path);
-        requireChecksum(item.sha256, `${path}.sha256`);
-    });
 }
 
 function validateMigrationsV3(
@@ -520,33 +574,29 @@ function validateFunctions(root: Record<string, unknown>): void {
     }
 }
 
-export function validateInventoryBundle(
+export async function validateInventoryBundle(
     value: unknown,
+    sourceValue: unknown,
     context: InventoryValidationContext,
     now = new Date(),
-): ValidatedInventoryBundle {
-    const root = record(value, "inventory");
-    exactKeys(root, [
-        "schemaVersion",
-        "identity",
-        "migrations",
-        "memberBaseline",
-        "auth",
-        "tables",
-        "storage",
-        "databaseFunctions",
-        "edgeFunctions",
-        "recoveryProfile",
-    ], "inventory");
-    if (root.schemaVersion !== 2) throw new Error("schemaVersion must equal 2");
+): Promise<ValidatedInventoryBundle> {
+    const source = validateDatabaseInventoryV2(sourceValue);
+    const inventory = validateInventoryStructure(value);
+    const sourceSha256 = await sha256CanonicalJson(sourceValue);
+    if (inventory.sourceDatabaseInventorySha256 !== sourceSha256) {
+        throw new Error(
+            "sourceDatabaseInventorySha256 does not match raw database payload",
+        );
+    }
+    validateDatabaseOwnedProjection(inventory, source);
+    const root = record(inventory, "inventory");
     validateIdentity(root, context);
-    validateMigrations(root);
     const authIsolation = validateAuthAndMember(root, context);
     const storageIsolation = validateTablesAndStorage(root, context);
     validateFunctions(root);
     const recoveryProfile = validateRecoveryProfile(root.recoveryProfile, now);
     return {
-        ...(value as InventoryBundleV2),
+        ...inventory,
         recoveryProfile,
         derivedIsolation: {
             ...authIsolation,
