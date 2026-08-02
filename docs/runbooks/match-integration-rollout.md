@@ -13,7 +13,7 @@ Use three distinct locations:
 
 - `TOOL_ROOT`: this reviewed helper checkout;
 - `BACKEND_ROOT`: clean exact product HEAD
-  `1fc16f34442b60083a003292d59fdc95c5afec0b`;
+  `37e75f15e5c1efd68c6a3514cb2ddcd8695a02d3`;
 - `CLIENT_ROOT`: clean exact product HEAD
   `ab1a6f0a41f4ce62a9a69ada7408627190a34e2e`.
 
@@ -85,7 +85,7 @@ isolated Auth/redirects/Storage/credentials, and approval IDs. Link only
 marker with exact approval:
 
 ```text
-BOOTSTRAP:<clone-ref>:<production-system-id>:<provenance-id>:1fc16f34442b60083a003292d59fdc95c5afec0b:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
+BOOTSTRAP:<clone-ref>:<production-system-id>:<provenance-id>:37e75f15e5c1efd68c6a3514cb2ddcd8695a02d3:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
 ```
 
 Run `rollout.ts bootstrap-provenance`. It independently reads
@@ -169,7 +169,7 @@ SQL.
 Apply requires this exact value:
 
 ```text
-APPLY:<clone-ref>:<db-dry-run-stage-hash>:1fc16f34442b60083a003292d59fdc95c5afec0b:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
+APPLY:<clone-ref>:<db-dry-run-stage-hash>:37e75f15e5c1efd68c6a3514cb2ddcd8695a02d3:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
 ```
 
 Set `TASK8_DRY_RUN_HASH` to that exact stage hash. The helper uses only the
