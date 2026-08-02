@@ -1,0 +1,131 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://jwtennisclub.example/schemas/task8/recovery-profile-v1.schema.json",
+    "title": "Task 8 recovery profile",
+    "oneOf": [
+        {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "profile",
+                "physicalBackupsEnabled",
+                "pitrEnabled",
+                "newestRecoveryPointAt",
+                "restoreStartedAt",
+                "restoreHealthyAt",
+                "recoveryPointAt",
+                "latestRestoredOperationAt",
+                "beforeMemberChecksum",
+                "afterMemberChecksum",
+                "beforeMatchChecksum",
+                "afterMatchChecksum"
+            ],
+            "properties": {
+                "profile": { "const": "managed-pitr-v1" },
+                "physicalBackupsEnabled": { "const": true },
+                "pitrEnabled": { "const": true },
+                "newestRecoveryPointAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "restoreStartedAt": { "type": "string", "format": "date-time" },
+                "restoreHealthyAt": { "type": "string", "format": "date-time" },
+                "recoveryPointAt": { "type": "string", "format": "date-time" },
+                "latestRestoredOperationAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "beforeMemberChecksum": { "$ref": "#/$defs/sha256" },
+                "afterMemberChecksum": { "$ref": "#/$defs/sha256" },
+                "beforeMatchChecksum": { "$ref": "#/$defs/sha256" },
+                "afterMatchChecksum": { "$ref": "#/$defs/sha256" }
+            }
+        },
+        {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "profile",
+                "repository",
+                "backupId",
+                "workflowRunId",
+                "encryptedArchiveSha256",
+                "sourceFingerprintSha256",
+                "archiveBytes",
+                "backupStartedAt",
+                "backupCompletedAt",
+                "lastStateCheckAt",
+                "maxStateCheckGapMinutes",
+                "decryptTestedAt",
+                "localRestoreTestedAt",
+                "hostedRestoreStartedAt",
+                "hostedRestoreHealthyAt",
+                "hostedRestoreProjectRef",
+                "quarterlyDrillAt",
+                "storageObjectCount",
+                "storageObjectsProtected",
+                "beforeMemberChecksum",
+                "afterMemberChecksum",
+                "beforeMatchChecksum",
+                "afterMatchChecksum"
+            ],
+            "properties": {
+                "profile": { "const": "logical-offsite-v1" },
+                "repository": { "const": "divclasssg/jwtennisclub-backups" },
+                "backupId": {
+                    "type": "string",
+                    "pattern": "^[0-9]{8}T[0-9]{9}Z-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "workflowRunId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$"
+                },
+                "encryptedArchiveSha256": { "$ref": "#/$defs/sha256" },
+                "sourceFingerprintSha256": { "$ref": "#/$defs/sha256" },
+                "archiveBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10485760
+                },
+                "backupStartedAt": { "type": "string", "format": "date-time" },
+                "backupCompletedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "lastStateCheckAt": { "type": "string", "format": "date-time" },
+                "maxStateCheckGapMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440
+                },
+                "decryptTestedAt": { "type": "string", "format": "date-time" },
+                "localRestoreTestedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "hostedRestoreStartedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "hostedRestoreHealthyAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "hostedRestoreProjectRef": { "const": "orssnkppcukrqxikxdbf" },
+                "quarterlyDrillAt": { "type": "string", "format": "date-time" },
+                "storageObjectCount": { "type": "integer", "minimum": 0 },
+                "storageObjectsProtected": { "type": "boolean" },
+                "beforeMemberChecksum": { "$ref": "#/$defs/sha256" },
+                "afterMemberChecksum": { "$ref": "#/$defs/sha256" },
+                "beforeMatchChecksum": { "$ref": "#/$defs/sha256" },
+                "afterMatchChecksum": { "$ref": "#/$defs/sha256" }
+            }
+        }
+    ],
+    "$defs": {
+        "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+        }
+    }
+}
