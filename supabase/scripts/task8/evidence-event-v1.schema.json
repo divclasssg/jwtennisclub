@@ -172,17 +172,11 @@
                 "timestamp",
                 "backupCapturedBeforeAt",
                 "backupCapturedAfterAt",
-                "restoreStartedAt",
-                "restoreHealthyAt",
-                "recoveryPointAt",
-                "latestRestoredOperationAt",
-                "beforeMemberChecksum",
-                "afterMemberChecksum",
-                "beforeMatchChecksum",
-                "afterMatchChecksum"
+                "recoveryProfile",
+                "profileEvidenceDigest"
             ],
             "properties": {
-                "schemaVersion": { "const": 1 },
+                "schemaVersion": { "const": 2 },
                 "kind": { "const": "recovery" },
                 "timestamp": { "$ref": "#/$defs/timestamp" },
                 "backupCapturedBeforeAt": {
@@ -191,17 +185,10 @@
                 "backupCapturedAfterAt": {
                     "$ref": "#/$defs/timestamp"
                 },
-                "restoreStartedAt": { "type": "string", "format": "date-time" },
-                "restoreHealthyAt": { "type": "string", "format": "date-time" },
-                "recoveryPointAt": { "type": "string", "format": "date-time" },
-                "latestRestoredOperationAt": {
-                    "type": "string",
-                    "format": "date-time"
+                "recoveryProfile": {
+                    "$ref": "recovery-profile-v1.schema.json"
                 },
-                "beforeMemberChecksum": { "$ref": "#/$defs/sha256" },
-                "afterMemberChecksum": { "$ref": "#/$defs/sha256" },
-                "beforeMatchChecksum": { "$ref": "#/$defs/sha256" },
-                "afterMatchChecksum": { "$ref": "#/$defs/sha256" }
+                "profileEvidenceDigest": { "$ref": "#/$defs/sha256" }
             }
         },
         "runWindow": {

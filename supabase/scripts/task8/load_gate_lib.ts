@@ -1,8 +1,13 @@
 /// <reference lib="deno.ns" />
 
+import {
+    type RecoveryProfile,
+    validateRecoveryProfile,
+} from "./recovery_profile_lib.ts";
+
 export interface LoadPlan {
-    schemaVersion: 1;
-    planId: "shared-match-clone-load-v1";
+    schemaVersion: 2;
+    planId: "shared-match-clone-load-v2";
     fixedSeed: "20260730";
     durationSeconds: 1800;
     operator: {
@@ -48,7 +53,8 @@ export interface LoadPlan {
         lockMaxMs: 1000;
         resourceWarningUsageRatioExclusive: 0.7;
         rtoMinutes: 60;
-        rpoMinutes: 15;
+        managedPitrRpoMinutes: 15;
+        logicalOffsiteRpoMinutes: 1440;
     };
 }
 
@@ -121,19 +127,13 @@ export interface ResourceEvent {
 }
 
 export interface RecoveryEvent {
-    schemaVersion: 1;
+    schemaVersion: 2;
     kind: "recovery";
     timestamp: string;
     backupCapturedBeforeAt: string;
     backupCapturedAfterAt: string;
-    restoreStartedAt: string;
-    restoreHealthyAt: string;
-    recoveryPointAt: string;
-    latestRestoredOperationAt: string;
-    beforeMemberChecksum: string;
-    afterMemberChecksum: string;
-    beforeMatchChecksum: string;
-    afterMatchChecksum: string;
+    recoveryProfile: RecoveryProfile;
+    profileEvidenceDigest: string;
 }
 
 export interface RunWindowEvent {
@@ -231,14 +231,8 @@ const allowedFields: Record<LoadEvidenceEvent["kind"], Set<string>> = {
         "timestamp",
         "backupCapturedBeforeAt",
         "backupCapturedAfterAt",
-        "restoreStartedAt",
-        "restoreHealthyAt",
-        "recoveryPointAt",
-        "latestRestoredOperationAt",
-        "beforeMemberChecksum",
-        "afterMemberChecksum",
-        "beforeMatchChecksum",
-        "afterMatchChecksum",
+        "recoveryProfile",
+        "profileEvidenceDigest",
     ]),
     run_window: new Set([
         "schemaVersion",
@@ -279,12 +273,15 @@ function validateParsedEvent(
     if (!isRecord(value)) {
         throw new Error(`line ${line}: event must be an object`);
     }
-    if (value.schemaVersion !== 1) {
-        throw new Error(`line ${line}: schemaVersion must equal 1`);
-    }
     const kind = value.kind;
     if (typeof kind !== "string" || !(kind in allowedFields)) {
         throw new Error(`line ${line}: unsupported event kind`);
+    }
+    const expectedSchemaVersion = kind === "recovery" ? 2 : 1;
+    if (value.schemaVersion !== expectedSchemaVersion) {
+        throw new Error(
+            `line ${line}: schemaVersion must equal ${expectedSchemaVersion}`,
+        );
     }
     for (const field of Object.keys(value)) {
         if (!allowedFields[kind as LoadEvidenceEvent["kind"]].has(field)) {
@@ -448,33 +445,23 @@ function validateParsedEvent(
         return value as unknown as RunWindowEvent;
     }
 
-    for (
-        const field of [
-            "backupCapturedBeforeAt",
-            "backupCapturedAfterAt",
-            "restoreStartedAt",
-            "restoreHealthyAt",
-            "recoveryPointAt",
-            "latestRestoredOperationAt",
-            "beforeMemberChecksum",
-            "afterMemberChecksum",
-            "beforeMatchChecksum",
-            "afterMatchChecksum",
-        ]
-    ) {
+    for (const field of ["backupCapturedBeforeAt", "backupCapturedAfterAt"]) {
         const item = requireString(value[field], field, line);
-        if (
-            field.endsWith("At") &&
-            !Number.isFinite(Date.parse(item))
-        ) {
+        if (!Number.isFinite(Date.parse(item))) {
             throw new Error(`line ${line}: ${field} must be an ISO timestamp`);
         }
-        if (field.endsWith("Checksum") && !/^[a-f0-9]{64}$/.test(item)) {
-            throw new Error(
-                `line ${line}: ${field} must be a SHA-256 checksum`,
-            );
-        }
     }
+    const digest = requireString(
+        value.profileEvidenceDigest,
+        "profileEvidenceDigest",
+        line,
+    );
+    if (!/^[a-f0-9]{64}$/.test(digest)) {
+        throw new Error(
+            `line ${line}: profileEvidenceDigest must be a SHA-256 checksum`,
+        );
+    }
+    validateRecoveryProfile(value.recoveryProfile, new Date(timestamp));
     return value as unknown as RecoveryEvent;
 }
 

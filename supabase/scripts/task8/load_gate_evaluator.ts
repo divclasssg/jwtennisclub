@@ -10,10 +10,15 @@ import type {
     RunWindowEvent,
     TelemetryCapabilityEvent,
 } from "./load_gate_lib.ts";
+import { validateRecoveryProfile } from "./recovery_profile_lib.ts";
+import {
+    profileEvidenceDigest,
+    recoveryProfileMetrics,
+} from "./stage_evidence_lib.ts";
 
 function assertFixedPlan(plan: LoadPlan): void {
-    const invalid = plan.schemaVersion !== 1 ||
-        plan.planId !== "shared-match-clone-load-v1" ||
+    const invalid = plan.schemaVersion !== 2 ||
+        plan.planId !== "shared-match-clone-load-v2" ||
         plan.fixedSeed !== "20260730" ||
         plan.durationSeconds !== 1800 ||
         plan.operator.sessionCount !== 5 ||
@@ -30,9 +35,11 @@ function assertFixedPlan(plan: LoadPlan): void {
             "member_command_lock_acquisition" ||
         Object.values(plan.successStatusByRequestType).some((value) =>
             value.length !== 1 || value[0] !== 200
-        );
+        ) || plan.thresholds.managedPitrRpoMinutes !== 15 ||
+        plan.thresholds.logicalOffsiteRpoMinutes !== 1440 ||
+        plan.thresholds.rtoMinutes !== 60;
     if (invalid) {
-        throw new Error("load plan does not match version 1 constants");
+        throw new Error("load plan does not match version 2 constants");
     }
 }
 
@@ -40,11 +47,6 @@ function p95(values: number[]): number | null {
     if (values.length === 0) return null;
     const sorted = [...values].sort((left, right) => left - right);
     return sorted[Math.ceil(sorted.length * 0.95) - 1];
-}
-
-function minutesBetween(later: string, earlier: string): number | null {
-    const delta = Date.parse(later) - Date.parse(earlier);
-    return Number.isFinite(delta) ? delta / 60_000 : null;
 }
 
 function expectedSessionId(prefix: string, index: number): string {
@@ -80,10 +82,12 @@ function validateCadence(
     }
 }
 
-export function evaluateLoadGate(
+export async function evaluateLoadGate(
     plan: LoadPlan,
     events: LoadEvidenceEvent[],
-): LoadGateResult {
+    expectedProfileEvidenceDigest: string,
+    now = new Date(),
+): Promise<LoadGateResult> {
     assertFixedPlan(plan);
     const failures: string[] = [];
     const windows = events.filter(
@@ -465,46 +469,81 @@ export function evaluateLoadGate(
         failures.push("exactly one recovery record is required");
     } else {
         const recovery = recoveryEvents[0];
-        rtoMinutes = minutesBetween(
-            recovery.restoreHealthyAt,
-            recovery.restoreStartedAt,
-        );
-        rpoMinutes = minutesBetween(
-            recovery.recoveryPointAt,
-            recovery.latestRestoredOperationAt,
-        );
-        if (
-            rtoMinutes === null || rtoMinutes < 0 ||
-            rtoMinutes > plan.thresholds.rtoMinutes
-        ) failures.push("RTO exceeds 60 minutes or is invalid");
-        if (
-            rpoMinutes === null || rpoMinutes < 0 ||
-            rpoMinutes > plan.thresholds.rpoMinutes
-        ) failures.push("RPO exceeds 15 minutes or is invalid");
-        if (
-            recovery.beforeMemberChecksum !== recovery.afterMemberChecksum ||
-            recovery.beforeMatchChecksum !== recovery.afterMatchChecksum
-        ) failures.push("restore before/after checksums do not match");
         const backupBeforeMs = Date.parse(recovery.backupCapturedBeforeAt);
         const backupAfterMs = Date.parse(recovery.backupCapturedAfterAt);
-        const latestRestoredMs = Date.parse(
-            recovery.latestRestoredOperationAt,
-        );
-        const recoveryPointMs = Date.parse(recovery.recoveryPointAt);
-        const restoreStartMs = Date.parse(recovery.restoreStartedAt);
-        const restoreHealthyMs = Date.parse(recovery.restoreHealthyAt);
         const recoveryEvidenceMs = Date.parse(recovery.timestamp);
         if (
             backupBeforeMs !== runStartMs ||
             backupAfterMs !== runEndMs
         ) failures.push("backup timestamps do not bracket after run_window");
-        if (
-            latestRestoredMs < runEndMs ||
-            latestRestoredMs > recoveryPointMs ||
-            recoveryPointMs > restoreStartMs ||
-            restoreStartMs > restoreHealthyMs ||
-            restoreHealthyMs > recoveryEvidenceMs
-        ) failures.push("recovery timestamps are not monotonic");
+        try {
+            const profile = validateRecoveryProfile(
+                recovery.recoveryProfile,
+                now,
+            );
+            const actualDigest = await profileEvidenceDigest(profile);
+            if (
+                !/^[a-f0-9]{64}$/.test(expectedProfileEvidenceDigest) ||
+                recovery.profileEvidenceDigest !== actualDigest ||
+                recovery.profileEvidenceDigest !== expectedProfileEvidenceDigest
+            ) {
+                failures.push("profile evidence digest mismatch");
+            }
+            const metrics = recoveryProfileMetrics(profile);
+            rtoMinutes = typeof metrics.rtoMinutes === "number"
+                ? metrics.rtoMinutes
+                : null;
+            rpoMinutes = typeof metrics.rpoMinutes === "number"
+                ? metrics.rpoMinutes
+                : null;
+            if (
+                rtoMinutes === null || rtoMinutes < 0 ||
+                rtoMinutes > plan.thresholds.rtoMinutes
+            ) failures.push("RTO exceeds 60 minutes or is invalid");
+            const rpoLimit = profile.profile === "managed-pitr-v1"
+                ? plan.thresholds.managedPitrRpoMinutes
+                : plan.thresholds.logicalOffsiteRpoMinutes;
+            if (
+                rpoMinutes === null || rpoMinutes < 0 || rpoMinutes > rpoLimit
+            ) {
+                failures.push(
+                    profile.profile === "managed-pitr-v1"
+                        ? "managed PITR RPO exceeds 15 minutes or is invalid"
+                        : "logical offsite RPO exceeds 1440 minutes or is invalid",
+                );
+            }
+            if (metrics.checksumMatch !== true) {
+                failures.push("restore before/after checksums do not match");
+            }
+            if (profile.profile === "managed-pitr-v1") {
+                const latestRestoredMs = Date.parse(
+                    profile.latestRestoredOperationAt,
+                );
+                const recoveryPointMs = Date.parse(profile.recoveryPointAt);
+                const restoreStartMs = Date.parse(profile.restoreStartedAt);
+                const restoreHealthyMs = Date.parse(profile.restoreHealthyAt);
+                if (
+                    latestRestoredMs < runEndMs ||
+                    latestRestoredMs > recoveryPointMs ||
+                    recoveryPointMs > restoreStartMs ||
+                    restoreStartMs > restoreHealthyMs ||
+                    restoreHealthyMs > recoveryEvidenceMs
+                ) failures.push("recovery timestamps are not monotonic");
+            } else {
+                if (
+                    Date.parse(profile.backupStartedAt) !== backupBeforeMs ||
+                    Date.parse(profile.backupCompletedAt) !== backupAfterMs ||
+                    Date.parse(profile.hostedRestoreHealthyAt) >
+                        recoveryEvidenceMs
+                ) failures.push("recovery timestamps are not monotonic");
+            }
+        } catch (error) {
+            failures.push(
+                error instanceof Error
+                    ? `recovery profile is invalid: ${error.message}`
+                    : "recovery profile is invalid",
+            );
+        }
     }
 
     return {
