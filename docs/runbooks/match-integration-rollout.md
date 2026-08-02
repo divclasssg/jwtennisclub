@@ -1,6 +1,7 @@
 # Match integration cloned-project rollout
 
-Status: `BLOCKED_PRECONDITION`; no remote rollout was run.
+Status: `RECOVERY_VERIFIED_ROLLOUT_BLOCKED`; the hosted recovery drill passed,
+but no Match DB apply, Edge replacement, load run, or release was run.
 
 This runbook applies only to an approved disposable clone. Production
 `jwtennisclub` (`ydiusirreirhbvlftegp`) is hard denied. Project creation, cost,
@@ -126,6 +127,20 @@ at least every 93 days. If the production Storage object count is nonzero,
 Before every pre-deploy validation, manually run the private backup repository's
 `Run workflow`, wait for its restore verification to pass, and use only that
 run's immutable index/checksum evidence. Never restore to production here.
+
+The initial hosted drill completed on 2026-08-02 against validation ref
+`orssnkppcukrqxikxdbf` using backup
+`20260802T030435497Z-af0948fe-295e-482f-aaff-d72ac743e6f8` from workflow run
+`30729954729`. The measured RTO was 546 seconds. Production and validation
+matched the same normalized digest
+`bcd68767f3be73f9b2491e185b61806ebbf851227738ca8ee4e16ebe151ee758`, the same
+21-member checksum, zero Match tables, and zero Storage objects. Supabase denied
+writes to the four platform-owned tables `auth.schema_migrations`,
+`storage.buckets_vectors`, `storage.migrations`, and `storage.vector_indexes`;
+the comparison excluded exactly those four on both sides. Catalog metadata
+otherwise differed only in hosted role attributes. After Match first exists in
+production, this pre-Match drill is insufficient: run a new manual backup and
+hosted drill before promotion.
 
 Validation requires `TASK8_IDENTITY_FILE` and `TASK8_PRODUCTION_INVENTORY_FILE`;
 the helper queries and validates live DB identity itself through the exact bound
@@ -258,9 +273,10 @@ postcondition; actual removal requires separate approval.
 
 ## 7. Current blocker
 
-Validation ref `orssnkppcukrqxikxdbf` is reserved for destructive hosted restore
-and clone validation, but its current source provenance, isolated credentials,
-and destructive-restore approval are not yet complete. No DB apply, Edge
-replacement, load run, release change, or remote restore may proceed until the
-logical profile's real evidence is composed and the hosted restore receives
-separate explicit approval. Production remains hard denied.
+Validation ref `orssnkppcukrqxikxdbf` passed the approved destructive hosted
+restore drill and the real `logical-offsite-v1` profile validates locally. The
+remaining blockers are immutable clone provenance, isolated Auth/client
+configuration, full inventory v2 composition, and the required Match/Edge/iOS
+gates. No DB apply, Edge replacement, load run, or release change may proceed
+until those prerequisites pass and their existing approvals are supplied.
+Production remains hard denied.
