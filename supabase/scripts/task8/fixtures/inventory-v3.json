@@ -1,0 +1,90 @@
+{
+    "schemaVersion": 3,
+    "sourceDatabaseInventorySha256": "633ed186e36397fbc27a4babf1e8cc3c1fe7086be36f09a22872f8e68ebe5d77",
+    "identity": {
+        "validationRef": "orssnkppcukrqxikxdbf",
+        "productionSystemIdentifier": "1111111111111111111",
+        "validationSystemIdentifier": "2222222222222222222",
+        "databaseOid": "5",
+        "markerDigest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "provenanceId": "clone-ticket-42"
+    },
+    "migrations": [
+        {
+            "version": "202607130001",
+            "name": "optimize_navigation_queries",
+            "statementsState": "unavailable",
+            "statementSha256": null,
+            "catalogSha256": "6f3f0d96f52eb42858814f6d5748bc6c3e9cd0ecde50bbf5cf56f98c97f6f421"
+        },
+        {
+            "version": "202608020001",
+            "name": "match_foundation",
+            "statementsState": "recorded",
+            "statementSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "catalogSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+    ],
+    "memberBaseline": {
+        "count": 25,
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "auth": {
+        "userCount": 25,
+        "identityCount": 25,
+        "providerCounts": {
+            "email": 25
+        },
+        "projectRef": "orssnkppcukrqxikxdbf",
+        "siteUrl": "https://validation.invalid",
+        "redirectHosts": [
+            "validation.invalid"
+        ],
+        "jwtExpirySeconds": 3600
+    },
+    "tables": [
+        {
+            "schema": "match",
+            "name": "events",
+            "rowCount": 0,
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+    ],
+    "storage": {
+        "projectRef": "orssnkppcukrqxikxdbf",
+        "buckets": [
+            {
+                "id": "avatars",
+                "public": false,
+                "fileSizeLimit": 1048576,
+                "allowedMimeTypes": [
+                    "image/png"
+                ],
+                "objectCount": 0
+            }
+        ]
+    },
+    "databaseFunctions": [
+        {
+            "schema": "public",
+            "name": "match_state",
+            "identityArguments": "uuid",
+            "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+    ],
+    "edgeFunctions": [],
+    "recoveryProfile": {
+        "profile": "managed-pitr-v1",
+        "physicalBackupsEnabled": true,
+        "pitrEnabled": true,
+        "newestRecoveryPointAt": "2026-08-02T03:45:00.000Z",
+        "restoreStartedAt": "2026-08-02T03:46:00.000Z",
+        "restoreHealthyAt": "2026-08-02T03:55:00.000Z",
+        "recoveryPointAt": "2026-08-02T03:45:00.000Z",
+        "latestRestoredOperationAt": "2026-08-02T03:35:00.000Z",
+        "beforeMemberChecksum": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "afterMemberChecksum": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "beforeMatchChecksum": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "afterMatchChecksum": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+}

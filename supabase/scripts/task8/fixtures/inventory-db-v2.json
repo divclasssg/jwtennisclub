@@ -1,0 +1,70 @@
+{
+    "schemaVersion": 2,
+    "identity": {
+        "projectRef": "orssnkppcukrqxikxdbf",
+        "systemIdentifier": "2222222222222222222",
+        "databaseOid": "5",
+        "sourceSystemIdentifier": "1111111111111111111",
+        "markerDigest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "provenanceId": "clone-ticket-42",
+        "sourceSnapshotAt": "2026-08-02T03:40:00.000Z"
+    },
+    "migrations": [
+        {
+            "version": "202607130001",
+            "name": "optimize_navigation_queries",
+            "statementsState": "unavailable",
+            "statementSha256": null,
+            "catalogSha256": "6f3f0d96f52eb42858814f6d5748bc6c3e9cd0ecde50bbf5cf56f98c97f6f421"
+        },
+        {
+            "version": "202608020001",
+            "name": "match_foundation",
+            "statementsState": "recorded",
+            "statementSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "catalogSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+    ],
+    "memberBaseline": {
+        "count": 25,
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "authDatabaseInventory": {
+        "userCount": 25,
+        "identityCount": 25,
+        "providers": {
+            "email": 25
+        }
+    },
+    "tables": [
+        {
+            "schema": "match",
+            "name": "events",
+            "rowCount": 0,
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+    ],
+    "storage": {
+        "buckets": [
+            {
+                "id": "avatars",
+                "name": "avatars",
+                "public": false,
+                "fileSizeLimit": 1048576,
+                "allowedMimeTypes": [
+                    "image/png"
+                ],
+                "objectCount": 0
+            }
+        ],
+        "totalObjectCount": 0
+    },
+    "databaseFunctions": [
+        {
+            "schema": "public",
+            "name": "match_state",
+            "identityArguments": "uuid",
+            "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+    ]
+}

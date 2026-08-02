@@ -49,6 +49,36 @@ export interface InventoryBundleV2 {
     recoveryProfile: RecoveryProfile;
 }
 
+export type MigrationInventoryEntryV3 =
+    | {
+        version: string;
+        name: string;
+        statementsState: "recorded";
+        statementSha256: string;
+        catalogSha256: string;
+    }
+    | {
+        version: string;
+        name: string;
+        statementsState: "unavailable";
+        statementSha256: null;
+        catalogSha256: string;
+    };
+
+export interface InventoryBundleV3 {
+    schemaVersion: 3;
+    sourceDatabaseInventorySha256: string;
+    identity: InventoryBundleV2["identity"];
+    migrations: MigrationInventoryEntryV3[];
+    memberBaseline: InventoryBundleV2["memberBaseline"];
+    auth: InventoryBundleV2["auth"];
+    tables: InventoryBundleV2["tables"];
+    storage: InventoryBundleV2["storage"];
+    databaseFunctions: InventoryBundleV2["databaseFunctions"];
+    edgeFunctions: InventoryBundleV2["edgeFunctions"];
+    recoveryProfile: RecoveryProfile;
+}
+
 export interface InventoryValidationContext {
     storedIdentity: ExpectedDatabaseIdentity;
     liveIdentity: DatabaseIdentity;
@@ -188,6 +218,107 @@ function validateMigrations(root: Record<string, unknown>): void {
         required(item, "name", isString, path);
         requireChecksum(item.sha256, `${path}.sha256`);
     });
+}
+
+function validateMigrationsV3(
+    root: Record<string, unknown>,
+): MigrationInventoryEntryV3[] {
+    const migrations = required(root, "migrations", isArray, "inventory");
+    const versions = new Set<string>();
+    const names = new Set<string>();
+    let previousVersion: string | undefined;
+
+    return migrations.map((entry, index) => {
+        const path = `migrations[${index}]`;
+        const item = record(entry, path);
+        exactKeys(item, [
+            "version",
+            "name",
+            "statementsState",
+            "statementSha256",
+            "catalogSha256",
+        ], path);
+        const version = required(item, "version", isString, path);
+        const name = required(item, "name", isString, path);
+        if (!/^[0-9]{12,14}$/.test(version)) {
+            throw new Error(`${path}.version is invalid`);
+        }
+        if (versions.has(version)) {
+            throw new Error(`duplicate migration version: ${version}`);
+        }
+        if (names.has(name)) {
+            throw new Error(`duplicate migration name: ${name}`);
+        }
+        if (previousVersion !== undefined && version < previousVersion) {
+            throw new Error("migrations must be sorted by ascending version");
+        }
+        versions.add(version);
+        names.add(name);
+        previousVersion = version;
+        const catalogSha256 = requireChecksum(
+            item.catalogSha256,
+            `${path}.catalogSha256`,
+        );
+        if (item.statementsState === "recorded") {
+            if (
+                typeof item.statementSha256 !== "string" ||
+                !SHA256_PATTERN.test(item.statementSha256)
+            ) {
+                throw new Error(
+                    "recorded migration must have a SHA-256 statementSha256",
+                );
+            }
+            return {
+                version,
+                name,
+                statementsState: "recorded",
+                statementSha256: item.statementSha256,
+                catalogSha256,
+            };
+        }
+        if (item.statementsState === "unavailable") {
+            if (item.statementSha256 !== null) {
+                throw new Error(
+                    "unavailable migration must have null statementSha256",
+                );
+            }
+            return {
+                version,
+                name,
+                statementsState: "unavailable",
+                statementSha256: null,
+                catalogSha256,
+            };
+        }
+        throw new Error(`${path}.statementsState is invalid`);
+    });
+}
+
+export function validateInventoryStructure(value: unknown): InventoryBundleV3 {
+    const root = record(value, "inventory");
+    exactKeys(root, [
+        "schemaVersion",
+        "sourceDatabaseInventorySha256",
+        "identity",
+        "migrations",
+        "memberBaseline",
+        "auth",
+        "tables",
+        "storage",
+        "databaseFunctions",
+        "edgeFunctions",
+        "recoveryProfile",
+    ], "inventory");
+    if (root.schemaVersion !== 3) throw new Error("schemaVersion must equal 3");
+    requireChecksum(
+        root.sourceDatabaseInventorySha256,
+        "inventory.sourceDatabaseInventorySha256",
+    );
+    const migrations = validateMigrationsV3(root);
+    return {
+        ...(value as InventoryBundleV3),
+        migrations,
+    };
 }
 
 function hostFromSiteUrl(value: string, path: string): string {

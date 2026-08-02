@@ -1,6 +1,15 @@
 /// <reference lib="deno.ns" />
 
-import { validateInventoryBundle } from "./inventory_lib.ts";
+import {
+    validateInventoryBundle,
+    validateInventoryStructure,
+} from "./inventory_lib.ts";
+import inventoryDatabaseFixture from "./fixtures/inventory-db-v2.json" with {
+    type: "json",
+};
+import inventoryV3Fixture from "./fixtures/inventory-v3.json" with {
+    type: "json",
+};
 
 const NOW = new Date("2026-08-02T05:00:00.000Z");
 
@@ -21,6 +30,111 @@ async function assertRejects(action: () => unknown, message: string) {
     }
     throw new Error(`expected rejection containing ${message}`);
 }
+
+function fixtureJson<T>(
+    name: "inventory-db-v2.json" | "inventory-v3.json",
+): T {
+    return structuredClone(
+        name === "inventory-db-v2.json"
+            ? inventoryDatabaseFixture
+            : inventoryV3Fixture,
+    ) as T;
+}
+
+interface InventoryV3Fixture extends Record<string, unknown> {
+    schemaVersion: number;
+    sourceDatabaseInventorySha256: string;
+    migrations: Array<Record<string, unknown>>;
+}
+
+Deno.test("inventory accepts recorded and unavailable migrations in exact v3", async () => {
+    const value = fixtureJson<InventoryV3Fixture>("inventory-v3.json");
+    const result = validateInventoryStructure(value);
+    assert(result.schemaVersion === 3);
+    assert(result.migrations[0].statementsState === "unavailable");
+    assert(result.migrations[0].statementSha256 === null);
+    assert(result.migrations[1].statementsState === "recorded");
+});
+
+Deno.test("inventory rejects legacy schemas instead of upgrading", async () => {
+    for (const schemaVersion of [1, 2]) {
+        const value = fixtureJson<InventoryV3Fixture>(
+            "inventory-v3.json",
+        );
+        value.schemaVersion = schemaVersion;
+        await assertRejects(
+            () => validateInventoryStructure(value),
+            "schemaVersion must equal 3",
+        );
+    }
+});
+
+Deno.test("inventory rejects migration state and statement hash contradictions", async () => {
+    const unavailableWithHash = fixtureJson<InventoryV3Fixture>(
+        "inventory-v3.json",
+    );
+    unavailableWithHash.migrations[0].statementSha256 = "a".repeat(64);
+    await assertRejects(
+        () => validateInventoryStructure(unavailableWithHash),
+        "unavailable migration must have null statementSha256",
+    );
+
+    const recordedWithoutHash = fixtureJson<InventoryV3Fixture>(
+        "inventory-v3.json",
+    );
+    recordedWithoutHash.migrations[1].statementSha256 = null;
+    await assertRejects(
+        () => validateInventoryStructure(recordedWithoutHash),
+        "recorded migration must have a SHA-256 statementSha256",
+    );
+});
+
+Deno.test("inventory rejects malformed, duplicate, and unsorted migration custody", async () => {
+    const malformed = fixtureJson<InventoryV3Fixture>(
+        "inventory-v3.json",
+    );
+    malformed.migrations[0].catalogSha256 = "A".repeat(64);
+    await assertRejects(
+        () => validateInventoryStructure(malformed),
+        "migrations[0].catalogSha256",
+    );
+
+    const duplicateVersion = fixtureJson<InventoryV3Fixture>(
+        "inventory-v3.json",
+    );
+    duplicateVersion.migrations[1].version = "202607130001";
+    await assertRejects(
+        () => validateInventoryStructure(duplicateVersion),
+        "duplicate migration version",
+    );
+
+    const duplicateName = fixtureJson<InventoryV3Fixture>(
+        "inventory-v3.json",
+    );
+    duplicateName.migrations[1].name = "optimize_navigation_queries";
+    await assertRejects(
+        () => validateInventoryStructure(duplicateName),
+        "duplicate migration name",
+    );
+
+    const unsorted = fixtureJson<InventoryV3Fixture>(
+        "inventory-v3.json",
+    );
+    unsorted.migrations.reverse();
+    await assertRejects(
+        () => validateInventoryStructure(unsorted),
+        "migrations must be sorted by ascending version",
+    );
+
+    const legacyHash = fixtureJson<InventoryV3Fixture>(
+        "inventory-v3.json",
+    );
+    legacyHash.migrations[0].sha256 = "a".repeat(64);
+    await assertRejects(
+        () => validateInventoryStructure(legacyHash),
+        "migrations[0].sha256 is an unexpected field",
+    );
+});
 
 function managedProfile() {
     return {

@@ -1,0 +1,90 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://jwtennisclub.invalid/schemas/task8/inventory-v3.schema.json",
+    "title": "Task 8 rollout custody inventory v3",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schemaVersion",
+        "sourceDatabaseInventorySha256",
+        "identity",
+        "migrations",
+        "memberBaseline",
+        "auth",
+        "tables",
+        "storage",
+        "databaseFunctions",
+        "edgeFunctions",
+        "recoveryProfile"
+    ],
+    "properties": {
+        "schemaVersion": { "const": 3 },
+        "sourceDatabaseInventorySha256": { "$ref": "#/$defs/sha256" },
+        "identity": { "$ref": "inventory-v2.schema.json#/$defs/identity" },
+        "migrations": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/migrationV3" }
+        },
+        "memberBaseline": {
+            "$ref": "inventory-v2.schema.json#/$defs/memberBaseline"
+        },
+        "auth": { "$ref": "inventory-v2.schema.json#/$defs/auth" },
+        "tables": {
+            "type": "array",
+            "items": { "$ref": "inventory-v2.schema.json#/$defs/namedHash" }
+        },
+        "storage": { "$ref": "inventory-v2.schema.json#/$defs/storage" },
+        "databaseFunctions": {
+            "type": "array",
+            "items": { "$ref": "inventory-v2.schema.json#/$defs/function" }
+        },
+        "edgeFunctions": {
+            "type": "array",
+            "oneOf": [
+                { "maxItems": 0 },
+                { "minItems": 7, "maxItems": 7 }
+            ],
+            "uniqueItems": true,
+            "items": { "$ref": "inventory-v2.schema.json#/$defs/edgeFunction" }
+        },
+        "recoveryProfile": { "$ref": "recovery-profile-v1.schema.json" }
+    },
+    "$defs": {
+        "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+        },
+        "migrationV3": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "version",
+                "name",
+                "statementsState",
+                "statementSha256",
+                "catalogSha256"
+            ],
+            "properties": {
+                "version": { "type": "string", "pattern": "^[0-9]{12,14}$" },
+                "name": { "type": "string", "minLength": 1 },
+                "statementsState": { "enum": ["recorded", "unavailable"] },
+                "statementSha256": { "type": ["string", "null"] },
+                "catalogSha256": { "$ref": "#/$defs/sha256" }
+            },
+            "oneOf": [
+                {
+                    "properties": {
+                        "statementsState": { "const": "recorded" },
+                        "statementSha256": { "$ref": "#/$defs/sha256" }
+                    }
+                },
+                {
+                    "properties": {
+                        "statementsState": { "const": "unavailable" },
+                        "statementSha256": { "type": "null" }
+                    }
+                }
+            ]
+        }
+    }
+}
