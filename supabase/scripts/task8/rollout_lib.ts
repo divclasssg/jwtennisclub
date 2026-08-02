@@ -30,6 +30,7 @@ import {
     verifyReleaseApproval,
 } from "./stage_evidence_lib.ts";
 import { writeEvidence, writeEvidenceManifest } from "./evidence_lib.ts";
+import { extractSingleJsonPayload } from "./inventory_db_lib.ts";
 
 export {
     BACKEND_PRODUCT_SHA,
@@ -519,11 +520,17 @@ export async function executeRolloutStep(
             options,
             "task8_inventory.sql",
         );
+        const databaseInventory = extractSingleJsonPayload(result.stdout);
+        await writeEvidence(
+            options.evidenceRoot,
+            "inventory-db-v2.json",
+            databaseInventory,
+        );
         await writeEvidence(
             options.evidenceRoot,
             "inventory-raw.json",
             {
-                schemaVersion: 1,
+                schemaVersion: 2,
                 kind: "inventory-raw",
                 startedAt,
                 endedAt: new Date().toISOString(),

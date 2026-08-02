@@ -87,12 +87,74 @@ export async function writeEvidence(
     return file;
 }
 
-async function sha256File(path: string): Promise<string> {
+export async function sha256File(path: string): Promise<string> {
     const bytes = await Deno.readFile(path);
     const digest = await crypto.subtle.digest("SHA-256", bytes);
     return [...new Uint8Array(digest)]
         .map((byte) => byte.toString(16).padStart(2, "0"))
         .join("");
+}
+
+export async function readManifestBoundPrivateJson<T>(
+    evidenceRoot: string,
+    name: string,
+): Promise<T> {
+    const safeName = safeEvidenceName(name);
+    const canonicalRoot = await Deno.realPath(resolve(evidenceRoot));
+    const file = resolve(canonicalRoot, safeName);
+    if (!isInside(file, canonicalRoot)) {
+        throw new Error("evidence filename escapes evidence root");
+    }
+    const fileInfo = await Deno.lstat(file);
+    if (!fileInfo.isFile || fileInfo.isSymlink) {
+        throw new Error(`${safeName} must be a regular evidence file`);
+    }
+    if (fileInfo.mode === null || (fileInfo.mode & 0o777) !== 0o600) {
+        throw new Error(`${safeName} mode must be 0600`);
+    }
+
+    const manifestPath = resolve(canonicalRoot, "manifest.json");
+    const manifestInfo = await Deno.lstat(manifestPath);
+    if (
+        !manifestInfo.isFile || manifestInfo.isSymlink ||
+        manifestInfo.mode === null ||
+        (manifestInfo.mode & 0o777) !== 0o600
+    ) {
+        throw new Error("manifest.json must be a private regular file");
+    }
+    const manifest = JSON.parse(
+        await Deno.readTextFile(manifestPath),
+    ) as {
+        schemaVersion?: unknown;
+        files?: unknown;
+    };
+    if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.files)) {
+        throw new Error("evidence manifest is invalid");
+    }
+    const matches = manifest.files.filter((candidate): candidate is {
+        path: string;
+        sha256: string;
+        bytes: number;
+    } => {
+        if (
+            candidate === null || typeof candidate !== "object" ||
+            Array.isArray(candidate)
+        ) return false;
+        return (candidate as Record<string, unknown>).path === safeName;
+    });
+    if (matches.length !== 1) {
+        throw new Error(`${safeName} must have exactly one manifest entry`);
+    }
+    const [entry] = matches;
+    if (
+        !/^[a-f0-9]{64}$/.test(entry.sha256) ||
+        !Number.isSafeInteger(entry.bytes) || entry.bytes < 0 ||
+        entry.bytes !== fileInfo.size ||
+        entry.sha256 !== await sha256File(file)
+    ) {
+        throw new Error(`${safeName} does not match manifest`);
+    }
+    return JSON.parse(await Deno.readTextFile(file)) as T;
 }
 
 export async function writeEvidenceManifest(

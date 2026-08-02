@@ -26,6 +26,9 @@ import {
     expectedIdentityDigest,
 } from "./stage_evidence_lib.ts";
 import { buildRecoveryValidationResults } from "./rollout.ts";
+import inventoryDatabaseFixture from "./fixtures/inventory-db-v2.json" with {
+    type: "json",
+};
 
 function assert(
     condition: unknown,
@@ -392,6 +395,7 @@ class FakeRunner implements RolloutCommandRunner {
     failDbPush = false;
     ignoredMutationInput = false;
     identity = validIdentity();
+    inventoryStdout = `${JSON.stringify(inventoryDatabaseFixture)}\n`;
 
     run(invocation: CommandInvocation): Promise<CommandResult> {
         this.invocations.push(invocation);
@@ -443,6 +447,13 @@ class FakeRunner implements RolloutCommandRunner {
             return Promise.resolve({
                 code: 0,
                 stdout: `${JSON.stringify(this.identity)}\n`,
+                stderr: "",
+            });
+        }
+        if (joined.includes("task8_inventory.sql")) {
+            return Promise.resolve({
+                code: 0,
+                stdout: this.inventoryStdout,
                 stderr: "",
             });
         }
@@ -819,12 +830,92 @@ Deno.test("raw inventory is manifest evidence and never a release-ledger stage",
                     entry.path === "inventory-raw.json",
             ),
         );
+        assert(
+            manifest.files.some(
+                (entry: { path: string }) =>
+                    entry.path === "inventory-db-v2.json",
+            ),
+        );
+        assertEquals(
+            JSON.parse(
+                await Deno.readTextFile(
+                    `${evidenceRoot}/inventory-db-v2.json`,
+                ),
+            ),
+            inventoryDatabaseFixture,
+        );
+        assertEquals(
+            (await Deno.stat(`${evidenceRoot}/inventory-db-v2.json`)).mode! &
+                0o777,
+            0o600,
+        );
         await assertRejects(
             () => Deno.readTextFile(`${evidenceRoot}/gate-ledger.json`),
             "No such file or directory",
         );
     } finally {
         await Deno.remove(sandbox, { recursive: true });
+    }
+});
+
+Deno.test("ambiguous inventory stdout fails before writing any evidence", async () => {
+    for (
+        const stdout of [
+            "",
+            `${JSON.stringify(inventoryDatabaseFixture)}\n${
+                JSON.stringify(inventoryDatabaseFixture)
+            }\n`,
+            `NOTICE\n${JSON.stringify(inventoryDatabaseFixture)}\n`,
+        ]
+    ) {
+        const runner = new FakeRunner();
+        runner.inventoryStdout = stdout;
+        const sandbox = await Deno.makeTempDir();
+        const backendRoot = `${sandbox}/backend`;
+        const clientRoot = `${sandbox}/client`;
+        const evidenceRoot = `${sandbox}/evidence`;
+        await Deno.mkdir(`${backendRoot}/supabase/.temp`, { recursive: true });
+        await Deno.mkdir(clientRoot);
+        await Deno.mkdir(evidenceRoot);
+        await Deno.writeTextFile(
+            `${backendRoot}/supabase/.temp/project-ref`,
+            `${validationRef}\n`,
+        );
+        try {
+            await assertRejects(
+                () =>
+                    executeRolloutStep({
+                        step: "inventory",
+                        backendRoot,
+                        clientRoot,
+                        validationTarget: {
+                            projectRef: validationRef,
+                            host: `db.${validationRef}.supabase.co`,
+                            user: "postgres",
+                            database: "postgres",
+                            sslMode: "verify-full",
+                        },
+                        expectedIdentity: {
+                            validationRef,
+                            productionSystemIdentifier,
+                            validationSystemIdentifier,
+                            databaseOid: "16384",
+                            markerDigest,
+                            provenanceId: "clone-ticket-42",
+                        },
+                        evidenceRoot,
+                        runner,
+                    }),
+                "exactly one JSON payload line",
+            );
+            const evidenceFiles = [];
+            for await (const entry of Deno.readDir(evidenceRoot)) {
+                evidenceFiles.push(entry.name);
+            }
+            assertEquals(evidenceFiles, []);
+        } finally {
+            await Deno.remove(sandbox, { recursive: true });
+        }
     }
 });
 
