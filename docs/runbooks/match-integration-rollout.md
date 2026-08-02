@@ -3,6 +3,17 @@
 Status: `RECOVERY_VERIFIED_ROLLOUT_BLOCKED`; the hosted recovery drill passed,
 but no Match DB apply, Edge replacement, load run, or release was run.
 
+Backup core implementation and the initial encrypted backup, decrypt test,
+local restore, and hosted validation restore have passed. Per the owner's
+2026-08-02 decision, final backup closeout is deferred until the end of the
+remaining development and validation work. Validation-project gates may
+continue, but final production promotion remains blocked until all of the
+following pass: a second recoverable private-key copy, visible GitHub `$0`
+spending/stop-usage confirmation, a signed approved-code release tag, real
+unattended backup and health schedule successes, and a fresh backup plus hosted
+restore after Match first reaches production. Mac Mini and Google Drive
+replication remain optional phase-two hardening.
+
 This runbook applies only to an approved disposable clone. Production
 `jwtennisclub` (`ydiusirreirhbvlftegp`) is hard denied. Project creation, cost,
 production changes, and deployment require separate authority.
