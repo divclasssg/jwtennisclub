@@ -271,7 +271,7 @@ async function verifyRecoveryProfileStageBinding(
     if (
         records[0]?.stage !== "inventory-validated" ||
         records[1]?.stage !== "recovery-validated" ||
-        inventory.schemaVersion !== 2
+        inventory.schemaVersion !== 3
     ) {
         throw new Error("recovery profile stages are missing or invalid");
     }

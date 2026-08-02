@@ -25,8 +25,14 @@ import {
     commandStreamEvidence,
     expectedIdentityDigest,
 } from "./stage_evidence_lib.ts";
-import { buildRecoveryValidationResults } from "./rollout.ts";
+import {
+    buildRecoveryValidationResults,
+    validateInventory,
+} from "./rollout.ts";
 import inventoryDatabaseFixture from "./fixtures/inventory-db-v2.json" with {
+    type: "json",
+};
+import inventoryV3Fixture from "./fixtures/inventory-v3.json" with {
     type: "json",
 };
 
@@ -109,7 +115,7 @@ Deno.test("rollout binds identical canonical recovery evidence into both validat
         afterMatchChecksum: "b".repeat(64),
     };
     const results = await buildRecoveryValidationResults({
-        schemaVersion: 2,
+        schemaVersion: 3,
         recoveryProfile: profile,
         derivedIsolation: {
             authProjectBound: true,
@@ -135,6 +141,204 @@ Deno.test("rollout binds identical canonical recovery evidence into both validat
         changed.inventoryResult.profileEvidenceDigest !==
             results.inventoryResult.profileEvidenceDigest,
     );
+});
+
+const inventoryNow = new Date("2026-08-02T05:00:00.000Z");
+
+function fixtureStoredIdentity() {
+    return {
+        validationRef: "orssnkppcukrqxikxdbf",
+        productionSystemIdentifier,
+        validationSystemIdentifier,
+        databaseOid: "5",
+        markerDigest: "9".repeat(64),
+        provenanceId: "clone-ticket-42",
+    };
+}
+
+function fixtureLiveIdentity() {
+    return {
+        projectRef: "orssnkppcukrqxikxdbf",
+        systemIdentifier: validationSystemIdentifier,
+        databaseOid: "5",
+        databaseName: "postgres",
+        sourceSystemIdentifier: productionSystemIdentifier,
+        markerDigest: "9".repeat(64),
+        provenanceId: "clone-ticket-42",
+    };
+}
+
+function fixtureProductionInventory() {
+    return {
+        projectRef: productionRef,
+        systemIdentifier: productionSystemIdentifier,
+        auth: {
+            projectRef: productionRef,
+            siteUrl: "https://jwtennisclub.example",
+            redirectHosts: ["jwtennisclub.example"],
+        },
+        storage: { projectRef: productionRef },
+    };
+}
+
+async function writePrivateJson(path: string, value: unknown): Promise<void> {
+    await Deno.writeTextFile(path, `${JSON.stringify(value, null, 2)}\n`);
+    await Deno.chmod(path, 0o600);
+}
+
+async function inventoryOrchestrationFixture(options?: {
+    composite?: unknown;
+    prepareSource?: (evidenceRoot: string) => Promise<void>;
+}) {
+    const root = await Deno.makeTempDir();
+    const evidenceRoot = `${root}/evidence`;
+    const inventoryFile = `${root}/operator-inventory.json`;
+    await Deno.mkdir(evidenceRoot);
+    await writePrivateJson(
+        inventoryFile,
+        options?.composite ?? structuredClone(inventoryV3Fixture),
+    );
+    if (options?.prepareSource) {
+        await options.prepareSource(evidenceRoot);
+    } else {
+        await writeEvidence(
+            evidenceRoot,
+            "inventory-db-v2.json",
+            inventoryDatabaseFixture,
+        );
+        await writeEvidenceManifest(evidenceRoot);
+    }
+    return {
+        root,
+        evidenceRoot,
+        run: () =>
+            validateInventory({
+                evidenceRoot,
+                inventoryFile,
+                storedIdentity: fixtureStoredIdentity(),
+                liveIdentity: fixtureLiveIdentity(),
+                productionInventory: fixtureProductionInventory(),
+                now: inventoryNow,
+            }),
+    };
+}
+
+Deno.test("validate-inventory writes manifest-bound v3 evidence before v3 stages", async () => {
+    const fixture = await inventoryOrchestrationFixture();
+    try {
+        await fixture.run();
+        const validated = JSON.parse(
+            await Deno.readTextFile(
+                `${fixture.evidenceRoot}/inventory-v3.json`,
+            ),
+        );
+        assertEquals(validated.schemaVersion, 3);
+        assertEquals(
+            validated.sourceDatabaseInventorySha256,
+            "633ed186e36397fbc27a4babf1e8cc3c1fe7086be36f09a22872f8e68ebe5d77",
+        );
+        assert(
+            !("derivedIsolation" in validated),
+            "inventory-v3.json must remain valid against the strict v3 schema",
+        );
+        const manifest = JSON.parse(
+            await Deno.readTextFile(`${fixture.evidenceRoot}/manifest.json`),
+        );
+        assert(
+            manifest.files.some(
+                (entry: { path: string }) => entry.path === "inventory-v3.json",
+            ),
+        );
+        const ledger = JSON.parse(
+            await Deno.readTextFile(`${fixture.evidenceRoot}/gate-ledger.json`),
+        );
+        assertEquals(ledger.entries.at(-2).stage, "inventory-validated");
+        assertEquals(ledger.entries.at(-1).stage, "recovery-validated");
+        const inventoryStage = JSON.parse(
+            await Deno.readTextFile(
+                `${fixture.evidenceRoot}/${ledger.entries.at(-2).file}`,
+            ),
+        );
+        const recoveryStage = JSON.parse(
+            await Deno.readTextFile(
+                `${fixture.evidenceRoot}/${ledger.entries.at(-1).file}`,
+            ),
+        );
+        assertEquals(inventoryStage.result.schemaVersion, 3);
+        assertEquals(recoveryStage.result.schemaVersion, 3);
+    } finally {
+        await Deno.remove(fixture.root, { recursive: true });
+    }
+});
+
+Deno.test("validate-inventory fails closed before output or ledger evidence", async () => {
+    const wrongDigest = structuredClone(inventoryV3Fixture);
+    wrongDigest.sourceDatabaseInventorySha256 = "0".repeat(64);
+    const legacy = structuredClone(inventoryV3Fixture) as Record<
+        string,
+        unknown
+    >;
+    legacy.schemaVersion = 2;
+    const cases: Array<[
+        string,
+        Parameters<typeof inventoryOrchestrationFixture>[0],
+    ]> = [
+        [
+            "exactly one manifest entry",
+            {
+                prepareSource: async (evidenceRoot) => {
+                    await writeEvidenceManifest(evidenceRoot);
+                    await writeEvidence(
+                        evidenceRoot,
+                        "inventory-db-v2.json",
+                        inventoryDatabaseFixture,
+                    );
+                },
+            },
+        ],
+        [
+            "does not match manifest",
+            {
+                prepareSource: async (evidenceRoot) => {
+                    await writeEvidence(
+                        evidenceRoot,
+                        "inventory-db-v2.json",
+                        inventoryDatabaseFixture,
+                    );
+                    await writeEvidenceManifest(evidenceRoot);
+                    await Deno.writeTextFile(
+                        `${evidenceRoot}/inventory-db-v2.json`,
+                        `${
+                            JSON.stringify({
+                                ...inventoryDatabaseFixture,
+                                schemaVersion: 1,
+                            })
+                        }\n`,
+                    );
+                },
+            },
+        ],
+        ["schemaVersion must equal 3", { composite: legacy }],
+        [
+            "sourceDatabaseInventorySha256 does not match raw database payload",
+            { composite: wrongDigest },
+        ],
+    ];
+
+    for (const [message, options] of cases) {
+        const fixture = await inventoryOrchestrationFixture(options);
+        try {
+            await assertRejects(fixture.run, message);
+            for (const name of ["inventory-v3.json", "gate-ledger.json"]) {
+                await assertRejects(
+                    () => Deno.stat(`${fixture.evidenceRoot}/${name}`),
+                    "No such file or directory",
+                );
+            }
+        } finally {
+            await Deno.remove(fixture.root, { recursive: true });
+        }
+    }
 });
 
 Deno.test("whitespace cannot disguise the production project ref", () => {

@@ -14,6 +14,7 @@ import {
 } from "./rollout_lib.ts";
 import {
     ensureEvidenceRoot,
+    readManifestBoundPrivateJson,
     writeEvidence,
     writeEvidenceManifest,
 } from "./evidence_lib.ts";
@@ -254,7 +255,18 @@ async function runStep(step: RolloutStep): Promise<void> {
     });
 }
 
-async function validateInventory(): Promise<void> {
+export interface ValidateInventoryOptions {
+    evidenceRoot: string;
+    inventoryFile: string;
+    storedIdentity: ExpectedDatabaseIdentity;
+    liveIdentity: InventoryValidationContext["liveIdentity"];
+    productionInventory: InventoryValidationContext["productionInventory"];
+    now?: Date;
+}
+
+async function configuredInventoryValidation(): Promise<
+    ValidateInventoryOptions
+> {
     const backendRoot = env("BACKEND_ROOT");
     const clientRoot = env("CLIENT_ROOT");
     const evidenceRoot = await ensureEvidenceRoot(
@@ -266,7 +278,6 @@ async function validateInventory(): Promise<void> {
     const storedIdentity = await readPrivateJson<ExpectedDatabaseIdentity>(
         env("TASK8_IDENTITY_FILE"),
     );
-    const runner = new DenoCommandRunner();
     const liveIdentity = await captureValidatedDatabaseIdentity({
         step: "inventory",
         backendRoot,
@@ -274,32 +285,60 @@ async function validateInventory(): Promise<void> {
         validationTarget: rolloutDbTarget(storedIdentity.validationRef),
         expectedIdentity: storedIdentity,
         evidenceRoot,
-        runner,
+        runner: new DenoCommandRunner(),
     });
-    const inventory = validateInventoryBundle(
-        await readPrivateJson<unknown>(env("TASK8_INVENTORY_FILE")),
-        {
-            storedIdentity,
-            liveIdentity,
-            productionInventory: await readPrivateJson<
-                InventoryValidationContext["productionInventory"]
-            >(env("TASK8_PRODUCTION_INVENTORY_FILE")),
-        },
+    return {
+        evidenceRoot,
+        inventoryFile: env("TASK8_INVENTORY_FILE"),
+        storedIdentity,
+        liveIdentity,
+        productionInventory: await readPrivateJson<
+            InventoryValidationContext["productionInventory"]
+        >(env("TASK8_PRODUCTION_INVENTORY_FILE")),
+    };
+}
+
+export async function validateInventory(
+    options?: ValidateInventoryOptions,
+): Promise<void> {
+    const configured = options ?? await configuredInventoryValidation();
+    const sourceDatabaseInventory = await readManifestBoundPrivateJson<unknown>(
+        configured.evidenceRoot,
+        "inventory-db-v2.json",
     );
-    await writeEvidence(evidenceRoot, "inventory-v2.json", inventory);
+    const inventory = await validateInventoryBundle(
+        await readPrivateJson<unknown>(configured.inventoryFile),
+        sourceDatabaseInventory,
+        {
+            storedIdentity: configured.storedIdentity,
+            liveIdentity: configured.liveIdentity,
+            productionInventory: configured.productionInventory,
+        },
+        configured.now,
+    );
+    const {
+        derivedIsolation: _stageDerivedIsolation,
+        ...inventoryV3
+    } = inventory;
+    await writeEvidence(
+        configured.evidenceRoot,
+        "inventory-v3.json",
+        inventoryV3,
+    );
+    await writeEvidenceManifest(configured.evidenceRoot);
     const { inventoryResult, recoveryResult } =
         await buildRecoveryValidationResults(
             inventory,
         );
     await appendInternalStage({
-        evidenceRoot,
-        identity: storedIdentity,
+        evidenceRoot: configured.evidenceRoot,
+        identity: configured.storedIdentity,
         stage: "inventory-validated",
         result: inventoryResult,
     });
     await appendInternalStage({
-        evidenceRoot,
-        identity: storedIdentity,
+        evidenceRoot: configured.evidenceRoot,
+        identity: configured.storedIdentity,
         stage: "recovery-validated",
         result: recoveryResult,
     });

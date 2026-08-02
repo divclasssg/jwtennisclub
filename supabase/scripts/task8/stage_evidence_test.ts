@@ -120,7 +120,7 @@ function logicalProfile() {
 async function profileResult(profile: RecoveryProfile = managedProfile()) {
     return {
         passed: true,
-        schemaVersion: 2,
+        schemaVersion: 3,
         recoveryProfile: profile,
         profileEvidenceDigest: await profileEvidenceDigest(profile),
         profileMetrics: recoveryProfileMetrics(profile),
