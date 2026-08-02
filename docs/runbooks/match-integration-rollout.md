@@ -30,17 +30,17 @@ deno run --allow-read --allow-write --allow-run --allow-env --allow-sys \
   supabase/scripts/task8/rollout.ts capture-production
 ```
 
-The helper obtains Management API identity through `supabase projects list`.
-Its default connection is the exact direct endpoint
+The helper obtains Management API identity through `supabase projects list`. Its
+default connection is the exact direct endpoint
 `db.ydiusirreirhbvlftegp.supabase.co:5432`, database/user `postgres`, with
 `sslmode=verify-full`. Supply the password through the process environment;
 never put it in an argument, URL, runbook, or evidence.
 
-For each command, set both `PGPASSWORD` (psql) and
-`SUPABASE_DB_PASSWORD` (Supabase CLI) to that command's one project-specific
-password. Retrieve it from the approved secret store in the invoking shell and
-unset both variables immediately afterward. Never reuse production credentials
-for validation or validation credentials for production.
+For each command, set both `PGPASSWORD` (psql) and `SUPABASE_DB_PASSWORD`
+(Supabase CLI) to that command's one project-specific password. Retrieve it from
+the approved secret store in the invoking shell and unset both variables
+immediately afterward. Never reuse production credentials for validation or
+validation credentials for production.
 
 On an IPv4-only operator network, the direct endpoint may be unreachable. The
 only permitted fallback is the Supabase CLI-derived **session** pooler URL on
@@ -65,13 +65,13 @@ command. Never reuse one project's pooler URL for the other.
 For clone commands, the helper also reads `BACKEND_ROOT/supabase/.temp` and
 requires its `project-ref` and canonical passwordless `pooler-url` to match the
 validated target before any `db push`. The actual dry-run and apply do not
-delegate target selection back to mutable linked state: they receive a
-canonical passwordless `--db-url` rebuilt from the already validated target.
-Both inherit `PGSSLMODE=verify-full` and `PGSSLROOTCERT`; the password remains
-environment-only. The clean-checkout gate permits only the eight known
-untracked Supabase CLI cache files under `.temp`. Any other non-ignored
-untracked or modified file fails closed, as does any ignored/untracked DB or
-Edge mutation input under the explicitly scanned Supabase paths.
+delegate target selection back to mutable linked state: they receive a canonical
+passwordless `--db-url` rebuilt from the already validated target. Both inherit
+`PGSSLMODE=verify-full` and `PGSSLROOTCERT`; the password remains
+environment-only. The clean-checkout gate permits only the eight known untracked
+Supabase CLI cache files under `.temp`. Any other non-ignored untracked or
+modified file fails closed, as does any ignored/untracked DB or Edge mutation
+input under the explicitly scanned Supabase paths.
 
 `serverFingerprintSha256` is only
 `SHA-256(pg_control_system().system_identifier)`. Separately,
@@ -96,7 +96,7 @@ identity, stop—there is no name-only fallback.
 ## 2. Inventory and recovery capability
 
 Run `rollout.ts inventory`; its raw output is manifest evidence, never a gate
-ledger stage. Then compose `inventory-v1.json` using `inventory-v1.schema.json`
+ledger stage. Then compose `inventory-v2.json` using `inventory-v2.schema.json`
 and run `rollout.ts validate-inventory`. Successful validation appends the
 identity-bound `inventory-validated` and `recovery-validated` stages. It
 requires:
@@ -109,21 +109,36 @@ requires:
 - exact deployed version/status for `admin-command`, `game-day-command`,
   `game-day-snapshot`, `match-recommendation`, `member-link`, `member-read`, and
   `operator-read`;
-- physical-backup/PITR status, newest recovery point, restore start/healthy
-  timestamps, latest restored operation, and before/after member/match hashes.
+- exactly one explicit recovery profile and its canonical SHA-256 digest.
+
+`managed-pitr-v1` is the preferred paid path. It requires physical backups and
+PITR enabled, RPO `<=15m`, RTO `<=60m`, and equal before/after member and match
+hashes. `logical-offsite-v1` is the approved Free path, not PITR-equivalent. It
+requires private repository `divclasssg/jwtennisclub-backups`, the exact backup
+ID, workflow run ID, encrypted archive SHA-256 and byte count, source
+fingerprint, backup window, state check gap `<=1440m` and freshness `<=36h`,
+successful private-key decrypt and local restore timestamps, and a hosted
+restore in validation project `orssnkppcukrqxikxdbf` with RTO `<=60m`.
+
+The Free path also requires an initial hosted restore and a hosted restore drill
+at least every 93 days. If the production Storage object count is nonzero,
+`storageObjectsProtected` must be true; metadata-only backup evidence fails.
+Before every pre-deploy validation, manually run the private backup repository's
+`Run workflow`, wait for its restore verification to pass, and use only that
+run's immutable index/checksum evidence. Never restore to production here.
 
 Validation requires `TASK8_IDENTITY_FILE` and `TASK8_PRODUCTION_INVENTORY_FILE`;
-the helper queries and validates live DB identity itself through the exact
-bound direct or approved session-pooler target. Isolation is derived by
-comparing stored/live DB identity,
-production system identifier, Auth instance and network hosts, and Storage
-project refs. A supplied `isolated` boolean is not accepted. Every Edge status
-must equal `ACTIVE`.
+the helper queries and validates live DB identity itself through the exact bound
+direct or approved session-pooler target. Isolation is derived by comparing
+stored/live DB identity, production system identifier, Auth instance and network
+hosts, and Storage project refs. A supplied `isolated` boolean is not accepted.
+Every Edge status must equal `ACTIVE`.
 
-Stop unless RPO is `<=15m`, the admin connection can prepare and reset the
-database baseline, and `rollout.ts lock-capability` passes. That gate requires
-approved instrumented lock acquisition with `lock_wait_ms` resolution `<=10ms`;
-`pg_stat_activity` polling is not accepted as lock-duration evidence.
+Stop unless the chosen profile's honest RPO (`<=15m` managed or `<=1440m`
+logical), the admin connection can prepare and reset the database baseline, and
+`rollout.ts lock-capability` passes. That gate requires approved instrumented
+lock acquisition with `lock_wait_ms` resolution `<=10ms`; `pg_stat_activity`
+polling is not accepted as lock-duration evidence.
 
 ## 3. DB dry-run and apply
 
@@ -140,10 +155,9 @@ APPLY:<clone-ref>:<db-dry-run-stage-hash>:1fc16f34442b60083a003292d59fdc95c5afec
 
 Set `TASK8_DRY_RUN_HASH` to that exact stage hash. The helper uses only the
 derived direct endpoint or strictly bound session-pooler target for identity
-SQL. It prepares the member baseline,
-rechecks clean trees and live identity immediately before and after the
-identity-bound `--db-url` push, and resets the baseline in `finally`. Any failed
-gate aborts.
+SQL. It prepares the member baseline, rechecks clean trees and live identity
+immediately before and after the identity-bound `--db-url` push, and resets the
+baseline in `finally`. Any failed gate aborts.
 
 ## 4. RPC, Edge, and iOS gates
 
@@ -187,14 +201,14 @@ validation release for test traffic, not final rollout acceptance. The helper
 requires the distinct pre-release approval
 `RELEASE:<clone-ref>:<ledger-hash>:<manifest-hash>:<backend-head>:<client-head>`.
 The hash-chained pre-release ledger must be exactly the passed, ordered
-sequence: inventory validation, recovery/backup/PITR proof, lock capability, DB
-dry-run/apply, direct RPC, Edge delete-empty/deploy-ACTIVE, and iOS test/build,
-all for the same ref, identity digest, and pinned heads. Every entry is bound
-before sequence checking; foreign, unknown, missing, failed, duplicate, or
-reordered evidence fails. The helper then updates only `match.release_state`.
+sequence: inventory validation, profile-bound recovery proof, lock capability,
+DB dry-run/apply, direct RPC, Edge delete-empty/deploy-ACTIVE, and iOS
+test/build, all for the same ref, identity digest, and pinned heads. Every entry
+is bound before sequence checking; foreign, unknown, missing, failed, duplicate,
+or reordered evidence fails. The helper then updates only `match.release_state`.
 
 Generate JSONL conforming to `evidence-event-v1.schema.json` and the immutable
-`load-plan-v1.json`: five operator sessions, 2-second cadence, 900 polls each;
+`load-plan-v2.json`: five operator sessions, 2-second cadence, 900 polls each;
 25 member sessions, 2-second cadence, 900 alternating requests each (450 reads
 and 450 commands); 900 web requests before and after. Each of 11,250 member
 commands needs one explicit instrumented `lock_wait_ms` sample.
@@ -207,14 +221,24 @@ telemetry timestamps must exactly bracket the after window; recovery timestamps
 must be monotonic. Every lock sample names the approved point/source at
 `<=10ms`.
 
-Run `load_gate.ts load-plan-v1.json evidence.jsonl`. It fails on missing,
-duplicate, malformed, or extra events. Required boundaries are:
+Run:
+
+```bash
+deno run --allow-read supabase/scripts/task8/load_gate.ts \
+  supabase/scripts/task8/load-plan-v2.json evidence.jsonl \
+  stage-01-recovery-validated.json
+```
+
+The third argument is mandatory and binds the load event to the earlier
+hash-chained profile digest. It fails on missing, duplicate, malformed, extra,
+cross-profile, or digest-drifted events. Required boundaries are:
 
 - web p95 regression `<=20%` and absolute p95 `<=500ms`;
 - lock p95 `<=100ms`, maximum `<=1000ms`;
 - deadlock, timeout, server 5xx, and web-transaction-failure deltas all zero;
 - CPU and connection warning ratios each `<70%`;
-- restore RTO `<=60m`, RPO `<=15m`, and equal before/after hashes.
+- restore RTO `<=60m`, profile-specific RPO (`<=15m` managed or `<=1440m`
+  logical), and equal before/after hashes.
 
 The immutable load JSONL plus passing `load_gate.ts` output form a distinct
 final rollout-acceptance event ledger. It is created only after validation
@@ -234,8 +258,9 @@ postcondition; actual removal requires separate approval.
 
 ## 7. Current blocker
 
-On 2026-07-30, the authenticated CLI exposed production and two unrelated
-inactive projects, but no proven clone or isolated access path. Therefore no
-project creation, link, deploy, load, release change, or remote mutation was
-performed. Supply an approved existing clone and access path, or separately
-approve project creation and cost.
+Validation ref `orssnkppcukrqxikxdbf` is reserved for destructive hosted restore
+and clone validation, but its current source provenance, isolated credentials,
+and destructive-restore approval are not yet complete. No DB apply, Edge
+replacement, load run, release change, or remote restore may proceed until the
+logical profile's real evidence is composed and the hosted restore receives
+separate explicit approval. Production remains hard denied.

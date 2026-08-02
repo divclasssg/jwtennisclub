@@ -247,6 +247,37 @@ Deno.test("stage evidence persists typed redacted output with a hashed chain", a
     }
 });
 
+Deno.test("stage evidence rejects changed backend or client product heads", async () => {
+    for (const changed of ["backendHead", "clientHead"] as const) {
+        const root = await Deno.makeTempDir();
+        try {
+            const record = {
+                schemaVersion: 1 as const,
+                stage: "inventory-validated" as const,
+                sequence: 0,
+                startedAt: "2026-07-30T00:00:00.000Z",
+                endedAt: "2026-07-30T00:00:01.000Z",
+                projectRef: ref,
+                identityDigest,
+                backendHead: BACKEND_PRODUCT_SHA,
+                clientHead: CLIENT_PRODUCT_SHA,
+                predecessorHash: null,
+                command: { program: "synthetic", args: [] },
+                stdout: commandStreamEvidence(""),
+                stderr: commandStreamEvidence(""),
+                result: { passed: true },
+            };
+            record[changed] = "0".repeat(64);
+            await assertRejects(
+                () => appendStageEvidence(root, record),
+                "stage evidence metadata is invalid",
+            );
+        } finally {
+            await Deno.remove(root, { recursive: true });
+        }
+    }
+});
+
 Deno.test("DB apply approval binds the exact dry-run transcript hash", async () => {
     const root = await Deno.makeTempDir();
     try {
