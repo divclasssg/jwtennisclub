@@ -49,8 +49,8 @@ For the empty local fixture stack only, run the tracked replay wrapper:
 
 The wrapper performs this exact staged procedure:
 
-1. Reset only through migration `202607300000` with
-   `supabase db reset --local --no-seed --version 202607300000`.
+1. Reset only through migration `202608020001` with
+   `supabase db reset --local --no-seed --version 202608020001`.
 2. Pipe `supabase/scripts/prepare_match_baseline.local.sql` into `psql` inside
    the local database container. The SQL computes the fixture count and digest
    inside PostgreSQL and installs them as database-level settings; it does not

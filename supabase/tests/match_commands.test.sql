@@ -921,7 +921,7 @@ set local role authenticated;
 
 select is(
   public.apply_game_day_command(
-    '{
+    pg_catalog.jsonb_set('{
       "operationId":"b4600000-0000-0000-0000-000000000012",
       "gameDayId":"b4400000-0000-0000-0000-000000000003",
       "baseVersion":0,
@@ -931,12 +931,14 @@ select is(
       "type":"create_game_day",
       "payload":{
         "seasonId":"b4300000-0000-0000-0000-000000000001",
-        "playedOn":"2026-07-31",
+        "playedOn":"2000-01-01",
         "activeCourts":1,
         "offlineOperatorId":"b4000000-0000-0000-0000-000000000002",
         "offlineDeviceId":"b4700000-0000-0000-0000-000000000001"
       }
-    }'::jsonb
+    }'::jsonb, '{payload,playedOn}', pg_catalog.to_jsonb(
+      (current_date + 1)::text
+    ))
   ),
   '{"status":"applied","version":1,"conflict":null}'::jsonb,
   'the established create-game-day command shape remains accepted'
@@ -944,7 +946,7 @@ select is(
 
 select is(
   public.apply_game_day_command(
-    '{
+    pg_catalog.jsonb_set('{ 
       "operationId":"b4600000-0000-0000-0000-000000000023",
       "gameDayId":"b4400000-0000-0000-0000-000000000003",
       "baseVersion":1,
@@ -955,9 +957,11 @@ select is(
       "payload":{
         "operatorId":"b4000000-0000-0000-0000-000000000002",
         "offlineDeviceId":"b4700000-0000-0000-0000-000000000003",
-        "expiresAt":"2026-08-01T00:00:00Z"
+        "expiresAt":"2000-01-01T00:00:00Z"
       }
-    }'::jsonb
+    }'::jsonb, '{payload,expiresAt}', pg_catalog.to_jsonb(
+      (pg_catalog.clock_timestamp() + interval '1 day')::text
+    ))
   ),
   '{"status":"applied","version":2,"conflict":null}'::jsonb,
   'an operator can atomically replace the game-day offline lease'

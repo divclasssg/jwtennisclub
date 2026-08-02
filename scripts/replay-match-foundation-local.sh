@@ -38,7 +38,7 @@ trap 'exit 143' TERM
 cd -- "${MATCH_REPLAY_ROOT}"
 export SUPABASE_TELEMETRY_DISABLED=1
 
-supabase db reset --local --no-seed --version 202607300000
+supabase db reset --local --no-seed --version 202608020001
 
 docker exec -i "${MATCH_DB_CONTAINER}" \
   psql -q -U supabase_admin -d postgres -X -v ON_ERROR_STOP=1 -f - \
