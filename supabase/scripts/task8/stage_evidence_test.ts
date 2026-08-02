@@ -4,10 +4,13 @@ import {
     appendStageEvidence,
     commandStreamEvidence,
     type GateStage,
+    profileEvidenceDigest,
+    recoveryProfileMetrics,
     verifyApplyApproval,
     verifyReleaseApproval,
 } from "./stage_evidence_lib.ts";
 import { BACKEND_PRODUCT_SHA, CLIENT_PRODUCT_SHA } from "./identity_lib.ts";
+import type { RecoveryProfile } from "./recovery_profile_lib.ts";
 
 function assert(
     condition: unknown,
@@ -47,6 +50,7 @@ async function append(
         projectRef: string;
         identityDigest: string;
     } = { projectRef: ref, identityDigest },
+    result: { passed: boolean; [key: string]: unknown } = { passed: true },
 ) {
     return await appendStageEvidence(root, {
         schemaVersion: 1,
@@ -64,8 +68,167 @@ async function append(
         stderr: commandStreamEvidence(
             "postgresql://postgres:must-not-survive@db.example/postgres",
         ),
-        result: { passed: true },
+        result,
     });
+}
+
+function managedProfile() {
+    return {
+        profile: "managed-pitr-v1" as const,
+        physicalBackupsEnabled: true as const,
+        pitrEnabled: true as const,
+        newestRecoveryPointAt: "2026-07-30T03:45:00.000Z",
+        restoreStartedAt: "2026-07-30T03:46:00.000Z",
+        restoreHealthyAt: "2026-07-30T03:55:00.000Z",
+        recoveryPointAt: "2026-07-30T03:45:00.000Z",
+        latestRestoredOperationAt: "2026-07-30T03:35:00.000Z",
+        beforeMemberChecksum: "a".repeat(64),
+        afterMemberChecksum: "a".repeat(64),
+        beforeMatchChecksum: "b".repeat(64),
+        afterMatchChecksum: "b".repeat(64),
+    };
+}
+
+function logicalProfile() {
+    return {
+        profile: "logical-offsite-v1" as const,
+        repository: "divclasssg/jwtennisclub-backups" as const,
+        backupId: "20260802T030435497Z-af0948fe-295e-482f-aaff-d72ac743e6f8",
+        workflowRunId: "30729954729",
+        encryptedArchiveSha256: "c".repeat(64),
+        sourceFingerprintSha256: "d".repeat(64),
+        archiveBytes: 82470,
+        backupStartedAt: "2026-08-02T03:04:35.497Z",
+        backupCompletedAt: "2026-08-02T03:07:05.402Z",
+        lastStateCheckAt: "2026-08-02T03:04:19.454Z",
+        maxStateCheckGapMinutes: 1440,
+        decryptTestedAt: "2026-08-02T03:13:56.000Z",
+        localRestoreTestedAt: "2026-08-02T03:08:31.949Z",
+        hostedRestoreStartedAt: "2026-08-02T03:14:00.000Z",
+        hostedRestoreHealthyAt: "2026-08-02T03:40:00.000Z",
+        hostedRestoreProjectRef: "orssnkppcukrqxikxdbf" as const,
+        quarterlyDrillAt: "2026-08-02T03:40:00.000Z",
+        storageObjectCount: 0,
+        storageObjectsProtected: false,
+        beforeMemberChecksum: "a".repeat(64),
+        afterMemberChecksum: "a".repeat(64),
+        beforeMatchChecksum: "b".repeat(64),
+        afterMatchChecksum: "b".repeat(64),
+    };
+}
+
+async function profileResult(profile: RecoveryProfile = managedProfile()) {
+    return {
+        passed: true,
+        schemaVersion: 2,
+        recoveryProfile: profile,
+        profileEvidenceDigest: await profileEvidenceDigest(profile),
+        profileMetrics: recoveryProfileMetrics(profile),
+    };
+}
+
+Deno.test("release binds the exact logical profile, digest, and metrics across stages", async () => {
+    const now = new Date("2026-08-02T05:00:00.000Z");
+    const validRoot = await Deno.makeTempDir();
+    try {
+        const valid = await profileResult(logicalProfile());
+        const { approval } = await appendReleaseLedger(
+            validRoot,
+            valid,
+            valid,
+        );
+        await verifyReleaseApproval(
+            validRoot,
+            approval,
+            ref,
+            identityDigest,
+            now,
+        );
+    } finally {
+        await Deno.remove(validRoot, { recursive: true });
+    }
+
+    for (
+        const mutation of [
+            { workflowRunId: "30729954730" },
+            { encryptedArchiveSha256: "e".repeat(64) },
+        ]
+    ) {
+        const root = await Deno.makeTempDir();
+        try {
+            const inventory = await profileResult(logicalProfile());
+            const recovery = await profileResult({
+                ...logicalProfile(),
+                ...mutation,
+            });
+            const { approval } = await appendReleaseLedger(
+                root,
+                inventory,
+                recovery,
+            );
+            await assertRejects(
+                () =>
+                    verifyReleaseApproval(
+                        root,
+                        approval,
+                        ref,
+                        identityDigest,
+                        now,
+                    ),
+                "digest mismatch",
+            );
+        } finally {
+            await Deno.remove(root, { recursive: true });
+        }
+    }
+});
+
+async function appendReleaseLedger(
+    root: string,
+    inventoryResult?: Awaited<ReturnType<typeof profileResult>>,
+    recoveryResult?: Awaited<ReturnType<typeof profileResult>>,
+) {
+    inventoryResult ??= await profileResult();
+    recoveryResult ??= inventoryResult;
+    const required: GateStage[] = [
+        "inventory-validated",
+        "recovery-validated",
+        "lock-capability",
+        "db-dry-run",
+        "db-apply",
+        "direct-rpc",
+        "edge-delete-empty",
+        "edge-deploy-active",
+        "ios-test",
+        "ios-build",
+    ];
+    let predecessor: string | null = null;
+    let ledgerHash = "";
+    let manifestHash = "";
+    for (const [sequence, stage] of required.entries()) {
+        const result = stage === "inventory-validated"
+            ? inventoryResult
+            : stage === "recovery-validated"
+            ? recoveryResult
+            : { passed: true };
+        const written = await append(
+            root,
+            stage,
+            sequence,
+            predecessor,
+            { projectRef: ref, identityDigest },
+            result,
+        );
+        predecessor = written.entryHash;
+        ledgerHash = written.ledgerHash;
+        manifestHash = written.manifestHash;
+    }
+    return {
+        ledgerHash,
+        manifestHash,
+        approval:
+            `RELEASE:${ref}:${ledgerHash}:${manifestHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`,
+    };
 }
 
 Deno.test("stage evidence persists typed redacted output with a hashed chain", async () => {
@@ -358,17 +521,7 @@ Deno.test("release approval rejects missing, stale, and reordered gate evidence"
     ];
     const root = await Deno.makeTempDir();
     try {
-        let predecessor: string | null = null;
-        let ledgerHash = "";
-        let manifestHash = "";
-        for (const [sequence, stage] of required.entries()) {
-            const written = await append(root, stage, sequence, predecessor);
-            predecessor = written.entryHash;
-            ledgerHash = written.ledgerHash;
-            manifestHash = written.manifestHash;
-        }
-        const approval =
-            `RELEASE:${ref}:${ledgerHash}:${manifestHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;
+        const { approval, manifestHash } = await appendReleaseLedger(root);
         await verifyReleaseApproval(root, approval, ref, identityDigest);
         await Deno.writeTextFile(`${root}/rogue.json`, "{}\n", {
             mode: 0o600,

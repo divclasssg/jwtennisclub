@@ -7,6 +7,10 @@ import {
     type ExpectedDatabaseIdentity,
 } from "./identity_lib.ts";
 import { writeEvidence, writeEvidenceManifest } from "./evidence_lib.ts";
+import {
+    type RecoveryProfile,
+    validateRecoveryProfile,
+} from "./recovery_profile_lib.ts";
 
 export type GateStage =
     | "db-dry-run"
@@ -80,6 +84,82 @@ async function sha256File(path: string): Promise<string> {
     return await sha256Bytes(await Deno.readFile(path));
 }
 
+function canonicalValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(canonicalValue);
+    if (value !== null && typeof value === "object") {
+        return Object.fromEntries(
+            Object.entries(value as Record<string, unknown>)
+                .sort(([left], [right]) =>
+                    left < right ? -1 : left > right ? 1 : 0
+                )
+                .map(([key, entry]) => [key, canonicalValue(entry)]),
+        );
+    }
+    return value;
+}
+
+export function canonicalProfileJson(profile: RecoveryProfile): string {
+    return JSON.stringify(canonicalValue(profile));
+}
+
+export async function profileEvidenceDigest(
+    profile: RecoveryProfile,
+): Promise<string> {
+    return await sha256Bytes(
+        new TextEncoder().encode(canonicalProfileJson(profile)),
+    );
+}
+
+export function recoveryProfileMetrics(
+    profile: RecoveryProfile,
+): Record<string, unknown> {
+    const checksumMatch = profile.beforeMemberChecksum ===
+            profile.afterMemberChecksum &&
+        profile.beforeMatchChecksum === profile.afterMatchChecksum;
+    if (profile.profile === "managed-pitr-v1") {
+        return {
+            profile: profile.profile,
+            physicalBackupsEnabled: profile.physicalBackupsEnabled,
+            pitrEnabled: profile.pitrEnabled,
+            rpoMinutes: (Date.parse(profile.recoveryPointAt) -
+                Date.parse(profile.latestRestoredOperationAt)) / 60_000,
+            rtoMinutes: (Date.parse(profile.restoreHealthyAt) -
+                Date.parse(profile.restoreStartedAt)) / 60_000,
+            checksumMatch,
+        };
+    }
+    return {
+        profile: profile.profile,
+        repository: profile.repository,
+        backupId: profile.backupId,
+        workflowRunId: profile.workflowRunId,
+        encryptedArchiveSha256: profile.encryptedArchiveSha256,
+        sourceFingerprintSha256: profile.sourceFingerprintSha256,
+        archiveBytes: profile.archiveBytes,
+        maxStateCheckGapMinutes: profile.maxStateCheckGapMinutes,
+        rpoMinutes: profile.maxStateCheckGapMinutes,
+        rtoMinutes: (Date.parse(profile.hostedRestoreHealthyAt) -
+            Date.parse(profile.hostedRestoreStartedAt)) / 60_000,
+        decryptTestedAt: profile.decryptTestedAt,
+        localRestoreTestedAt: profile.localRestoreTestedAt,
+        hostedRestoreStartedAt: profile.hostedRestoreStartedAt,
+        hostedRestoreHealthyAt: profile.hostedRestoreHealthyAt,
+        quarterlyDrillAt: profile.quarterlyDrillAt,
+        storageObjectCount: profile.storageObjectCount,
+        storageObjectsProtected: profile.storageObjectsProtected,
+        checksumMatch,
+    };
+}
+
+export async function recoveryProfileStageResult(profile: RecoveryProfile) {
+    return {
+        passed: true as const,
+        recoveryProfile: profile,
+        profileEvidenceDigest: await profileEvidenceDigest(profile),
+        profileMetrics: recoveryProfileMetrics(profile),
+    };
+}
+
 function assertIso(value: string, label: string): void {
     if (!Number.isFinite(Date.parse(value))) {
         throw new Error(`${label} is invalid`);
@@ -132,6 +212,7 @@ async function readLedger(root: string): Promise<GateLedger> {
 async function verifiedLedger(root: string): Promise<{
     ledger: GateLedger;
     ledgerHash: string;
+    records: StageEvidence[];
 }> {
     const ledgerPath = resolve(root, "gate-ledger.json");
     const ledger = await readLedger(root);
@@ -140,6 +221,7 @@ async function verifiedLedger(root: string): Promise<{
     }
     let predecessor: string | null = null;
     let previousEndedAt = Number.NEGATIVE_INFINITY;
+    const records: StageEvidence[] = [];
     for (const [index, entry] of ledger.entries.entries()) {
         const expectedFile = `stage-${
             String(index).padStart(2, "0")
@@ -175,8 +257,57 @@ async function verifiedLedger(root: string): Promise<{
         }
         previousEndedAt = Date.parse(record.endedAt);
         predecessor = entry.entryHash;
+        records.push(record);
     }
-    return { ledger, ledgerHash: await sha256File(ledgerPath) };
+    return { ledger, ledgerHash: await sha256File(ledgerPath), records };
+}
+
+async function verifyRecoveryProfileStageBinding(
+    records: StageEvidence[],
+    now: Date,
+): Promise<void> {
+    const inventory = records[0]?.result;
+    const recovery = records[1]?.result;
+    if (
+        records[0]?.stage !== "inventory-validated" ||
+        records[1]?.stage !== "recovery-validated" ||
+        inventory.schemaVersion !== 2
+    ) {
+        throw new Error("recovery profile stages are missing or invalid");
+    }
+    const inventoryProfile = validateRecoveryProfile(
+        inventory.recoveryProfile,
+        now,
+    );
+    const recoveryProfile = validateRecoveryProfile(
+        recovery.recoveryProfile,
+        now,
+    );
+    const inventoryDigest = inventory.profileEvidenceDigest;
+    const recoveryDigest = recovery.profileEvidenceDigest;
+    const expectedDigest = await profileEvidenceDigest(inventoryProfile);
+    if (
+        typeof inventoryDigest !== "string" ||
+        typeof recoveryDigest !== "string" ||
+        inventoryDigest !== expectedDigest || recoveryDigest !== expectedDigest
+    ) {
+        throw new Error("recovery profile evidence digest mismatch");
+    }
+    if (
+        canonicalProfileJson(inventoryProfile) !==
+            canonicalProfileJson(recoveryProfile)
+    ) {
+        throw new Error("recovery profile stage binding mismatch");
+    }
+    const expectedMetrics = JSON.stringify(
+        recoveryProfileMetrics(inventoryProfile),
+    );
+    if (
+        JSON.stringify(inventory.profileMetrics) !== expectedMetrics ||
+        JSON.stringify(recovery.profileMetrics) !== expectedMetrics
+    ) {
+        throw new Error("recovery profile metrics mismatch");
+    }
 }
 
 async function verifiedManifest(root: string): Promise<string> {
@@ -336,8 +467,9 @@ export async function verifyReleaseApproval(
     approval: string,
     projectRef: string,
     identityDigest: string,
+    now = new Date(),
 ): Promise<void> {
-    const { ledger, ledgerHash } = await verifiedLedger(root);
+    const { ledger, ledgerHash, records } = await verifiedLedger(root);
     for (const entry of ledger.entries) {
         if (
             entry.projectRef !== projectRef ||
@@ -359,6 +491,7 @@ export async function verifyReleaseApproval(
     ) {
         throw new Error("release ledger stage sequence mismatch");
     }
+    await verifyRecoveryProfileStageBinding(records, now);
     const manifestHash = await verifiedManifest(root);
     const expected =
         `RELEASE:${projectRef}:${ledgerHash}:${manifestHash}:${BACKEND_PRODUCT_SHA}:${CLIENT_PRODUCT_SHA}`;

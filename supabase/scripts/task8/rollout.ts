@@ -19,6 +19,7 @@ import {
 } from "./evidence_lib.ts";
 import {
     type InventoryValidationContext,
+    type ValidatedInventoryBundle,
     validateInventoryBundle,
 } from "./inventory_lib.ts";
 import {
@@ -37,6 +38,7 @@ import {
     expectedIdentityDigest,
     type GateStage,
     readStageCursor,
+    recoveryProfileStageResult,
 } from "./stage_evidence_lib.ts";
 
 function env(name: string): string {
@@ -107,6 +109,28 @@ async function appendInternalStage(options: {
         stderr: commandStreamEvidence(""),
         result: options.result,
     });
+}
+
+export async function buildRecoveryValidationResults(
+    inventory: Pick<
+        ValidatedInventoryBundle,
+        "schemaVersion" | "recoveryProfile" | "derivedIsolation"
+    >,
+) {
+    const profileStage = await recoveryProfileStageResult(
+        inventory.recoveryProfile,
+    );
+    return {
+        inventoryResult: {
+            ...profileStage,
+            schemaVersion: inventory.schemaVersion,
+            derivedIsolation: inventory.derivedIsolation,
+        },
+        recoveryResult: {
+            ...profileStage,
+            schemaVersion: inventory.schemaVersion,
+        },
+    };
 }
 
 async function captureProduction(): Promise<void> {
@@ -262,30 +286,22 @@ async function validateInventory(): Promise<void> {
             >(env("TASK8_PRODUCTION_INVENTORY_FILE")),
         },
     );
-    await writeEvidence(evidenceRoot, "inventory-v1.json", inventory);
+    await writeEvidence(evidenceRoot, "inventory-v2.json", inventory);
+    const { inventoryResult, recoveryResult } =
+        await buildRecoveryValidationResults(
+            inventory,
+        );
     await appendInternalStage({
         evidenceRoot,
         identity: storedIdentity,
         stage: "inventory-validated",
-        result: {
-            passed: true,
-            schemaVersion: inventory.schemaVersion,
-            derivedIsolation: inventory.derivedIsolation,
-        },
+        result: inventoryResult,
     });
     await appendInternalStage({
         evidenceRoot,
         identity: storedIdentity,
         stage: "recovery-validated",
-        result: {
-            passed: true,
-            physicalBackupsEnabled: inventory.backup.physicalBackupsEnabled,
-            pitrEnabled: inventory.backup.pitrEnabled,
-            checksumMatch: inventory.recovery.beforeMemberChecksum ===
-                    inventory.recovery.afterMemberChecksum &&
-                inventory.recovery.beforeMatchChecksum ===
-                    inventory.recovery.afterMatchChecksum,
-        },
+        result: recoveryResult,
     });
 }
 

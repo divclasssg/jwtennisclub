@@ -25,6 +25,7 @@ import {
     commandStreamEvidence,
     expectedIdentityDigest,
 } from "./stage_evidence_lib.ts";
+import { buildRecoveryValidationResults } from "./rollout.ts";
 
 function assert(
     condition: unknown,
@@ -77,6 +78,61 @@ function validIdentity() {
         provenanceId: "clone-ticket-42",
     };
 }
+
+Deno.test("rollout binds identical canonical recovery evidence into both validation stages", async () => {
+    const profile = {
+        profile: "logical-offsite-v1" as const,
+        repository: "divclasssg/jwtennisclub-backups" as const,
+        backupId: "20260802T030435497Z-af0948fe-295e-482f-aaff-d72ac743e6f8",
+        workflowRunId: "30729954729",
+        encryptedArchiveSha256: "c".repeat(64),
+        sourceFingerprintSha256: "d".repeat(64),
+        archiveBytes: 82470,
+        backupStartedAt: "2026-08-02T03:04:35.497Z",
+        backupCompletedAt: "2026-08-02T03:07:05.402Z",
+        lastStateCheckAt: "2026-08-02T03:04:19.454Z",
+        maxStateCheckGapMinutes: 1440,
+        decryptTestedAt: "2026-08-02T03:13:56.000Z",
+        localRestoreTestedAt: "2026-08-02T03:08:31.949Z",
+        hostedRestoreStartedAt: "2026-08-02T03:14:00.000Z",
+        hostedRestoreHealthyAt: "2026-08-02T03:40:00.000Z",
+        hostedRestoreProjectRef: "orssnkppcukrqxikxdbf" as const,
+        quarterlyDrillAt: "2026-08-02T03:40:00.000Z",
+        storageObjectCount: 0,
+        storageObjectsProtected: false,
+        beforeMemberChecksum: "a".repeat(64),
+        afterMemberChecksum: "a".repeat(64),
+        beforeMatchChecksum: "b".repeat(64),
+        afterMatchChecksum: "b".repeat(64),
+    };
+    const results = await buildRecoveryValidationResults({
+        schemaVersion: 2,
+        recoveryProfile: profile,
+        derivedIsolation: {
+            authInstanceDistinct: true,
+            storageProjectBound: true,
+            networkHostsDistinct: true,
+        },
+    });
+    assertEquals(
+        results.inventoryResult.profileEvidenceDigest,
+        results.recoveryResult.profileEvidenceDigest,
+    );
+    assertEquals(
+        results.inventoryResult.recoveryProfile,
+        results.recoveryResult.recoveryProfile,
+    );
+
+    const changed = await buildRecoveryValidationResults({
+        ...results.inventoryResult,
+        recoveryProfile: { ...profile, workflowRunId: "30729954730" },
+        derivedIsolation: results.inventoryResult.derivedIsolation,
+    });
+    assert(
+        changed.inventoryResult.profileEvidenceDigest !==
+            results.inventoryResult.profileEvidenceDigest,
+    );
+});
 
 Deno.test("whitespace cannot disguise the production project ref", () => {
     let message = "";
