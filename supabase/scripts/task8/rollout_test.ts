@@ -76,6 +76,13 @@ const productionSystemIdentifier = "1111111111111111111";
 const validationSystemIdentifier = "2222222222222222222";
 const markerDigest = "a".repeat(64);
 
+Deno.test("backend product custody pin targets the inventory v3 candidate", () => {
+    assertEquals(
+        BACKEND_PRODUCT_SHA,
+        "83e02eb5fcfb18313f13946dcdf7173920a0d320",
+    );
+});
+
 function validIdentity() {
     return {
         projectRef: validationRef,

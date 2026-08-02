@@ -1,5 +1,5 @@
 export const PRODUCTION_REF = "ydiusirreirhbvlftegp";
-export const BACKEND_PRODUCT_SHA = "37e75f15e5c1efd68c6a3514cb2ddcd8695a02d3";
+export const BACKEND_PRODUCT_SHA = "83e02eb5fcfb18313f13946dcdf7173920a0d320";
 export const CLIENT_PRODUCT_SHA = "ab1a6f0a41f4ce62a9a69ada7408627190a34e2e";
 
 const PROJECT_REF_PATTERN = /^[a-z]{20}$/;

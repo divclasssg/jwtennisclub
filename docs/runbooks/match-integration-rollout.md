@@ -13,7 +13,7 @@ Use three distinct locations:
 
 - `TOOL_ROOT`: this reviewed helper checkout;
 - `BACKEND_ROOT`: clean exact product HEAD
-  `37e75f15e5c1efd68c6a3514cb2ddcd8695a02d3`;
+  `83e02eb5fcfb18313f13946dcdf7173920a0d320`;
 - `CLIENT_ROOT`: clean exact product HEAD
   `ab1a6f0a41f4ce62a9a69ada7408627190a34e2e`.
 
@@ -85,7 +85,7 @@ isolated Auth/redirects/Storage/credentials, and approval IDs. Link only
 marker with exact approval:
 
 ```text
-BOOTSTRAP:<clone-ref>:<production-system-id>:<provenance-id>:37e75f15e5c1efd68c6a3514cb2ddcd8695a02d3:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
+BOOTSTRAP:<clone-ref>:<production-system-id>:<provenance-id>:83e02eb5fcfb18313f13946dcdf7173920a0d320:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
 ```
 
 Run `rollout.ts bootstrap-provenance`. It independently reads
@@ -96,11 +96,28 @@ identity, stop—there is no name-only fallback.
 
 ## 2. Inventory and recovery capability
 
-Run `rollout.ts inventory`; its raw output is manifest evidence, never a gate
-ledger stage. Then compose `inventory-v2.json` using `inventory-v2.schema.json`
-and run `rollout.ts validate-inventory`. Successful validation appends the
-identity-bound `inventory-validated` and `recovery-validated` stages. It
-requires:
+Run `rollout.ts inventory`. Its identity-guarded, SELECT-only SQL must emit
+exactly one undecorated JSON payload. The helper stores that payload as private
+`inventory-db-v2.json` and preserves the raw transcript; both are mode `0600`
+and bound into `manifest.json`. Raw inventory is evidence, never a gate-ledger
+stage.
+
+Separately compose the operator input against `inventory-v3.schema.json` by
+combining Management API Auth, Storage, and Edge observations with the approved
+recovery profile. Set `sourceDatabaseInventorySha256` to the SHA-256 of the
+parsed source payload serialized as recursive-key-sorted canonical JSON. It is
+not the hash of the raw file bytes. Each migration records `statementsState` as
+`recorded` or `unavailable`; `unavailable` truthfully means the SQL text is not
+present. It does not block validation, but it is not proof of the executed SQL.
+
+Point `TASK8_INVENTORY_FILE` at that private operator-composed v3 file and run
+`rollout.ts validate-inventory`. The validator always reloads the fixed
+`inventory-db-v2.json` under `TASK8_EVIDENCE_ROOT`, verifies its private mode,
+manifest byte count and file hash, recomputes the canonical source digest, and
+compares every DB-owned projection before writing `inventory-v3.json`. v1/v2
+composite input cannot produce a new `inventory-validated` stage. Successful
+validation appends identity-bound `inventory-validated` and `recovery-validated`
+stages with schema version 3. It requires:
 
 - migration version/name/statement hash and member count/hash;
 - Auth user/identity/provider counts plus project ref, site URL, redirect hosts,
@@ -112,6 +129,11 @@ requires:
   `game-day-command`, `game-day-snapshot`, `match-recommendation`,
   `member-link`, `member-read`, and `operator-read`; partial sets fail closed;
 - exactly one explicit recovery profile and its canonical SHA-256 digest.
+
+Supply the validation DB password only through the process environment. Never
+put it in arguments, files, evidence, or chat. This inventory procedure does not
+authorize DB apply, Edge deployment, release enablement, or production access;
+each remains a separate approval boundary.
 
 `managed-pitr-v1` is the preferred paid path. It requires physical backups and
 PITR enabled, RPO `<=15m`, RTO `<=60m`, and equal before/after member and match
@@ -169,7 +191,7 @@ SQL.
 Apply requires this exact value:
 
 ```text
-APPLY:<clone-ref>:<db-dry-run-stage-hash>:37e75f15e5c1efd68c6a3514cb2ddcd8695a02d3:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
+APPLY:<clone-ref>:<db-dry-run-stage-hash>:83e02eb5fcfb18313f13946dcdf7173920a0d320:ab1a6f0a41f4ce62a9a69ada7408627190a34e2e
 ```
 
 Set `TASK8_DRY_RUN_HASH` to that exact stage hash. The helper uses only the
